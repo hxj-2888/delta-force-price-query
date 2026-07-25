@@ -1,0 +1,77 @@
+<!-- 三角洲行动 - 价格异动 -->
+<view class="container">
+  <!-- 方向切换 -->
+  <view class="price-toggle">
+    <button class="sort-btn {{direction === 'up' ? 'active' : ''}}" bindtap="onSetDirection" data-dir="up">涨幅榜 ↑</button>
+    <button class="sort-btn {{direction === 'down' ? 'active' : ''}}" bindtap="onSetDirection" data-dir="down">跌幅榜 ↓</button>
+  </view>
+
+  <!-- 时间周期选择 -->
+  <view class="sort-bar" style="flex-wrap:wrap">
+    <button class="sort-btn {{period === 'bl' ? 'active' : ''}}" bindtap="onSetPeriod" data-period="bl">今日</button>
+    <button class="sort-btn {{period === 'day_3_bl' ? 'active' : ''}}" bindtap="onSetPeriod" data-period="day_3_bl">近3天</button>
+    <button class="sort-btn {{period === 'day_7_bl' ? 'active' : ''}}" bindtap="onSetPeriod" data-period="day_7_bl">近7天</button>
+    <button class="sort-btn {{period === 'local_1d' ? 'active' : ''}}" bindtap="onSetPeriod" data-period="local_1d">本地1天</button>
+    <button class="sort-btn {{period === 'local_3d' ? 'active' : ''}}" bindtap="onSetPeriod" data-period="local_3d">本地3天</button>
+    <button class="sort-btn {{period === 'local_7d' ? 'active' : ''}}" bindtap="onSetPeriod" data-period="local_7d">本地7天</button>
+  </view>
+
+  <!-- 价格区间 -->
+  <view class="sort-bar" style="flex-wrap:wrap">
+    <button class="sort-btn {{rangeFilter === 'all' ? 'active' : ''}}" bindtap="onSetRange" data-range="all">全部</button>
+    <button class="sort-btn {{rangeFilter === '1-10w' ? 'active' : ''}}" bindtap="onSetRange" data-range="1-10w">1-10万</button>
+    <button class="sort-btn {{rangeFilter === '10-100w' ? 'active' : ''}}" bindtap="onSetRange" data-range="10-100w">10-100万</button>
+    <button class="sort-btn {{rangeFilter === '100w+' ? 'active' : ''}}" bindtap="onSetRange" data-range="100w+">100万以上</button>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-container" wx:if="{{isLoading}}">
+    <view class="loading-spinner"></view>
+    <view class="loading-text">加载中...</view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-container" wx:elif="{{movers.length === 0 && !isLoading}}">
+    <view class="empty-icon">-</view>
+    <view class="empty-text">
+      {{emptyText || '暂无数据'}}
+    </view>
+  </view>
+
+  <!-- 异动列表 -->
+  <block wx:else>
+    <view class="list-stats">
+      <text>{{periodLabel}} {{direction === 'up' ? '涨幅榜' : '跌幅榜'}} 前 {{movers.length}} · 按涨跌幅排序</text>
+      <text>点击物品查看详情</text>
+    </view>
+
+    <view class="item-card fade-in"
+      wx:for="{{movers}}" wx:key="id"
+      bindtap="onOpenDetail" data-id="{{item.id}}"
+      style="position:relative;{{item.gradeBg}}">
+      <!-- 等级菱形 -->
+      <view class="grade-diamond" wx:if="{{item.showGradeDiamond}}" style="background:{{item.gradeColor}}"></view>
+      <!-- 图片 -->
+      <view class="item-pic">
+        <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}" />
+        <text class="pic-placeholder" wx:else>-</text>
+      </view>
+      <!-- 信息 -->
+      <view class="item-info">
+        <view class="item-name-row">
+          <text class="item-name">{{item.name}}</text>
+          <text class="item-grade" wx:if="{{item.gradeText}}" style="color:{{item.gradeColor}}">{{item.gradeText}}</text>
+        </view>
+        <view class="item-price-row">
+          <text class="item-price">¥{{item.priceText}}</text>
+          <text class="item-change {{item.changeClass}}">{{item.changeText}}</text>
+        </view>
+        <!-- 变化幅度条 -->
+        <view style="margin-top:12rpx;height:8rpx;background:rgba(255,255,255,0.06);border-radius:4rpx;overflow:hidden">
+          <view style="height:100%;width:{{item.barWidth}}%;background:{{item.barColor}};border-radius:4rpx;transition:width 0.3s"></view>
+        </view>
+      </view>
+      <text class="item-arrow">›</text>
+    </view>
+  </block>
+</view>

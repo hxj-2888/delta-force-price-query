@@ -1,0 +1,37 @@
+<!-- 三角洲行动 - 我的收藏 -->
+<view class="container">
+  <!-- 空状态 -->
+  <view class="empty-container" wx:if="{{favorites.length === 0 && !isLoading}}">
+    <view class="empty-icon">-</view>
+    <view class="empty-text">暂无收藏物品，在物品详情页收藏</view>
+  </view>
+
+  <!-- 收藏列表 -->
+  <block wx:else>
+    <view class="list-stats">
+      <text>共 {{favorites.length}} 件收藏</text>
+      <text class="history-clear" bindtap="onClearAll" style="color:#f44336">清空收藏</text>
+    </view>
+
+    <view class="item-card fade-in"
+      wx:for="{{favorites}}" wx:key="id"
+      bindtap="onOpenDetail" data-id="{{item.id}}"
+      style="position:relative">
+      <view class="item-pic">
+        <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}" />
+        <text class="pic-placeholder" wx:else>-</text>
+      </view>
+      <view class="item-info">
+        <view class="item-name-row">
+          <text class="item-name">{{item.name}}</text>
+          <text style="font-size:20rpx;color:#667eea;margin-left:12rpx">{{item.catName}}</text>
+        </view>
+        <view class="item-price-row">
+          <text class="item-price">¥{{item.priceText}}</text>
+          <text class="item-change {{item.changeClass}}">{{item.changeText}}</text>
+        </view>
+      </view>
+      <text class="item-arrow">›</text>
+    </view>
+  </block>
+</view>

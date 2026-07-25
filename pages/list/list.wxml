@@ -1,0 +1,96 @@
+<!-- 三角洲行动 - 物品列表 -->
+<view class="container">
+  <!-- 加载中 -->
+  <view class="loading-container" wx:if="{{isLoading}}">
+    <view class="loading-spinner"></view>
+    <view class="loading-text">加载中...</view>
+  </view>
+
+  <!-- 错误状态 -->
+  <view class="error-container" wx:elif="{{hasError}}">
+    <view class="error-text">加载失败，请检查网络后重试</view>
+    <button class="retry-btn" bindtap="onRetry">重新加载</button>
+  </view>
+
+  <!-- 正常内容 -->
+  <block wx:else>
+    <!-- 统计信息 -->
+    <view class="list-stats">
+      <text>共 {{totalCount}} 件 · 第 {{currentPage}}/{{totalPages}} 页</text>
+      <text wx:if="{{updateTime}}">更新于 {{updateTime}}</text>
+    </view>
+
+    <!-- 排序栏 -->
+    <view class="sort-bar">
+      <button class="sort-btn {{sortBy === 'price' ? 'active' : ''}}" bindtap="onSetSort" data-sort="price">
+        价格<text class="sort-dir">{{sortBy === 'price' ? (sortDir === 'desc' ? '↓' : '↑') : ''}}</text>
+      </button>
+      <button class="sort-btn {{sortBy === 'change' ? 'active' : ''}}" bindtap="onSetSort" data-sort="change">
+        涨跌幅<text class="sort-dir">{{sortBy === 'change' ? (sortDir === 'desc' ? '↓' : '↑') : ''}}</text>
+      </button>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-container" wx:if="{{pageItems.length === 0}}">
+      <view class="empty-icon">-</view>
+      <view class="empty-text">暂无物品数据</view>
+    </view>
+
+    <!-- 物品列表 -->
+    <view wx:else>
+      <view class="item-card fade-in"
+        wx:for="{{pageItems}}" wx:key="id"
+        bindtap="onOpenDetail" data-id="{{item.id}}"
+        style="position:relative;{{item.gradeBg}}">
+        <!-- 等级菱形 -->
+        <view class="grade-diamond" wx:if="{{item.showGradeDiamond}}" style="background:{{item.gradeColor}}"></view>
+        <!-- 收藏指示点 -->
+        <view class="item-fav-indicator" wx:if="{{item.isFavorited}}"></view>
+        <!-- 图片 -->
+        <view class="item-pic">
+          <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}" />
+          <text class="pic-placeholder" wx:else>-</text>
+        </view>
+        <!-- 信息 -->
+        <view class="item-info">
+          <view class="item-name-row">
+            <text class="item-name">{{item.name}}</text>
+            <text class="item-grade" wx:if="{{item.gradeText}}" style="color:{{item.gradeColor}}">{{item.gradeText}}</text>
+          </view>
+          <view class="item-price-row">
+            <text class="item-price">¥{{item.priceText}}</text>
+            <text class="item-change {{item.changeClass}}">{{item.changeText}}</text>
+          </view>
+          <view class="item-attrs" wx:if="{{item.attrs}}">
+            <text class="item-attrs-text">{{item.attrs}}</text>
+          </view>
+          <view class="item-trend-mini" wx:if="{{item.d30p}}">
+            <text class="trend-mini-label">30天前:</text>
+            <text class="trend-mini-price">¥{{item.d30pText}}</text>
+            <text class="trend-mini-change {{item.d30ChangeClass}}">{{item.d30ChangeText}}</text>
+          </view>
+        </view>
+        <text class="item-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 分页 -->
+    <view class="pagination" wx:if="{{totalPages > 1}}">
+      <button class="page-btn arrow {{currentPage <= 1 ? 'disabled' : ''}}" bindtap="onGoPage" data-page="{{currentPage - 1}}" wx:if="{{currentPage > 1}}">◀</button>
+      <button class="page-btn disabled" wx:else>◀</button>
+
+      <button class="page-btn" wx:if="{{showFirstBtn}}" bindtap="onGoPage" data-page="1">1</button>
+      <text wx:if="{{showStartEllipsis}}" style="color:#666;padding:0 4rpx">…</text>
+
+      <block wx:for="{{pageRange}}" wx:key="*this">
+        <button class="page-btn {{item === currentPage ? 'active' : ''}}" bindtap="onGoPage" data-page="{{item}}">{{item}}</button>
+      </block>
+
+      <text wx:if="{{showEndEllipsis}}" style="color:#666;padding:0 4rpx">…</text>
+      <button class="page-btn" wx:if="{{showLastBtn}}" bindtap="onGoPage" data-page="{{totalPages}}">{{totalPages}}</button>
+
+      <button class="page-btn arrow {{currentPage >= totalPages ? 'disabled' : ''}}" bindtap="onGoPage" data-page="{{currentPage + 1}}" wx:if="{{currentPage < totalPages}}">▶</button>
+      <button class="page-btn disabled" wx:else>▶</button>
+    </view>
+  </block>
+</view>

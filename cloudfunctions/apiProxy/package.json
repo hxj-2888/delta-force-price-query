@@ -1,0 +1,8 @@
+{
+  "name": "api-proxy",
+  "version": "1.0.0",
+  "description": "三角洲行动 - API代理云函数",
+  "main": "index.js",
+  "dependencies": {},
+  "cloudbase": "^2.0.0"
+}

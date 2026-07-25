@@ -1,0 +1,66 @@
+/* 首页样式 - 绝大部分继承 app.wxss */
+
+.tm-pic {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 12rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.tm-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-period-label {
+  font-size: 20rpx;
+  color: #8890b0;
+  margin-bottom: 4rpx;
+}
+
+.tm-name {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-price-info {
+  text-align: right;
+  margin-left: 16rpx;
+  flex-shrink: 0;
+}
+
+.tm-price {
+  font-size: 26rpx;
+  color: #ffd700;
+  font-weight: 500;
+}
+
+.tm-change {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #4caf50;
+  margin-top: 4rpx;
+}
+
+.auto-refresh-time {
+  font-size: 20rpx;
+  color: #555;
+  margin-left: 16rpx;
+}
+
+.item-cur-price {
+  font-size: 24rpx;
+  color: #aaa;
+}
+
+.item-change-pct {
+  font-size: 24rpx;
+  font-weight: 500;
+}
+.item-change-pct.up { color: #4caf50; }
+.item-change-pct.down { color: #f44336; }

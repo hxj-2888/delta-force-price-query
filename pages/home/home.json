@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "三角洲行动",
+  "enablePullDownRefresh": true,
+  "backgroundColor": "#000000",
+  "navigationBarBackgroundColor": "#1a1a2e",
+  "usingComponents": {}
+}

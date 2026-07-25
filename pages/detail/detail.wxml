@@ -1,0 +1,123 @@
+<!-- 三角洲行动 - 物品详情 -->
+<view class="container" wx:if="{{!isLoading && item}}">
+  <!-- 头部 -->
+  <view class="detail-header">
+    <view class="detail-pic">
+      <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}" />
+      <text style="font-size:72rpx" wx:else>-</text>
+    </view>
+    <view class="detail-basic">
+      <view class="detail-name">{{item.name}}</view>
+      <view class="detail-meta">
+        <text class="meta-tag" wx:if="{{item.secondClassCN}}">{{item.secondClassCN}}</text>
+        <text class="meta-tag" wx:if="{{item.grade}}" style="color:{{item.gradeColor}}">{{item.gradeText}}</text>
+      </view>
+      <view wx:if="{{item.desc}}" style="font-size:22rpx;color:#666;margin-top:12rpx;line-height:1.5">{{item.desc}}</view>
+    </view>
+  </view>
+
+  <!-- 价格卡片 -->
+  <view class="price-card">
+    <view class="price-card-header">
+      <text class="price-card-title">当前价格</text>
+      <text class="price-card-time">更新于 {{item.updateTime}}</text>
+    </view>
+    <view class="price-main">
+      <text class="price-currency">¥</text>
+      <text class="price-value">{{item.priceText}}</text>
+    </view>
+    <view class="price-sub">
+      <view class="sub-item">
+        <text class="sub-label">今日开盘</text>
+        <text class="sub-value">¥{{item.priceStartText}}</text>
+      </view>
+      <view class="sub-item">
+        <text class="sub-label">今日涨跌</text>
+        <text class="sub-value {{item.changeClass}}">{{item.changeText}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 30天趋势图表 -->
+  <view class="section">
+    <view class="section-title">近30天价格趋势</view>
+    <view class="chart-container">
+      <canvas
+        type="2d"
+        id="priceChart"
+        class="chart-canvas"
+        style="width:100%;height:340rpx"
+        wx:if="{{chartReady}}"
+      ></canvas>
+      <view style="text-align:center;color:#666;padding:60rpx" wx:else>
+        {{chartError || '数据不足，无法生成曲线'}}
+      </view>
+      <view class="curve-legend" wx:if="{{chartReady}}">
+        <view class="curve-legend-item">
+          <view class="curve-legend-dot" style="background:#888"></view>
+          <text>30天前 ¥{{item.d30pText}}</text>
+          <text class="{{item.d30ChangeClass}}" style="font-size:20rpx">{{item.d30ChangeText}}</text>
+        </view>
+        <view class="curve-legend-item">
+          <view class="curve-legend-dot" style="background:#667eea"></view>
+          <text>7天前 ¥{{item.d7pText}}</text>
+          <text class="{{item.d7ChangeClass}}" style="font-size:20rpx">{{item.d7ChangeText}}</text>
+        </view>
+        <view class="curve-legend-item">
+          <view class="curve-legend-dot" style="background:#4caf50"></view>
+          <text>3天前 ¥{{item.d3pText}}</text>
+          <text class="{{item.d3ChangeClass}}" style="font-size:20rpx">{{item.d3ChangeText}}</text>
+        </view>
+        <view class="curve-legend-item">
+          <view class="curve-legend-dot" style="background:#ffd700"></view>
+          <text>当前 ¥{{item.priceText}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 物品属性 -->
+  <view class="section" wx:if="{{item.hasProps}}">
+    <view class="section-title">物品属性</view>
+    <view class="info-grid">
+      <view class="info-item" wx:if="{{item.secondClassCN}}">
+        <text class="info-label">分类</text>
+        <text class="info-value">{{item.secondClassCN}}</text>
+      </view>
+      <view class="info-item" wx:if="{{item.size}}">
+        <text class="info-label">占格</text>
+        <text class="info-value">{{item.size}}</text>
+      </view>
+      <view class="info-item" wx:if="{{item.weightText}}">
+        <text class="info-label">重量</text>
+        <text class="info-value">{{item.weightText}} kg</text>
+      </view>
+      <view class="info-item" wx:if="{{item.grade}}">
+        <text class="info-label">等级</text>
+        <text class="info-value" style="color:{{item.gradeColor}}">{{item.gradeText}}</text>
+      </view>
+      <view class="info-item" wx:if="{{item.objectID}}">
+        <text class="info-label">ID</text>
+        <text class="info-value" style="font-size:26rpx">{{item.objectID}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 数据来源 -->
+  <view class="source-note">
+    <text>数据来源：三角洲数据帝 orzice.com 开放平台</text>
+    <text>禁止编造或篡改任何价格信息</text>
+  </view>
+</view>
+
+<!-- 加载中 -->
+<view class="loading-container" wx:if="{{isLoading}}">
+  <view class="loading-spinner"></view>
+  <view class="loading-text">正在向API请求最新数据...</view>
+</view>
+
+<!-- 错误 -->
+<view class="error-container" wx:if="{{hasError}}">
+  <view class="error-text">加载失败</view>
+  <button class="retry-btn" bindtap="onRetry">重新加载</button>
+</view>

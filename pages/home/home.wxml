@@ -1,0 +1,80 @@
+<!-- 三角洲行动 - 首页 -->
+<view class="container">
+  <!-- 头图 -->
+  <view class="header">
+    <image class="header-logo" src="/images/delta-force-logo.png" mode="aspectFit" />
+    <view class="header-title">三角洲行动</view>
+    <view class="header-subtitle">变卖物实时价格查询</view>
+    <view class="header-info">
+      <text class="refresh-all" bindtap="onRefreshAll" wx:if="{{!isRefreshing}}">刷新全部</text>
+      <text class="refresh-all" wx:else>刷新中...</text>
+      <text class="auto-refresh-time" wx:if="{{autoRefreshTime}}">{{autoRefreshTime}}</text>
+    </view>
+  </view>
+
+  <!-- 搜索栏 -->
+  <view class="search-bar" bindtap="onShowSearch">
+    <text class="search-placeholder">搜索物品名称...</text>
+  </view>
+
+  <!-- 涨幅推送卡片 -->
+  <view class="top-mover-card" wx:if="{{topMovers.length > 0}}">
+    <view class="tm-row" wx:for="{{topMovers}}" wx:key="id" bindtap="onOpenTopMover" data-id="{{item.id}}">
+      <image src="{{item.pic}}" mode="aspectFit" class="tm-pic" wx:if="{{item.pic}}" />
+      <view class="tm-info">
+        <view class="tm-period-label">{{item.isDay7 ? '近7天' : '今日'}} {{item.label}}</view>
+        <view class="tm-name">{{item.name}}</view>
+      </view>
+      <view class="tm-price-info">
+        <view class="tm-price">¥{{item.priceText}}</view>
+        <view class="tm-change" wx:if="{{item.val > 0}}">+{{item.valText}}%</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 收藏价格提醒 -->
+  <view class="price-alert" wx:if="{{priceAlert.show}}">
+    <text wx:for="{{priceAlert.changes}}" wx:key="id" class="price-alert-item {{item.dir}}">
+      {{item.name}} {{item.dir === 'up' ? '↑' : '↓'}}{{item.pctText}}%
+    </text>
+  </view>
+
+  <view class="price-changed-section" wx:if="{{priceChanges.length > 0}}">
+    <view class="price-changed-title">收藏价格提醒</view>
+    <view class="price-changed-item" wx:for="{{priceChanges}}" wx:key="id" bindtap="onOpenDetail" data-id="{{item.id}}">
+      <view class="item-pic" style="width:72rpx;height:72rpx;">
+        <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}" />
+        <text class="pic-placeholder" wx:else>-</text>
+      </view>
+      <view class="item-info">
+        <view class="item-name">{{item.name}}</view>
+        <view class="item-price-row">
+          <text class="item-cur-price">¥{{item.priceText}}</text>
+          <text class="item-change-pct {{item.dir}}">{{item.pctText}}%</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 分类网格 -->
+  <view class="category-grid">
+    <!-- 全部物品 -->
+    <view class="category-card all-items" bindtap="onOpenAll">
+      <view class="cat-icon">
+        <image src="{{allIconUrl}}" mode="aspectFit" style="width:96rpx;height:96rpx;border-radius:12rpx" wx:if="{{allIconUrl}}" />
+        <text wx:else>📦</text>
+      </view>
+      <view class="cat-name">全部物品</view>
+      <view class="cat-arrow">›</view>
+    </view>
+    <!-- 各分类 -->
+    <view class="category-card" wx:for="{{categories}}" wx:key="key" bindtap="onOpenCategory" data-key="{{item.key}}" data-name="{{item.name}}">
+      <view class="cat-icon">
+        <image src="{{item.iconUrl}}" mode="aspectFit" style="width:72rpx;height:72rpx;border-radius:12rpx" wx:if="{{item.iconUrl}}" />
+        <text wx:else>{{item.icon}}</text>
+      </view>
+      <view class="cat-name">{{item.name}}</view>
+      <view class="cat-arrow">›</view>
+    </view>
+  </view>
+</view>
