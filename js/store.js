@@ -42,11 +42,14 @@ function getCache() {
   if (t && (Date.now() - parseInt(t) < CACHE_DURATION)) {
     try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch(e) {}
   }
-  // 降级：时间戳缺失但数据存在 → 仍返回（防止写入中断导致数据丢失）
+  // 降级：时间戳缺失但数据存在 → 仍返回，同时补写时间戳（防止永久降级）
   if (!t) {
     try {
       var raw = localStorage.getItem(CACHE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+        return JSON.parse(raw);
+      }
     } catch(e) {}
   }
   return null;
