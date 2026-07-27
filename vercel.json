@@ -19,10 +19,5 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]
     }
-  ],
-  "functions": {
-    "api/[...path].js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }

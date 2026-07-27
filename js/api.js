@@ -111,9 +111,10 @@ async function apiRequest(endpoint, params, retries, noCache) {
 
 async function fetchCategoryAll(catKey) {
   var t0 = Date.now();
+  var PAGE_LIMIT = 5000;
   var res1;
   try {
-    res1 = await apiRequest('item_list', { types: catKey, p: 1, limit: 500 });
+    res1 = await apiRequest('item_list', { types: catKey, p: 1, limit: PAGE_LIMIT });
   } catch (e) {
     console.error('[fetchCategoryAll] 首页请求失败 (' + catKey + '):', e.message);
     return [];
@@ -121,8 +122,12 @@ async function fetchCategoryAll(catKey) {
   var allItems = (res1.data || []).map(function(item) { return Object.assign({}, item, { _category: catKey }); });
   var totalCount = res1.count || 0;
   // 修复：第一页返回0条时（API异常），不按0计算perPage，避免除零或极大翻页数
-  var perPage = allItems.length > 0 ? allItems.length : 500;
+  var perPage = allItems.length > 0 ? allItems.length : PAGE_LIMIT;
   var totalPages = totalCount > 0 ? Math.ceil(totalCount / perPage) : 1;
+  // 安全兜底：如果首页恰好返回了 limit 数量，count 可能不可靠，至少再翻一页
+  if (totalPages <= 1 && allItems.length >= PAGE_LIMIT) {
+    totalPages = 2;
+  }
 
   if (allItems.length >= totalCount || totalPages <= 1) {
     if (typeof setApiDuration === 'function') setApiDuration(Date.now() - t0);
@@ -131,14 +136,40 @@ async function fetchCategoryAll(catKey) {
 
   var remainingPages = [];
   for (var p = 2; p <= totalPages; p++) { remainingPages.push(p); }
-  var pageResults = await batchAsync(remainingPages.map(function(page) {
-    return function() {
-      return apiRequest('item_list', { types: catKey, p: page, limit: 500 })
-        .then(function(r) { return (r.data || []).map(function(item) { return Object.assign({}, item, { _category: catKey }); }); })
-        .catch(function() { return []; });
-    };
-  }), 10);
-  pageResults.forEach(function(items) { allItems = allItems.concat(items); });
+
+  // 逐页翻取直到返回空或不足一页（替代一次性计算 totalPages，防止 count 不准确）
+  var pageIdx = 0;
+  while (pageIdx < remainingPages.length) {
+    var batchPages = remainingPages.slice(pageIdx, pageIdx + 8);
+    var pageResults = await batchAsync(batchPages.map(function(page) {
+      return function() {
+        return apiRequest('item_list', { types: catKey, p: page, limit: PAGE_LIMIT })
+          .then(function(r) { return (r.data || []).map(function(item) { return Object.assign({}, item, { _category: catKey }); }); })
+          .catch(function() { return []; });
+      };
+    }), 8);
+    var gotMore = false;
+    pageResults.forEach(function(items) {
+      if (items.length > 0) {
+        allItems = allItems.concat(items);
+        gotMore = true;
+      }
+    });
+    pageIdx += batchPages.length;
+    // 如果某一整批都没返回数据，说明已到末尾，停止翻页
+    if (!gotMore) break;
+    // 如果最后一批不足一整页，继续翻一页确认是否还有
+    if (batchPages.length < 8 && gotMore && pageIdx < remainingPages.length) {
+      // 扩展 remainingPages，动态追加新页码
+      var nextP = remainingPages[remainingPages.length - 1] + 1;
+      // 最多再翻 20 页（安全上限，防止无限循环）
+      for (var extra = 0; extra < 20 && pageIdx < 200; extra++) {
+        remainingPages.push(nextP + extra);
+      }
+    }
+    // 安全上限：最多翻 200 页
+    if (pageIdx >= 200) break;
+  }
   if (typeof setApiDuration === 'function') setApiDuration(Date.now() - t0);
   return allItems;
 }

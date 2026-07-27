@@ -133,10 +133,12 @@ async function openCategory(key, name) {
   try {
     const cached = getCache();
     let items;
+    var fromCache = false;
     if (cached && cached._allItems) {
       items = cached._allItems.filter(function(i) { return i._category === key; });
+      fromCache = items && items.length > 0;
     }
-    if (!items || items.length === 0) {
+    if (!fromCache) {
       items = await fetchCategoryAll(key);
       // 修复：将新拉取的分类数据合并回缓存，保持全量缓存完整性
       if (items && items.length > 0) {
@@ -151,6 +153,23 @@ async function openCategory(key, name) {
     if (currentCategory.key !== key) return;
     listItems = items;
     renderList(items, false);
+
+    // 后台静默补拉：即使缓存有数据，也异步请求 API 全量，防止旧缓存数据不全
+    if (fromCache) {
+      fetchCategoryAll(key).then(function(freshItems) {
+        if (currentCategory.key !== key) return;
+        if (freshItems && freshItems.length > 0 && freshItems.length !== listItems.length) {
+          listItems = freshItems;
+          renderList(freshItems, false);
+          var c3 = getCache();
+          if (c3 && c3._allItems) {
+            var others = c3._allItems.filter(function(i) { return i._category !== key; });
+            c3._allItems = others.concat(freshItems);
+            setCache(c3);
+          }
+        }
+      }).catch(function() {});
+    }
   } catch (err) {
     if (currentCategory.key !== key) return;
     console.error('加载失败:', err);
