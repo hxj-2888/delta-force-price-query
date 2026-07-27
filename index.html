@@ -42,19 +42,38 @@
             if (!res1 || !res1.data || res1.data.length === 0) return null;
             var all = res1.data.slice();
             var totalPages = Math.ceil(res1.count / (res1.data.length || 10));
+            // 安全兜底：如果首页恰好返回了 limit 数量，count 可能不可靠，至少再翻一页
+            if (totalPages <= 1 && res1.data.length >= limit) {
+              totalPages = 2;
+            }
             if (totalPages > 1) {
-              var pageFns = [];
-              for (var p = 2; p <= totalPages; p++) {
-                pageFns.push((function(page) {
-                  var ac = new AbortController();
-                  var tid = setTimeout(function() { ac.abort(); }, 15000);
-                  return fetchPage(cat, page, ac.signal).then(function(r) { clearTimeout(tid); return r; });
-                })(p));
-              }
-              for (var i = 0; i < pageFns.length; i += 8) {
-                var batch = pageFns.slice(i, i + 8);
-                var results = await Promise.all(batch);
-                results.forEach(function(result) { all = all.concat(result.data); });
+              var nextP = 2;
+              var maxPages = 200; // 安全上限
+              while (nextP <= totalPages && nextP <= maxPages) {
+                var batchFns = [];
+                var batchEnd = Math.min(nextP + 7, totalPages, maxPages);
+                for (var p = nextP; p <= batchEnd; p++) {
+                  batchFns.push((function(page) {
+                    var ac = new AbortController();
+                    var tid = setTimeout(function() { ac.abort(); }, 15000);
+                    return fetchPage(cat, page, ac.signal).then(function(r) { clearTimeout(tid); return r; });
+                  })(p));
+                }
+                var results = await Promise.all(batchFns);
+                var gotData = false;
+                results.forEach(function(result) {
+                  if (result.data && result.data.length > 0) {
+                    all = all.concat(result.data);
+                    gotData = true;
+                  }
+                });
+                nextP = batchEnd + 1;
+                // 这批全空 → 已到末尾，停止
+                if (!gotData) break;
+                // 如果走到了预计算的末页且还有数据，多翻一页试试
+                if (nextP > totalPages && gotData && nextP <= maxPages) {
+                  totalPages = Math.min(nextP + 1, maxPages);
+                }
               }
             }
             var items = all.map(function(item) { item._category = cat; return item; });
