@@ -43,11 +43,16 @@ async function apiRequest(endpoint, params, retries, noCache) {
   var cacheKey = getApiCacheKey(endpoint, params || {});
   var lastErr;
 
-  if (!noCache && endpoint === 'item_price_all') {
-    var cached = getApiFromCache(cacheKey, 5 * 60 * 1000);
-    if (cached) return cached;
-    if (_apiPending[cacheKey]) {
-      try { return await _apiPending[cacheKey]; } catch(e) { /* fall through to fresh request */ }
+  if (!noCache) {
+    var _ttl = endpoint === 'item_price_all' ? 5 * 60 * 1000
+             : endpoint === 'item_list'       ? 2 * 60 * 1000
+             : 0;
+    if (_ttl > 0) {
+      var cached = getApiFromCache(cacheKey, _ttl);
+      if (cached) return cached;
+      if (_apiPending[cacheKey]) {
+        try { return await _apiPending[cacheKey]; } catch(e) { /* fall through to fresh request */ }
+      }
     }
   }
 
@@ -70,7 +75,7 @@ async function apiRequest(endpoint, params, retries, noCache) {
           })
           .then(function(data) {
             if (data.code !== 0) throw new Error(data.msg || 'API返回错误');
-            if (endpoint === 'item_price_all') {
+            if (endpoint === 'item_price_all' || endpoint === 'item_list') {
               setApiCache(cacheKey, data);
               delete _apiPending[cacheKey];
             }
@@ -78,13 +83,13 @@ async function apiRequest(endpoint, params, retries, noCache) {
           })
           .catch(function(err) {
             clearTimeout(timeoutId);
-            if (endpoint === 'item_price_all') {
+            if (endpoint === 'item_price_all' || endpoint === 'item_list') {
               delete _apiPending[cacheKey];
             }
             reject(err);
           });
 
-        if (endpoint === 'item_price_all' && attemptN === 0) {
+        if ((endpoint === 'item_price_all' || endpoint === 'item_list') && attemptN === 0) {
           _apiPending[cacheKey] = new Promise(function(res, rej) {
             fetchPromise.then(res).catch(rej);
           });
@@ -197,7 +202,8 @@ async function loadAllItems(forceRefresh) {
     }
   }
 
-  var prefetched = forceRefresh ? {} : (window.__prefetch || {});
+  // forceRefresh 只跳过 localStorage 缓存，prefetch 数据仍然有效（避免浪费已拉取的数据）
+  var prefetched = window.__prefetch || {};
   var taskFns = CATEGORIES.map(function(cat) {
     var p = prefetched[cat.key];
     if (p) {
