@@ -1,0 +1,108 @@
+<!-- 搜索页 -->
+<view class="search-header">
+  <view class="search-input-wrap">
+    <input type="text" placeholder="输入物品名称搜索..." bindinput="onInput" bindconfirm="onConfirm" value="{{keyword}}" focus="true" />
+    <text class="search-clear {{keyword ? 'visible' : ''}}" bindtap="clearSearch">✕</text>
+  </view>
+  <text class="search-cancel" bindtap="goBack">取消</text>
+</view>
+
+<!-- 搜索提示 -->
+<view class="search-hint" wx:if="{{!keyword && !hasResults}}">
+  <view class="hint-title">搜索提示</view>
+  <view class="hint-text">支持搜索物品名称关键词<br/>例如：头盔、弹匣、钥匙、瞄具...</view>
+</view>
+
+<!-- 搜索历史 -->
+<view class="history-section" wx:if="{{history.length > 0 && !keyword && !hasResults}}">
+  <view class="history-title">
+    <text>搜索历史</text>
+    <text class="history-clear" bindtap="clearHistory">清空</text>
+  </view>
+  <view class="history-tags">
+    <text class="history-tag" wx:for="{{history}}" wx:key="*this" data-keyword="{{item}}" bindtap="searchHistory">{{item}}</text>
+  </view>
+</view>
+
+<!-- 最近浏览 -->
+<view class="history-section" wx:if="{{recentViews.length > 0 && !keyword && !hasResults}}">
+  <view class="history-title">
+    <text>最近浏览</text>
+    <text class="history-clear" bindtap="clearRecentViews">清空</text>
+  </view>
+  <view class="recent-items">
+    <view class="result-item" wx:for="{{recentViews}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail">
+      <view class="item-pic-sm">
+        <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}"></image>
+        <text wx:else>-</text>
+      </view>
+      <view class="item-info">
+        <view class="item-name-row">
+          <text class="item-name">{{item.name}}</text>
+          <text class="item-cat-tag">{{item.catName}}</text>
+        </view>
+        <view class="item-price-row">
+          <text class="item-price">¥{{item.priceFormatted}}</text>
+          <text class="item-change {{item.changeClass}}">{{item.changeFormatted}}</text>
+        </view>
+      </view>
+      <text class="item-arrow">›</text>
+    </view>
+  </view>
+</view>
+
+<!-- 收藏物品 -->
+<view class="history-section" wx:if="{{favorites.length > 0 && !keyword && !hasResults}}">
+  <view class="history-title">
+    <text>我的收藏</text>
+    <text class="history-clear" bindtap="clearFavorites">清空</text>
+  </view>
+  <view class="recent-items">
+    <view class="result-item" wx:for="{{favorites}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail">
+      <view class="item-pic-sm">
+        <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}"></image>
+        <text wx:else>-</text>
+      </view>
+      <view class="item-info">
+        <view class="item-name-row">
+          <text class="item-name">{{item.name}}</text>
+          <text class="item-cat-tag">{{item.catName}}</text>
+        </view>
+        <view class="item-price-row">
+          <text class="item-price">¥{{item.priceFormatted}}</text>
+          <text class="item-change {{item.changeClass}}">{{item.changeFormatted}}</text>
+        </view>
+      </view>
+      <text class="item-arrow">›</text>
+    </view>
+  </view>
+</view>
+
+<!-- 搜索结果 -->
+<view wx:if="{{hasResults}}">
+  <view class="search-result-header" wx:if="{{results.length > 0}}">
+    <text>找到 {{results.length}} 个结果</text>
+  </view>
+  <view class="result-item" wx:for="{{results}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail">
+    <view class="item-pic-sm">
+      <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}"></image>
+      <text wx:else>-</text>
+    </view>
+    <view class="item-info">
+      <view class="item-name-row">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-cat-tag">{{item.catName}}</text>
+      </view>
+      <view class="item-price-row">
+        <text class="item-price">¥{{item.priceFormatted}}</text>
+        <text class="item-change {{item.changeClass}}">{{item.changeFormatted}}</text>
+      </view>
+    </view>
+    <text class="item-arrow">›</text>
+  </view>
+  <!-- 无结果 -->
+  <view class="empty-container" wx:if="{{results.length === 0 && keyword}}">
+    <view class="empty-icon">-</view>
+    <view class="empty-text">未找到 "{{keyword}}" 相关物品</view>
+  </view>
+</view>

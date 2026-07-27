@@ -1,0 +1,49 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/list/list",
+    "pages/detail/detail",
+    "pages/search/search",
+    "pages/price/price",
+    "pages/favorites/favorites"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#1a1a2e",
+    "navigationBarTitleText": "三角洲行动 - 变卖物价格查询",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#000000",
+    "backgroundTextStyle": "dark",
+    "enablePullDownRefresh": true
+  },
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#00e676",
+    "backgroundColor": "#1a1a2e",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "images/home.svg",
+        "selectedIconPath": "images/home-active.svg"
+      },
+      {
+        "pagePath": "pages/price/price",
+        "text": "价格异动",
+        "iconPath": "images/price.svg",
+        "selectedIconPath": "images/price-active.svg"
+      },
+      {
+        "pagePath": "pages/favorites/favorites",
+        "text": "收藏",
+        "iconPath": "images/favorites.svg",
+        "selectedIconPath": "images/favorites-active.svg"
+      }
+    ]
+  },
+  "networkTimeout": {
+    "request": 30000
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

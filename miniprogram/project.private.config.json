@@ -1,0 +1,9 @@
+{
+  "projectname": "delta-force-price-query",
+  "setting": {
+    "compileHotReLoad": false
+  },
+  "description": "三角洲行动 - 变卖物实时价格查询",
+  "libVersion": "3.3.4",
+  "appid": "wx0000000000000000"
+}

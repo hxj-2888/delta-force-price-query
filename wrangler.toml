@@ -1,0 +1,6 @@
+name = "delta-force-miniprogram"
+pages_build_output_dir = "."
+compatibility_date = "2026-07-27"
+
+# Cloudflare Pages 环境变量（在 Dashboard 中设置，或通过 wrangler secret 管理）
+# API_TOKEN - 上游 API 访问令牌

@@ -1,0 +1,43 @@
+<!-- 收藏页 -->
+<view class="nav-bar">
+  <view class="nav-title">我的收藏</view>
+  <view class="nav-actions">
+    <text class="nav-action" bindtap="refreshFavs">刷新</text>
+  </view>
+</view>
+
+<view class="list-stats" wx:if="{{items.length > 0}}">
+  <text>共 {{items.length}} 件收藏</text>
+  <text class="history-clear" bindtap="clearAllFavs">清空收藏</text>
+</view>
+
+<!-- 加载中 -->
+<view class="loading-container" wx:if="{{loading}}">
+  <view class="loading-spinner"></view>
+  <view class="loading-text">加载中...</view>
+</view>
+
+<!-- 空状态 -->
+<view class="empty-container" wx:elif="{{items.length === 0 && !loading}}">
+  <view class="empty-icon">-</view>
+  <view class="empty-text">暂无收藏物品，在物品详情页收藏</view>
+</view>
+
+<!-- 收藏列表 -->
+<view wx:for="{{items}}" wx:key="id" class="item-card" data-id="{{item.id}}" bindtap="openDetail">
+  <view class="item-pic">
+    <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}"></image>
+    <text class="pic-placeholder" wx:else>-</text>
+  </view>
+  <view class="item-info">
+    <view class="item-name-row">
+      <text class="item-name">{{item.name}}</text>
+      <text class="item-cat-tag">{{item.catName}}</text>
+    </view>
+    <view class="item-price-row">
+      <text class="item-price">¥{{item.priceFormatted}}</text>
+      <text class="item-change {{item.changeClass}}">{{item.changeFormatted}}</text>
+    </view>
+  </view>
+  <text class="item-arrow">›</text>
+</view>

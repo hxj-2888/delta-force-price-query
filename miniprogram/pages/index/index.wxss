@@ -1,0 +1,321 @@
+/* ========== 首页头部 ========== */
+.header {
+  padding: 32px 20px 16px;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2));
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.header-logo {
+  width: 84px;
+  height: 84px;
+  margin-bottom: 8px;
+}
+.header-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #fff;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+.header-subtitle {
+  font-size: 13px;
+  color: #8890b0;
+  margin-bottom: 6px;
+}
+.header-info {
+  font-size: 11px;
+  color: #555;
+  margin-top: 4px;
+}
+.refresh-all {
+  color: #667eea;
+  font-size: 11px;
+  margin-left: 8px;
+  opacity: 0.7;
+}
+.refresh-all:active {
+  opacity: 1;
+}
+.auto-refresh-time {
+  font-size: 10px;
+  color: #555;
+  margin-left: 8px;
+}
+
+/* ========== 搜索栏 ========== */
+.search-bar {
+  display: flex;
+  align-items: center;
+  margin: 16px 20px;
+  padding: 12px 18px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.search-placeholder {
+  color: #666;
+  font-size: 14px;
+}
+
+/* ========== 分类网格 ========== */
+.category-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0 14px;
+}
+.category-card {
+  display: flex;
+  align-items: center;
+  padding: 18px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.category-card:active {
+  background: rgba(102,126,234,0.2);
+  border-color: rgba(102,126,234,0.4);
+}
+.category-card .cat-icon {
+  width: 48px;
+  text-align: center;
+  font-size: 24px;
+  margin-right: 10px;
+}
+.category-card .cat-icon image {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+.category-card .cat-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+.category-card .cat-arrow {
+  color: #555;
+  font-size: 18px;
+}
+.category-card.all-items {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, rgba(255,215,0,0.12), rgba(255,165,0,0.06));
+  border: 1px solid rgba(255,215,0,0.35);
+}
+.category-card.all-items .cat-name {
+  font-size: 16px;
+  color: #ffd700;
+}
+.category-card.all-items:active {
+  background: linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,165,0,0.12));
+}
+
+/* ========== 涨跌幅推送卡片 ========== */
+.top-mover-card {
+  margin: 0 20px 6px;
+  background: linear-gradient(135deg, rgba(102,126,234,0.12), rgba(118,75,162,0.08));
+  border: 1px solid rgba(102,126,234,0.25);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.tm-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 16px;
+}
+.tm-row:active {
+  background: rgba(102,126,234,0.15);
+}
+.tm-row + .tm-row {
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.tm-pic {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  margin-right: 10px;
+}
+.tm-info {
+  flex: 1;
+  min-width: 0;
+}
+.tm-period-label {
+  font-size: 10px;
+  color: #8890b0;
+  line-height: 1.3;
+}
+.tm-name {
+  font-size: 13px;
+  font-weight: bold;
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-price {
+  text-align: right;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.tm-price-value {
+  font-size: 13px;
+  color: #ffd700;
+  font-weight: 500;
+}
+.tm-change {
+  font-size: 12px;
+  font-weight: bold;
+  color: #4caf50;
+}
+
+/* ========== 价格提醒 ========== */
+.price-alert {
+  margin: 0 20px 10px;
+  padding: 10px 14px;
+  background: rgba(255,107,53,0.1);
+  border: 1px solid rgba(255,107,53,0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #ff8c5a;
+}
+.price-alert-item {
+  display: inline;
+}
+.price-alert-item.up {
+  color: #2ed573;
+}
+.price-alert-item.down {
+  color: #ff4757;
+}
+
+/* ========== 收藏价格变动 ========== */
+.price-changed-section {
+  margin: 4px 12px 8px;
+}
+.price-changed-title {
+  font-size: 12px;
+  color: #888;
+  padding: 8px 4px 6px;
+  font-weight: 500;
+}
+.price-changed-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.price-changed-item:active {
+  background: rgba(102,126,234,0.15);
+  border-color: rgba(102,126,234,0.3);
+}
+.price-changed-item .item-pic {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.3);
+  margin-right: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.price-changed-item .item-pic image {
+  width: 100%;
+  height: 100%;
+}
+.price-changed-item .item-info {
+  flex: 1;
+  min-width: 0;
+}
+.price-changed-item .item-name {
+  font-size: 13px;
+  color: #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.price-changed-item .item-price-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.price-changed-item .item-cur-price {
+  font-size: 12px;
+  color: #aaa;
+}
+.price-changed-item .item-change-pct {
+  font-size: 12px;
+  font-weight: 500;
+}
+.price-changed-item .item-change-pct.up {
+  color: #4caf50;
+}
+.price-changed-item .item-change-pct.down {
+  color: #f44336;
+}
+
+/* ========== 加载遮罩 ========== */
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #0a0a0a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.4s;
+}
+.loading-screen.fade-out {
+  opacity: 0;
+}
+.loading-screen.removed {
+  display: none;
+}
+.loading-logo-wrap {
+  position: relative;
+  margin-bottom: 40px;
+}
+.loading-logo-glow {
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
+  background: radial-gradient(circle, rgba(102,126,234,0.3), transparent 70%);
+  border-radius: 50%;
+  transition: opacity 0.15s;
+}
+.loading-logo-img {
+  width: 100px;
+  height: 100px;
+  transition: filter 0.15s;
+}
+.loading-progress-wrap {
+  width: 240px;
+  text-align: center;
+}
+.loading-progress-track {
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.loading-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 2px;
+  transition: width 0.2s;
+}
+.loading-status {
+  color: #888;
+  font-size: 12px;
+  margin-top: 12px;
+}

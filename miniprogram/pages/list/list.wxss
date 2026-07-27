@@ -1,0 +1,221 @@
+/* ========== 导航栏 ========== */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #1a1a2e;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.nav-back {
+  color: #667eea;
+  font-size: 16px;
+  width: 60px;
+}
+.nav-title {
+  flex: 1;
+  text-align: center;
+  font-size: 17px;
+  font-weight: bold;
+  color: #fff;
+}
+.nav-actions {
+  display: flex;
+  gap: 6px;
+  min-width: 80px;
+  justify-content: flex-end;
+}
+.nav-action {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0.7;
+  background: rgba(255,255,255,0.06);
+}
+.nav-action:active {
+  opacity: 1;
+}
+
+/* ========== 列表统计 / 排序 ========== */
+.list-stats {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 20px;
+  font-size: 12px;
+  color: #888;
+  background: rgba(255,255,255,0.02);
+}
+.sort-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.sort-btn {
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #888;
+  white-space: nowrap;
+}
+.sort-btn:active {
+  transform: scale(0.95);
+}
+.sort-btn.active {
+  background: rgba(102,126,234,0.2);
+  border-color: rgba(102,126,234,0.4);
+  color: #aab8ff;
+}
+.sort-dir {
+  margin-left: 2px;
+  font-size: 10px;
+}
+
+/* ========== 物品卡片 ========== */
+.item-card {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  margin: 4px 12px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  position: relative;
+}
+.item-card:active {
+  background: rgba(102,126,234,0.15);
+  border-color: rgba(102,126,234,0.3);
+}
+.item-pic {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.3);
+  margin-right: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.item-pic image {
+  width: 100%;
+  height: 100%;
+}
+.pic-placeholder {
+  font-size: 24px;
+}
+.item-info {
+  flex: 1;
+  min-width: 0;
+}
+.item-name-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.item-name {
+  font-size: 14px;
+  color: #e0e0e0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-grade {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-left: 8px;
+  background: rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.item-price-row {
+  display: flex;
+  align-items: center;
+}
+.item-price {
+  font-size: 16px;
+  font-weight: bold;
+  color: #ffd700;
+  margin-right: 10px;
+}
+.item-change {
+  font-size: 12px;
+  font-weight: 500;
+}
+.item-change.up {
+  color: #4caf50;
+}
+.item-change.down {
+  color: #f44336;
+}
+.item-change.flat {
+  color: #888;
+}
+.item-arrow {
+  color: #444;
+  font-size: 18px;
+  margin-left: 6px;
+}
+.item-attrs {
+  margin-top: 4px;
+}
+.item-attrs-text {
+  font-size: 10px;
+  color: #888;
+}
+
+/* ========== 等级菱形标注 ========== */
+.grade-diamond {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  z-index: 2;
+}
+
+/* ========== 分页 ========== */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 12px;
+  flex-wrap: wrap;
+}
+.page-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #aaa;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.page-btn:active {
+  background: rgba(102,126,234,0.25);
+  border-color: rgba(102,126,234,0.4);
+  color: #fff;
+}
+.page-btn.active {
+  background: rgba(102,126,234,0.25);
+  border-color: rgba(102,126,234,0.5);
+  color: #aab8ff;
+  font-weight: bold;
+}
+.page-btn.disabled {
+  opacity: 0.25;
+  pointer-events: none;
+}

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>三角洲行动 - 变卖物价格查询</title>
+  <link rel="icon" type="image/png" href="/delta-force-logo.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="三角洲价格查询">
+  <link rel="dns-prefetch" href="//delta-force-api.hexiangjie694.workers.dev">
+  <link rel="preconnect" href="https://delta-force-api.hexiangjie694.workers.dev" crossorigin>
+  <link rel="preload" href="/delta-force-logo.png" as="image" fetchpriority="high">
+  <script>
+    // ★ 全局常量：Cloudflare Worker 后端地址（唯一出处，js/api.js 和 sw.js 均从此读取）
+    window.__WORKER_BASE = 'https://delta-force-api.hexiangjie694.workers.dev';
+  </script>
+  <script>
+    // 全量预取 — 通过 Cloudflare Worker 代理，等所有分页完成后再 resolve
+    window.__prefetch = (function() {
+      var CATS = ['gun','ammo','acc','helmet','armor','chest','bag','key','collection','consume'];
+      var limit = 5000;
+      var proxyUrl = window.__WORKER_BASE + '/api/proxy';
+      var running = {};
+
+      function fetchPage(cat, page, signal) {
+        return fetch(proxyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: 'item_list', params: { types: cat, p: page, limit: limit } }),
+          signal: signal
+        }).then(function(r) { return r.json(); })
+          .then(function(r) { return { data: (r && r.data) ? r.data : [], count: (r && r.count) ? r.count : 0 }; })
+          .catch(function() { return { data: [], count: 0 }; });
+      }
+
+      CATS.forEach(function(cat) {
+        running[cat] = (async function() {
+          try {
+            var res1 = await fetchPage(cat, 1);
+            if (!res1 || !res1.data || res1.data.length === 0) return null;
+            var all = res1.data.slice();
+            var totalPages = Math.ceil(res1.count / (res1.data.length || 10));
+            if (totalPages > 1) {
+              var pageFns = [];
+              for (var p = 2; p <= totalPages; p++) {
+                pageFns.push((function(page) {
+                  var ac = new AbortController();
+                  var tid = setTimeout(function() { ac.abort(); }, 15000);
+                  return fetchPage(cat, page, ac.signal).then(function(r) { clearTimeout(tid); return r; });
+                })(p));
+              }
+              for (var i = 0; i < pageFns.length; i += 8) {
+                var batch = pageFns.slice(i, i + 8);
+                var results = await Promise.all(batch);
+                results.forEach(function(result) { all = all.concat(result.data); });
+              }
+            }
+            var items = all.map(function(item) { item._category = cat; return item; });
+            running[cat]._resolvedData = items;
+            return { code: 0, count: all.length, data: items, _complete: true };
+          } catch(e) { return null; }
+        })();
+      });
+      return running;
+    })();
+  </script>
+  <link rel="stylesheet" href="css/base.css?v=20260617">
+  <link rel="stylesheet" href="css/layout.css?v=20260617">
+  <link rel="stylesheet" href="css/components.css?v=20260617">
+</head>
+<body>
+  <div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo-wrap">
+    <div class="loading-logo-glow" id="loadingGlow"></div>
+    <img class="loading-logo-img" id="loadingLogo" src="delta-force-logo.png" alt="三角洲行动">
+  </div>
+  <div class="loading-progress-wrap">
+    <div class="loading-progress-track">
+      <div class="loading-progress-bar" id="loadingProgressBar"></div>
+    </div>
+    <div class="loading-status" id="loadingStatus">正在连接数据源...</div>
+  </div>
+</div>
+<div class="container" id="app">
+    <!-- ===== 首页 ===== -->
+    <div class="page active" id="page-home">
+      <div class="header">
+        <img class="header-logo" src="delta-force-logo.png" alt="三角洲行动" onerror="this.style.display='none'">
+        <div class="header-title">三角洲行动</div>
+        <div class="header-subtitle">变卖物实时价格查询</div>
+        <div class="header-info">
+          <span class="refresh-all" onclick="refreshAllData()">刷新全部</span>
+          <span id="autoRefreshTime" style="font-size:10px;color:#555;margin-left:8px"></span>
+        </div>
+      </div>
+      <div class="search-bar" onclick="showSearch()">
+        <span class="search-placeholder">搜索物品名称...</span>
+      </div>
+      <div class="top-mover-card" id="topMover" style="display:none"></div>
+      <div class="price-alert" id="priceAlert"></div>
+      <div class="price-changed-section" id="priceChangedSection">
+        <div class="price-changed-title">收藏价格提醒</div>
+        <div id="priceChangedItems"></div>
+      </div>
+      <div class="category-grid" id="categoryGrid"></div>
+    </div>
+
+    <!-- ===== 列表页 ===== -->
+    <div class="page" id="page-list">
+      <div class="nav-bar">
+        <div class="nav-back" onclick="goBack()">‹ 返回</div>
+        <div class="nav-title" id="listTitle">物品列表</div>
+        <div class="nav-actions">
+          <span class="nav-action" onclick="refreshCurrentList()" title="刷新当前分类">刷新</span>
+          <span class="nav-action" onclick="showSearch()" title="搜索">搜索</span>
+        </div>
+      </div>
+      <div class="list-stats" id="listStats"></div>
+      <div class="sort-bar" id="sortBar">
+        <button class="sort-btn active" data-sort="price" onclick="setSort('price')">价格<span class="sort-dir" id="dir-price">↓</span></button>
+        <button class="sort-btn" data-sort="change" onclick="setSort('change')">涨跌幅<span class="sort-dir" id="dir-change"></span></button>
+      </div>
+      <div id="listContent"></div>
+      <div id="pagination"></div>
+    </div>
+
+    <!-- ===== 详情页 ===== -->
+    <div class="page" id="page-detail">
+      <div class="nav-bar">
+        <div class="nav-back" onclick="goBack()">‹ 返回</div>
+        <div class="nav-title">物品详情</div>
+        <div class="nav-actions">
+          <span class="nav-action" id="detailFavBtn" onclick="toggleCurrentFavorite()" title="收藏"></span>
+          <span class="nav-action" onclick="refreshCurrentItem()" title="刷新此物品">刷新</span>
+        </div>
+      </div>
+      <div id="detailContent">
+        <div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">正在向API请求最新数据...</div></div>
+      </div>
+    </div>
+
+    <!-- ===== 搜索页 ===== -->
+    <div class="page slide-in" id="page-search">
+      <div class="search-header">
+        <div class="search-input-wrap">
+          <input type="text" id="searchInput" placeholder="输入物品名称搜索..." autocomplete="off">
+          <span class="search-clear" id="searchClear" onclick="clearSearch()">✕</span>
+        </div>
+        <div class="search-cancel" onclick="hideSearch()">取消</div>
+      </div>
+      <div class="search-hint" id="searchHint">
+        <div class="hint-title">搜索提示</div>
+        <div class="hint-text">支持搜索物品名称关键词<br>例如：头盔、弹匣、钥匙、瞄具...</div>
+      </div>
+      <!-- 搜索历史 -->
+      <div class="history-section" id="searchHistory" style="display:none">
+        <div class="history-title">
+          <span>搜索历史</span>
+          <span class="history-clear" onclick="clearSearchHistory()">清空</span>
+        </div>
+        <div class="history-tags" id="historyTags"></div>
+      </div>
+      <!-- 最近浏览 -->
+      <div class="history-section" id="recentViewSection" style="display:none">
+        <div class="history-title">
+          <span>最近浏览</span>
+          <span class="history-clear" onclick="clearRecentViews()">清空</span>
+        </div>
+        <div class="recent-items" id="recentViewItems"></div>
+      </div>
+      <!-- 收藏物品 -->
+      <div class="history-section" id="favoritesSection" style="display:none">
+        <div class="history-title">
+          <span>我的收藏</span>
+          <span class="history-clear" onclick="clearFavorites()">清空</span>
+        </div>
+        <div class="recent-items" id="favoritesItems"></div>
+      </div>
+      <div id="searchResults"></div>
+    </div>
+
+    <!-- ===== 价格异动页 ===== -->
+    <div class="page" id="page-price">
+      <div class="nav-bar">
+        <div class="nav-back" onclick="switchTab('home')">‹ 首页</div>
+        <div class="nav-title">价格异动</div>
+        <div class="nav-actions" style="width:auto;gap:6px">
+          <button class="sort-btn" id="btnGainers" style="font-size:11px;padding:5px 10px;border-radius:14px" onclick="setPriceDirection('up')">涨幅榜</button>
+          <button class="sort-btn" id="btnLosers" style="font-size:11px;padding:5px 10px;border-radius:14px" onclick="setPriceDirection('down')">跌幅榜</button>
+          <span class="nav-action" onclick="refreshPriceMovers()" title="刷新">刷新</span>
+        </div>
+      </div>
+      <div id="priceContent"></div>
+    </div>
+
+    <!-- ===== 我的收藏页 ===== -->
+    <div class="page" id="page-favtab">
+      <div class="nav-bar">
+        <div class="nav-back" onclick="switchTab('home')">‹ 首页</div>
+        <div class="nav-title">我的收藏</div>
+        <div class="nav-actions">
+          <span class="nav-action" onclick="refreshFavTab()" title="刷新">刷新</span>
+        </div>
+      </div>
+      <div id="favtabContent"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <!-- ===== 底部导航 ===== -->
+  <div class="bottom-nav" id="bottomNav">
+    <div class="tab active" data-tab="home" onclick="switchTab('home')">
+      <span class="tab-label">首页</span>
+    </div>
+    <div class="tab" data-tab="price" onclick="switchTab('price')">
+      <span class="tab-label">价格异动</span>
+    </div>
+    <div class="tab" data-tab="favtab" onclick="switchTab('favtab')">
+      <span class="tab-label">我的收藏</span>
+    </div>
+  </div>
+
+  <!-- 模块加载顺序：依赖方在后 -->
+  <script src="js/utils.js?v=20260617"></script>
+  <script src="js/store.js?v=20260617"></script>
+  <script src="js/render.js?v=20260617"></script>
+  <script src="js/api.js?v=20260617"></script>
+  <script src="js/sw-register.js?v=20260617"></script>
+  <script src="js/main.js?v=20260617"></script>
+</body>
+</html>
