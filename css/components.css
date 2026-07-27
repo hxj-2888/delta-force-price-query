@@ -1,0 +1,159 @@
+﻿/* ========== 鐗╁搧鍗＄墖 ========== */
+.item-card { display: flex; align-items: center; padding: 14px 16px; margin: 4px 12px; background: rgba(255,255,255,0.04); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); cursor: pointer; transition: all 0.2s; }
+.item-card:active { background: rgba(102,126,234,0.15); border-color: rgba(102,126,234,0.3); }
+.item-pic { width: 48px; height: 48px; border-radius: 8px; overflow: hidden; background: rgba(0,0,0,0.3); margin-right: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.item-pic img { width: 100%; height: 100%; object-fit: contain; }
+.item-pic .pic-placeholder { font-size: 24px; }
+.item-info { flex: 1; min-width: 0; }
+.item-name-row { display: flex; align-items: center; margin-bottom: 4px; }
+.item-name { font-size: 14px; color: #e0e0e0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-grade { font-size: 10px; padding: 2px 8px; border-radius: 6px; margin-left: 8px; background: rgba(255,255,255,0.06); flex-shrink: 0; }
+.item-price-row { display: flex; align-items: center; }
+.item-price { font-size: 16px; font-weight: bold; color: #ffd700; margin-right: 10px; }
+.item-change { font-size: 12px; font-weight: 500; }
+.item-change.up, .change-up { color: #4caf50; }
+.item-change.down, .change-down { color: #f44336; }
+.item-change.flat, .change-flat { color: #888; }
+.item-arrow { color: #444; font-size: 18px; margin-left: 6px; }
+.item-attrs { margin-top: 4px; }
+.item-attrs-text { font-size: 10px; color: #888; }
+.item-trend-mini { display: flex; align-items: center; margin-top: 2px; }
+.trend-mini-label { font-size: 10px; color: #555; margin-right: 6px; }
+.trend-mini-price { font-size: 11px; color: #aaa; margin-right: 6px; }
+.trend-mini-change { font-size: 10px; font-weight: 500; }
+
+/* 绛夌骇鑿卞舰鏍囨敞 */
+.grade-diamond { position: absolute; top: 6px; left: 6px; width: 10px; height: 10px; transform: rotate(45deg); border-radius: 2px; z-index: 2; }
+
+/* 鏀惰棌鎸囩ず鐐?*/
+.item-fav-indicator { position: absolute; top: 6px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: #ffd700; opacity: 0.8; pointer-events: none; }
+
+/* 杩蜂綘鐏姳绾?*/
+.item-sparkline { width: 64px; height: 26px; flex-shrink: 0; margin-left: 2px; align-self: center; }
+.item-sparkline svg { width: 100%; height: 100%; display: block; }
+.item-card-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 3px; }
+
+/* ========== 浠锋牸鎻愰啋 ========== */
+.price-alert { margin: 0 20px 10px; padding: 10px 14px; background: rgba(255,107,53,0.1); border: 1px solid rgba(255,107,53,0.2); border-radius: 8px; font-size: 12px; line-height: 1.6; color: #ff8c5a; display: none; }
+.price-alert.show { display: block; }
+.price-alert-item { display: inline; }
+.price-alert-item.up { color: #2ed573; }
+.price-alert-item.down { color: #ff4757; }
+
+/* ========== 娑ㄨ穼骞呭崱鐗囷紙棣栭〉鎺ㄩ€侊級 ========== */
+.top-mover-card { margin: 0 20px 6px; background: linear-gradient(135deg, rgba(102,126,234,0.12), rgba(118,75,162,0.08)); border: 1px solid rgba(102,126,234,0.25); border-radius: 10px; overflow: hidden; }
+.top-mover-card .tm-row:hover { background: rgba(102,126,234,0.15); }
+.top-mover-card .tm-row + .tm-row { border-top: 1px solid rgba(255,255,255,0.06); }
+
+/* ========== 鏀惰棌浠锋牸鍙樺姩鍖?========== */
+.price-changed-section { margin: 4px 12px 8px; display: none; }
+.price-changed-section.show { display: block; }
+.price-changed-title { font-size: 12px; color: #888; padding: 8px 4px 6px; font-weight: 500; }
+.price-changed-item { display: flex; align-items: center; padding: 10px 12px; margin-bottom: 4px; background: rgba(255,255,255,0.04); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); cursor: pointer; transition: all 0.2s; }
+.price-changed-item:active { background: rgba(102,126,234,0.15); border-color: rgba(102,126,234,0.3); }
+.price-changed-item .item-pic { width: 36px; height: 36px; border-radius: 6px; }
+.price-changed-item .item-info { flex: 1; min-width: 0; }
+.price-changed-item .item-name { font-size: 13px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.price-changed-item .item-price-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.price-changed-item .item-cur-price { font-size: 12px; color: #aaa; }
+.price-changed-item .item-change-pct { font-size: 12px; font-weight: 500; }
+.price-changed-item .item-change-pct.up { color: #4caf50; }
+.price-changed-item .item-change-pct.down { color: #f44336; }
+
+/* ========== 璇︽儏椤?========== */
+.detail-header { display: flex; padding: 20px; background: rgba(255,255,255,0.04); border-radius: 0 0 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 12px; }
+.detail-pic { width: 80px; height: 80px; border-radius: 12px; overflow: hidden; background: rgba(0,0,0,0.3); margin-right: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.detail-pic img { width: 100%; height: 100%; object-fit: contain; }
+.detail-basic { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.detail-name { font-size: 18px; font-weight: bold; color: #fff; line-height: 1.4; margin-bottom: 6px; }
+.detail-meta { display: flex; gap: 8px; }
+.meta-tag { font-size: 11px; padding: 3px 10px; border-radius: 12px; background: rgba(255,255,255,0.08); color: #aaa; }
+
+.price-card { margin: 0 12px 12px; padding: 22px; background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,165,0,0.05)); border: 1px solid rgba(255,215,0,0.2); border-radius: 16px; }
+.price-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.price-card-title { font-size: 12px; color: #aaa; }
+.price-card-time { font-size: 11px; color: #555; }
+.price-main { display: flex; align-items: baseline; margin-bottom: 16px; }
+.price-currency { font-size: 20px; color: #ffd700; margin-right: 6px; }
+.price-value { font-size: 36px; font-weight: bold; color: #ffd700; letter-spacing: 1px; }
+.price-sub { display: flex; gap: 30px; }
+.sub-item { display: flex; flex-direction: column; }
+.sub-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+.sub-value { font-size: 14px; font-weight: 500; color: #ccc; }
+
+/* 瓒嬪娍鍖哄煙 */
+.section { margin: 0 12px 12px; }
+.section-title { display: flex; align-items: center; margin-bottom: 14px; font-size: 16px; font-weight: bold; color: #e0e0e0; }
+.trend-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.trend-card { padding: 14px 10px; background: rgba(255,255,255,0.04); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: center; }
+.trend-card.highlight { background: rgba(102,126,234,0.1); border-color: rgba(102,126,234,0.3); }
+.trend-card-label { font-size: 10px; color: #666; margin-bottom: 6px; }
+.trend-card-price { font-size: 14px; font-weight: bold; color: #ddd; margin-bottom: 4px; }
+.trend-card-change { font-size: 11px; font-weight: 500; }
+
+/* 30鏃ヤ环鏍兼洸绾垮浘 */
+.price-curve-box { padding: 16px 10px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); overflow: hidden; }
+.price-curve-box svg { width: 100%; height: auto; display: block; }
+.curve-legend { display: flex; justify-content: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; padding: 0 4px; }
+.curve-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #888; }
+.curve-legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.info-item { padding: 14px; background: rgba(255,255,255,0.04); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); }
+.info-label { display: block; font-size: 11px; color: #666; margin-bottom: 4px; }
+.info-value { font-size: 16px; color: #ddd; font-weight: 500; }
+
+.source-note { padding: 20px 16px; text-align: center; }
+.source-note span { display: block; font-size: 10px; color: #444; line-height: 1.8; }
+
+/* 鏀惰棌鎸夐挳 */
+#detailFavBtn { font-size: 12px; padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.08); opacity: 0.7; }
+#detailFavBtn::before { content: '\6536\85CF'; }
+#detailFavBtn.favorited { background: rgba(255,215,0,0.15); color: #ffd700; opacity: 1; }
+#detailFavBtn.favorited::before { content: '\5DF2\6536\85CF'; }
+@keyframes favPop { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.nav-action.fav-pop { animation: favPop 0.3s ease; }
+
+/* ========== 鎼滅储缁撴灉 ========== */
+.result-item { display: flex; align-items: center; padding: 12px 16px; margin: 3px 12px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); cursor: pointer; }
+.result-item:active { background: rgba(102,126,234,0.15); }
+
+/* 鎼滅储鍘嗗彶 / 鏈€杩戞祻瑙?*/
+.history-section { padding: 0 16px; margin-top: 16px; }
+.history-title { font-size: 12px; color: #666; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.history-clear { color: #f44336; font-size: 11px; cursor: pointer; }
+.history-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.history-tag { font-size: 12px; padding: 6px 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; color: #aaa; cursor: pointer; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; transition: all 0.2s; }
+.history-tag:active { background: rgba(102,126,234,0.2); border-color: rgba(102,126,234,0.4); color: #fff; }
+.recent-items { padding: 0 12px; }
+.recent-items .result-item { margin: 3px 0; }
+
+/* ========== Toast ========== */
+.toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); color: #fff; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 999; display: none; }
+.toast.show { display: block; animation: fadeIn 0.2s ease; }
+
+/* ========== 鑷畾涔夋粴鍔ㄦ潯 ========== */
+.custom-scrollbar { position: fixed; right: 2px; top: 10%; width: 8px; height: 80%; z-index: 999; pointer-events: none; }
+.custom-scrollbar .cs-track { width: 100%; height: 100%; background: rgba(255,255,255,0.06); border-radius: 4px; position: relative; pointer-events: auto; }
+.custom-scrollbar .cs-thumb { position: absolute; left: 0; width: 100%; min-height: 28px; border-radius: 4px; background: #ffd700; box-shadow: 0 0 6px rgba(255,215,0,0.5); cursor: pointer; transition: background 0.15s; }
+.custom-scrollbar .cs-thumb:active { background: #ffaa00; box-shadow: 0 0 10px rgba(255,170,0,0.7); }
+@media (pointer: coarse) { .custom-scrollbar { display: none !important; } }
+
+/* ========== 鍚姩鍔犺浇灞?========== */
+.loading-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #000000; z-index: 10000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease;
+}
+.loading-screen.fade-out { opacity: 0; pointer-events: none; }
+.loading-screen.removed { display: none; }
+.loading-logo-wrap { position: relative; width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; }
+.loading-logo-img { width: 140px; height: 140px; object-fit: contain; filter: blur(20px); transition: filter 0.35s ease-out; will-change: filter; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; backface-visibility: hidden; transform: translateZ(0); }
+.loading-logo-glow { position: absolute; width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, rgba(255,215,0,0.18) 0%, transparent 70%); opacity: 0; transition: opacity 0.4s ease; }
+.loading-progress-wrap { width: 220px; margin-top: 40px; }
+.loading-progress-track { width: 100%; height: 3px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+.loading-progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #667eea, #764ba2, #ffd700); background-size: 200% 100%; animation: progressShimmer 2s ease infinite; border-radius: 3px; transition: width 0.4s ease; }
+.loading-status { color: #555; font-size: 12px; margin-top: 12px; text-align: center; min-height: 18px; }
+
+/* ========== 浜壊涓婚瑕嗙洊 ========== */

@@ -1,0 +1,89 @@
+<!-- 首页 -->
+<view class="header">
+  <image class="header-logo" src="/images/logo.png" mode="aspectFit"></image>
+  <view class="header-title">三角洲行动</view>
+  <view class="header-subtitle">变卖物实时价格查询</view>
+  <view class="header-info">
+    <text class="refresh-all" bindtap="refreshAllData">刷新全部</text>
+    <text class="auto-refresh-time" id="autoRefreshTime">{{autoRefreshTime}}</text>
+  </view>
+</view>
+
+<view class="search-bar" bindtap="goToSearch">
+  <text class="search-placeholder">搜索物品名称...</text>
+</view>
+
+<!-- 涨幅榜推送 -->
+<view class="top-mover-card" wx:if="{{topMovers.length > 0}}">
+  <view class="tm-row" wx:for="{{topMovers}}" wx:key="id" data-id="{{item.id}}" bindtap="openTopMover">
+    <image class="tm-pic" src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}"></image>
+    <view class="tm-info">
+      <view class="tm-period-label">{{item.periodText}} {{item.rankLabel}}</view>
+      <view class="tm-name">{{item.name}}</view>
+    </view>
+    <view class="tm-price">
+      <view class="tm-price-value">¥{{item.priceFormatted}}</view>
+      <view class="tm-change up">{{item.changeFormatted}}</view>
+    </view>
+  </view>
+</view>
+
+<!-- 收藏价格提醒 -->
+<view class="price-alert {{priceAlertClass}}" wx:if="{{priceAlerts.length > 0}}">
+  <text wx:for="{{priceAlerts}}" wx:key="id">
+    <text class="price-alert-item {{item.dir}}">{{item.name}} {{item.pct}}</text>
+    <text wx:if="{{index < priceAlerts.length - 1}}">、</text>
+  </text>
+</view>
+
+<!-- 收藏价格变动 -->
+<view class="price-changed-section {{priceChangedClass}}" wx:if="{{priceChangedItems.length > 0}}">
+  <view class="price-changed-title">收藏价格提醒</view>
+  <view class="price-changed-item" wx:for="{{priceChangedItems}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail">
+    <view class="item-pic">
+      <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}"></image>
+      <text wx:else>-</text>
+    </view>
+    <view class="item-info">
+      <view class="item-name">{{item.name}}</view>
+      <view class="item-price-row">
+        <text class="item-cur-price">¥{{item.priceFormatted}}</text>
+        <text class="item-change-pct {{item.dir}}">{{item.changeText}}</text>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- 分类网格 -->
+<view class="category-grid">
+  <view class="category-card all-items" bindtap="openAllItems">
+    <view class="cat-icon">
+      <image src="{{allIcon}}" mode="aspectFit" wx:if="{{allIcon}}"></image>
+      <text wx:else>📦</text>
+    </view>
+    <view class="cat-name">全部物品</view>
+    <view class="cat-arrow">›</view>
+  </view>
+  <view class="category-card" wx:for="{{categories}}" wx:key="key" data-key="{{item.key}}" data-name="{{item.name}}" bindtap="openCategory">
+    <view class="cat-icon">
+      <image src="{{item.icon}}" mode="aspectFit" wx:if="{{item.icon}}"></image>
+      <text wx:else>{{item.iconText}}</text>
+    </view>
+    <view class="cat-name">{{item.name}}</view>
+    <view class="cat-arrow">›</view>
+  </view>
+</view>
+
+<!-- 加载遮罩 -->
+<view class="loading-screen {{loadingScreenClass}}" wx:if="{{showLoading}}">
+  <view class="loading-logo-wrap">
+    <view class="loading-logo-glow" style="opacity:{{loadingProgress}}"></view>
+    <image class="loading-logo-img" src="/images/logo.png" mode="aspectFit" style="filter:blur({{loadingBlur}}px)"></image>
+  </view>
+  <view class="loading-progress-wrap">
+    <view class="loading-progress-track">
+      <view class="loading-progress-bar" style="width:{{loadingProgress * 100}}%"></view>
+    </view>
+    <view class="loading-status">{{loadingStatus}}</view>
+  </view>
+</view>

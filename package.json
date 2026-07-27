@@ -1,0 +1,28 @@
+{
+  "name": "delta-force-price-query",
+  "version": "1.0.0",
+  "description": "三角洲行动 - 变卖物实时价格查询工具",
+  "main": "server.js",
+  "bin": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "pkg": {
+    "assets": [
+      "index.html",
+      "manifest.json",
+      "sw.js",
+      "css/**/*",
+      "js/**/*",
+      "delta-force-logo.png",
+      ".env.example"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "keywords": ["三角洲行动", "价格查询", "变卖物"],
+  "author": "",
+  "license": "MIT"
+}
