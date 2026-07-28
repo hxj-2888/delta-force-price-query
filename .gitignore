@@ -1,0 +1,40 @@
+# 依赖
+node_modules/
+
+# 敏感文件 — 绝不上传
+.env
+.env.example
+.env.local
+.env.production
+
+# Cloudflare Workers 本地缓存
+.wrangler/
+
+# Vercel 本地配置
+.vercel/
+
+# 本地开发/打包工具
+installer.iss
+setup.bat
+start.bat
+server.js
+package.json
+package-lock.json
+
+# 版本控制
+.git/
+.gitattributes
+.vercelignore
+
+# 小程序（独立部署，不走网页端）
+miniprogram/
+miniprogram.zip
+
+# 文档
+README.md
+DEPLOY.md
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+*.log
