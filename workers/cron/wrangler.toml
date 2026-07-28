@@ -1,0 +1,11 @@
+name = "delta-force-cron"
+main = "index.js"
+compatibility_date = "2026-07-27"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "delta-force-prices"
+database_id = "b1a4f06e-4236-4a79-9ab4-1cd0fa72b224"
+
+[triggers]
+crons = ["0 22 * * *"]
