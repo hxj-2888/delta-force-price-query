@@ -1,0 +1,238 @@
+/* ========== 导航栏 ========== */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #1a1a2e;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.nav-back {
+  color: #667eea;
+  font-size: 16px;
+  width: 60px;
+}
+.nav-title {
+  flex: 1;
+  text-align: center;
+  font-size: 17px;
+  font-weight: bold;
+  color: #fff;
+}
+.nav-actions {
+  display: flex;
+  gap: 6px;
+  min-width: 80px;
+  justify-content: flex-end;
+}
+.nav-action {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0.7;
+  background: rgba(255,255,255,0.06);
+}
+.nav-action:active {
+  opacity: 1;
+}
+.nav-action.favorited {
+  color: #ffd700;
+  opacity: 1;
+}
+
+/* ========== 详情头部 ========== */
+.detail-header {
+  display: flex;
+  padding: 20px;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 12px;
+}
+.detail-pic {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.3);
+  margin-right: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.detail-pic image {
+  width: 100%;
+  height: 100%;
+}
+.detail-basic {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.detail-name {
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.detail-meta {
+  display: flex;
+  gap: 8px;
+}
+.meta-tag {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  color: #aaa;
+}
+.detail-desc {
+  font-size: 11px;
+  color: #666;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+/* ========== 价格卡片 ========== */
+.price-card {
+  margin: 0 12px 12px;
+  padding: 22px;
+  background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,165,0,0.05));
+  border: 1px solid rgba(255,215,0,0.2);
+  border-radius: 16px;
+}
+.price-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.price-card-title {
+  font-size: 12px;
+  color: #aaa;
+}
+.price-card-time {
+  font-size: 11px;
+  color: #555;
+}
+.price-main {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 16px;
+}
+.price-currency {
+  font-size: 20px;
+  color: #ffd700;
+  margin-right: 6px;
+}
+.price-value {
+  font-size: 36px;
+  font-weight: bold;
+  color: #ffd700;
+  letter-spacing: 1px;
+}
+.price-sub {
+  display: flex;
+  gap: 30px;
+}
+.sub-item {
+  display: flex;
+  flex-direction: column;
+}
+.sub-label {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 4px;
+}
+.sub-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ccc;
+}
+.sub-value.up {
+  color: #4caf50;
+}
+.sub-value.down {
+  color: #f44336;
+}
+
+/* ========== 趋势区域 ========== */
+.section {
+  margin: 0 12px 12px;
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #e0e0e0;
+}
+.trend-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.trend-card {
+  padding: 14px 10px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  text-align: center;
+}
+.trend-card.highlight {
+  background: rgba(102,126,234,0.1);
+  border-color: rgba(102,126,234,0.3);
+}
+.trend-card-label {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 6px;
+}
+.trend-card-price {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ddd;
+  margin-bottom: 4px;
+}
+.trend-card-change {
+  font-size: 11px;
+  font-weight: 500;
+}
+.trend-card-change.up {
+  color: #4caf50;
+}
+.trend-card-change.down {
+  color: #f44336;
+}
+
+/* ========== 属性信息 ========== */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+.info-label {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 4px;
+}
+.info-value {
+  font-size: 13px;
+  color: #ddd;
+  font-weight: 500;
+}
