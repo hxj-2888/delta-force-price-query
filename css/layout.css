@@ -1,0 +1,131 @@
+﻿/* ========== 椤甸潰鍒囨崲 ========== */
+.page { display: none; }
+.page.active { display: block; animation: fadeIn 0.3s ease; }
+.slide-in { animation: slideIn 0.3s ease; }
+
+/* ========== 棣栭〉澶撮儴 ========== */
+.header { padding: 32px 20px 16px; text-align: center; background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2)); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.header-logo { width: 84px; height: 84px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+.header-title { font-size: 24px; font-weight: bold; color: #fff; letter-spacing: 2px; margin-bottom: 4px; }
+.header-subtitle { font-size: 13px; color: #8890b0; margin-bottom: 6px; }
+.header-info { font-size: 11px; color: #555; margin-top: 4px; }
+
+/* ========== 鎼滅储鏍?========== */
+.search-bar { display: flex; align-items: center; margin: 16px 20px; padding: 12px 18px; background: rgba(255,255,255,0.08); border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+.search-placeholder { color: #666; font-size: 14px; }
+
+/* ========== 鍒嗙被缃戞牸 ========== */
+.category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 14px; }
+.category-card { display: flex; align-items: center; padding: 18px 16px; background: rgba(255,255,255,0.05); border-radius: 0; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: all 0.2s; }
+.category-card:active { background: rgba(102,126,234,0.2); border-color: rgba(102,126,234,0.4); transform: scale(0.97); }
+.category-card .cat-icon { width: 48px; text-align: center; font-size: 24px; margin-right: 10px; }
+.category-card .cat-name { flex: 1; font-size: 14px; font-weight: 500; }
+.category-card .cat-arrow { color: #555; font-size: 18px; }
+.category-card.all-items { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(255,215,0,0.12), rgba(255,165,0,0.06)); border: 1px solid rgba(255,215,0,0.35); }
+.category-card.all-items .cat-name { font-size: 16px; color: #ffd700; }
+.category-card.all-items .cat-icon { font-size: 28px; }
+.category-card.all-items:active { background: linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,165,0,0.12)); }
+
+/* ========== 搴曢儴瀵艰埅 ========== */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 500px; display: flex;
+  background: #1a1a2e; border-top: 2px solid rgba(0, 255, 0, 0.25);
+  padding: 8px 0; z-index: 100;
+}
+.bottom-nav .tab { flex: 1; text-align: center; cursor: pointer; user-select: none; color: #666; transition: all 0.2s; padding: 4px 0; }
+.bottom-nav .tab.active { color: #00e676; }
+.bottom-nav .tab .tab-label { font-size: 11px; }
+.bottom-nav .tab:active { opacity: 0.5; }
+
+/* ========== 瀵艰埅鏍?========== */
+.nav-bar { display: flex; align-items: center; padding: 12px 16px; background: #1a1a2e; border-bottom: 1px solid rgba(255,255,255,0.05); position: sticky; top: 0; z-index: 10; }
+.nav-back { color: #667eea; font-size: 16px; cursor: pointer; width: 60px; }
+.nav-title { flex: 1; text-align: center; font-size: 17px; font-weight: bold; color: #fff; }
+.nav-actions { display: flex; gap: 6px; min-width: 80px; justify-content: flex-end; }
+.nav-action { font-size: 12px; cursor: pointer; padding: 4px 8px; border-radius: 4px; opacity: 0.7; transition: opacity 0.2s; background: rgba(255,255,255,0.06); }
+.nav-action:hover { opacity: 1; }
+.nav-action.spinning { animation: spin 0.8s linear infinite; }
+.refresh-all { color: #667eea; font-size: 11px; cursor: pointer; margin-left: 8px; opacity: 0.7; transition: opacity 0.2s; }
+.refresh-all:hover { opacity: 1; }
+
+/* ========== 鍒楄〃缁熻 / 鎺掑簭 ========== */
+.list-stats { display: flex; justify-content: space-between; padding: 12px 20px; font-size: 12px; color: #888; background: rgba(255,255,255,0.02); }
+.sort-bar { display: flex; gap: 8px; padding: 8px 16px; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.04); }
+.sort-btn { font-size: 11px; padding: 6px 14px; border-radius: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #888; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.sort-btn:active { transform: scale(0.95); }
+.sort-btn.active { background: rgba(102,126,234,0.2); border-color: rgba(102,126,234,0.4); color: #aab8ff; }
+.sort-dir { margin-left: 2px; font-size: 10px; }
+
+/* ========== 鍒嗛〉 ========== */
+.pagination { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 16px 12px; flex-wrap: wrap; }
+.page-btn { width: 34px; height: 34px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #aaa; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; user-select: none; }
+.page-btn:active { background: rgba(102,126,234,0.25); border-color: rgba(102,126,234,0.4); color: #fff; }
+.page-btn.active { background: rgba(102,126,234,0.25); border-color: rgba(102,126,234,0.5); color: #aab8ff; font-weight: bold; }
+.page-btn.disabled { opacity: 0.25; pointer-events: none; }
+.page-btn.arrow { font-size: 16px; }
+.page-info { font-size: 11px; color: #666; text-align: center; padding: 4px 12px; }
+
+/* ========== 鎼滅储椤靛ご閮?========== */
+.search-header { display: flex; align-items: center; padding: 10px 14px; background: #1a1a2e; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.search-input-wrap { flex: 1; display: flex; align-items: center; background: rgba(255,255,255,0.08); border-radius: 22px; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.1); }
+.search-input-wrap input { flex: 1; background: none; border: none; outline: none; color: #fff; font-size: 14px; }
+.search-input-wrap input::placeholder { color: #555; }
+.search-clear { color: #666; font-size: 16px; padding: 0 6px; cursor: pointer; display: none; }
+.search-clear.visible { display: block; }
+.search-cancel { color: #667eea; font-size: 14px; padding: 8px 12px; cursor: pointer; flex-shrink: 0; }
+.search-hint { text-align: center; padding: 40px 30px 20px; }
+.search-hint .hint-title { font-size: 16px; color: #aaa; margin-bottom: 10px; }
+.search-hint .hint-text { font-size: 13px; color: #666; }
+
+/* ========== 筛选工具栏 ========== */
+.filter-toolbar {
+  display: flex; align-items: center; justify-content: space-evenly; gap: 4px;
+  padding: 6px 8px; background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: sticky; top: 0; z-index: 20;
+}
+.toolbar-btn {
+  flex: 1; font-size: 11px; padding: 6px 4px; border-radius: 14px; text-align: center;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+  color: #aaa; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+}
+.toolbar-btn:active { transform: scale(0.95); }
+.toolbar-arrow { font-size: 8px; color: #666; }
+
+/* ========== 下拉面板（筛选 / 排序） ========== */
+.dropdown-panel {
+  position: fixed; z-index: 101;
+  min-width: 175px; max-width: 240px;
+  background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+  overflow: hidden; animation: fadeIn 0.15s ease;
+}
+/* 分类纵列（小号紧凑） */
+.filter-cat-list {
+  display: flex; flex-direction: column; padding: 0 8px;
+}
+.filter-cat-chip {
+  font-size: 12px; padding: 8px 12px; border-radius: 6px; text-align: left;
+  background: transparent; border: none; color: #aaa; cursor: pointer;
+  transition: all 0.12s; white-space: nowrap;
+}
+.filter-cat-chip:active { background: rgba(102,126,234,0.2); }
+.filter-cat-chip.active {
+  background: rgba(102,126,234,0.18); color: #aab8ff; font-weight: 500;
+}
+
+/* 下拉菜单项 */
+.dropdown-item {
+  padding: 10px 14px; font-size: 13px; color: #aaa; cursor: pointer;
+  transition: background 0.12s; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:active { background: rgba(102,126,234,0.2); }
+.dropdown-item.active { color: #aab8ff; background: rgba(102,126,234,0.12); }
+
+/* ========== 首页物品列表 ========== */
+.home-movers-section { margin: 0 12px 12px; }
+
+/* ========== 浜壊涓婚瑕嗙洊 ========== */
