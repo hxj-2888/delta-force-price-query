@@ -1,11 +1,9 @@
 <!--
-index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v20260730m
-功能清单: 预取v3(item_price_all+metadata双请求合并) | 加载动画+进度条 | 首页(筛选/排序/分页/涨跌Top2)
-列表页(分类/排序/分页) | 详情页(价格图表/收藏) | 搜索页(实时搜索/历史/最近浏览/收藏) | 底部Tab导航
+index.html �?三角洲行动变卖物价格查询 PWA 主入�?| build: v20260730m-deploy114358
+功能清单: 预取v3(item_price_all+metadata双请求合�? | 加载动画+进度�?| 首页(筛�?排序/分页/涨跌Top2)
+列表�?分类/排序/分页) | 详情�?价格图表/收藏) | 搜索�?实时搜索/历史/最近浏�?收藏) | 底部Tab导航
 依赖: js/bundle.js(合并所有JS模块) css/layout.css css/components.css
-改动影响: 修改预取逻辑→影响加载速度和数据完整性; 修改DOM结构→影响render.js的innerHTML选择器
-修复(v20260730m): Tab切回首页不重渲染(保持滚动+分页) | 收藏页不触发loadAllItems | 图表数据点日历对齐
--->
+改动影响: 修改预取逻辑→影响加载速度和数据完整�? 修改DOM结构→影响render.js的innerHTML选择�?修复(v20260730m): Tab切回首页不重渲染(保持滚动+分页) | 收藏页不触发loadAllItems | 图表数据点日历对�?-->
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
 <head>
@@ -14,24 +12,22 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   <meta http-equiv="Cache-Control" content="no-cache">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>三角洲行动 - 变卖物价格查询</title>
+  <title>三角洲行�?- 变卖物价格查�?/title>
   <link rel="icon" type="image/webp" href="/delta-force-logo.webp">
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="三角洲价格查询">
-  <!-- ★ 预连接上游 API 域名，减少 TLS 握手延迟 -->
+  <meta name="apple-mobile-web-app-title" content="三角洲价格查�?>
+  <!-- �?预连接上�?API 域名，减�?TLS 握手延迟 -->
   <link rel="preconnect" href="https://orzice.com" crossorigin>
   <link rel="dns-prefetch" href="https://orzice.com">
   <link rel="preload" href="/delta-force-logo.webp" as="image" fetchpriority="high">
   <script>
-    // ★ 同源：使用部署站点自带的 /api 代理（Cloudflare Pages Functions）
-    window.__WORKER_BASE = '';
+    // �?同源：使用部署站点自带的 /api 代理（Cloudflare Pages Functions�?    window.__WORKER_BASE = '';
   </script>
   <script>
-    // ★ 预取 v3：metadata.json（静态元数据）+ item_price_all（实时价格）→ 客户端合并
-    // 2 请求替代 143 请求，~2s 拿到全量 1350 件，排序/筛选纯本地
+    // �?预取 v3：metadata.json（静态元数据�? item_price_all（实时价格）�?客户端合�?    // 2 请求替代 143 请求，~2s 拿到全量 1350 件，排序/筛选纯本地
     window.__prefetch = (function() {
       var CATS = ['gun','ammo','acc','helmet','armor','chest','bag','key','collection','consume'];
       var proxyUrl = window.__WORKER_BASE + '/api/proxy';
@@ -61,8 +57,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         }
       }
 
-      // 初始化分类对象（保持与 v2 兼容）
-      CATS.forEach(function(cat) {
+      // 初始化分类对象（保持�?v2 兼容�?      CATS.forEach(function(cat) {
         var quickResolve, quickReject;
         var obj = {
           _resolvedData: [],
@@ -78,7 +73,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         running[cat] = obj;
       });
 
-      // ★ 检查 localStorage 是否有缓存（用于加速加载动画）
+      // �?检�?localStorage 是否有缓存（用于加速加载动画）
       var _hasCache = false;
       try {
         var _raw = localStorage.getItem('deltaforce_cache_v10');
@@ -88,28 +83,26 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         }
       } catch(e) {}
 
-      // ★ 涨幅前二数据（item_price_all 返回后填充）
+      // �?涨幅前二数据（item_price_all 返回后填充）
       var _topMoverData = null;
       var _topMoverApiDone = false;
       running._topMoverData = null;
       running._topMoverApiDone = false;
 
-      // ★ 核心：并行拉取价格 + 元数据，客户端合并
-      // metadata 优先从 /api/metadata（KV动态更新）获取，失败降级到静态文件
-      var metadataPromise = fetch('/api/metadata')
+      // �?核心：并行拉取价�?+ 元数据，客户端合�?      // metadata 优先�?/api/metadata（KV动态更新）获取，失败降级到静态文�?      var metadataPromise = fetch('/api/metadata')
         .then(function(r) { return r.json(); })
         .catch(function() {
-          console.warn('[prefetch] /api/metadata 不可用，降级到静态文件');
+          console.warn('[prefetch] /api/metadata 不可用，降级到静态文�?);
           return fetch('/data/metadata.json')
             .then(function(r) { return r.json(); })
             .catch(function() {
-              console.error('[prefetch] 静态 metadata 也失败，物品将显示为"物品#ID"');
+              console.error('[prefetch] 静�?metadata 也失败，物品将显示为"物品#ID"');
               running._metadataFailed = true;
               return {};
             });
         });
 
-      // ★ 带超时 + 1次重试的 fetch
+      // �?带超�?+ 1次重试的 fetch
       function _fetchWithTimeout(url, timeoutMs) {
         return new Promise(function(resolve, reject) {
           var controller = new AbortController();
@@ -123,25 +116,25 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
       function _fetchPriceAllWithRetry() {
         var url = proxyUrl + '?endpoint=item_price_all';
         return _fetchWithTimeout(url, 15000).catch(function(err) {
-          console.warn('[prefetch] item_price_all 首次失败(' + err.message + ')，1秒后重试...');
+          console.warn('[prefetch] item_price_all 首次失败(' + err.message + ')�?秒后重试...');
           return new Promise(function(resolve) {
             setTimeout(function() { resolve(_fetchWithTimeout(url, 15000)); }, 1000);
           });
         }).catch(function(err) {
-          console.warn('[prefetch] item_price_all 重试也失败(' + err.message + ')');
+          console.warn('[prefetch] item_price_all 重试也失�?' + err.message + ')');
           return new Promise(function(resolve) {
             setTimeout(function() { resolve(_fetchWithTimeout(url, 20000)); }, 1500);
           });
         });
       }
 
-      // ★ 错误状态（loading 层可检查）
+      // �?错误状态（loading 层可检查）
       running._error = null;
       running._metadataFailed = false;  // metadata 加载失败标志
       running.getError = function() { return running._error; };
       running.isMetadataDegraded = function() { return running._metadataFailed; };
 
-      // ★ 暴露重试入口
+      // �?暴露重试入口
       running.retry = function() { location.reload(); };
 
       Promise.all([
@@ -157,13 +150,12 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
           return;
         }
 
-        // ★ 合并：item_price_all 提供价格，metadata 提供名称/图标/分类
+        // �?合并：item_price_all 提供价格，metadata 提供名称/图标/分类
         var merged = priceRes.data.map(function(item) {
           var meta = metadata[item.id] || metadata[item.tid] || {};
           var result = Object.assign({}, item, meta);
           if (!result._category) {
-            // 尝试用 tid 在 metadata 中查找
-            var metaByTid = metadata[item.tid];
+            // 尝试�?tid �?metadata 中查�?            var metaByTid = metadata[item.tid];
             if (metaByTid) {
               result = Object.assign({}, item, metaByTid);
             } else {
@@ -174,8 +166,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
           return result;
         });
 
-        // ★ 补充 metadata 中有但 item_price_all 中没有的物品（已下架/过期物品）
-        var priceIds = {};
+        // �?补充 metadata 中有�?item_price_all 中没有的物品（已下架/过期物品�?        var priceIds = {};
         merged.forEach(function(item) { priceIds[item.id] = true; if (item.tid) priceIds[item.tid] = true; });
         Object.keys(metadata).forEach(function(id) {
           if (!priceIds[Number(id)] && !priceIds[id]) {
@@ -187,7 +178,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
           }
         });
 
-        // ★ 元数据自动补全：检测合并后仍有未知分类/无名物品，从 item_list API 补全
+        // �?元数据自动补全：检测合并后仍有未知分类/无名物品，从 item_list API 补全
         var _unknownItems = merged.filter(function(item) {
           return !item._category || item._category === 'unknown' || !item.name || item.name.indexOf('物品#') === 0;
         });
@@ -195,7 +186,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         if (_unknownItems.length > 0) {
           console.warn('[prefetch] 发现 ' + _unknownItems.length + ' 个未知物品，启动补全...');
 
-          // Phase 1: 用已获取的 metadata 按 tid 二次匹配
+          // Phase 1: 用已获取�?metadata �?tid 二次匹配
           if (Object.keys(metadata).length > 0) {
             _unknownItems.forEach(function(item) {
               if (item.tid && metadata[item.tid]) {
@@ -207,8 +198,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
             });
           }
 
-          // Phase 2: 从 item_list 第1页并行拉取 10 个分类补全
-          if (_unknownItems.length > 0) {
+          // Phase 2: �?item_list �?页并行拉�?10 个分类补�?          if (_unknownItems.length > 0) {
             var _unknownIds = {};
             _unknownItems.forEach(function(item) { _unknownIds[item.id] = true; if (item.tid) _unknownIds[item.tid] = true; });
 
@@ -252,7 +242,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
               if (_patched > 0) {
                 console.log('[prefetch] 补全完成: ' + _patched + ' 个物品获得元数据');
               } else {
-                console.warn('[prefetch] item_list page1 未找到剩余未知物品的元数据');
+                console.warn('[prefetch] item_list page1 未找到剩余未知物品的元数�?);
               }
             } catch(e) {
               console.warn('[prefetch] item_list 补全失败:', e.message);
@@ -262,8 +252,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
 
         _allMerged = merged;
 
-        // ★ 按分类分配
-        var catMap = {};
+        // �?按分类分�?        var catMap = {};
         CATS.forEach(function(c) { catMap[c] = []; });
         merged.forEach(function(item) {
           var cat = item._category;
@@ -272,8 +261,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
           }
         });
 
-        // 填充各分类对象
-        CATS.forEach(function(cat) {
+        // 填充各分类对�?        CATS.forEach(function(cat) {
           var items = catMap[cat];
           items.sort(function(a, b) { return _significanceScore(b) - _significanceScore(a); });
           var o = running[cat];
@@ -287,7 +275,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
           if (typeof o._onComplete === 'function') o._onComplete(items);
         });
 
-        // ★ 涨幅前二数据就绪
+        // �?涨幅前二数据就绪
         _topMoverData = priceRes.data;
         _topMoverApiDone = true;
         running._topMoverData = _topMoverData;
@@ -309,10 +297,9 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         }
       }).catch(function(err) {
         console.error('[prefetch] 加载失败:', err);
-        running._error = err.message || '数据加载失败，请检查网络连接';
+        running._error = err.message || '数据加载失败，请检查网络连�?;
         _allReject(err);
-        // ★ 3 秒后仍未恢复 → 显示重试按钮（loading 层的 8s 超时可能已隐藏 loading）
-        var errWrap = document.getElementById('loadingRetryWrap');
+        // �?3 秒后仍未恢复 �?显示重试按钮（loading 层的 8s 超时可能已隐�?loading�?        var errWrap = document.getElementById('loadingRetryWrap');
         var errText = document.getElementById('loadingErrorText');
         var statusEl = document.getElementById('loadingStatus');
         if (errWrap) errWrap.style.display = 'flex';
@@ -320,33 +307,29 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         if (statusEl) statusEl.textContent = '连接超时';
       });
 
-      // ★ 暴露 API（保持与 v2 兼容）
-      running._allPage1Ready = _allReady;
+      // �?暴露 API（保持与 v2 兼容�?      running._allPage1Ready = _allReady;
       running._totalArrived = 0;
       running.getTotalArrived = function() { return _totalArrived; };
       running.onItemsArrive = function(cb) { _onArriveCallbacks.push(cb); };
       running.getAllPage1Items = function() { return _allMerged.slice(); };
       running.isAllPage1Ready = function() { return _dataReady; };
-      running.startPagination = function() {}; // no-op: 数据一次到齐
-      running.getQueueLength = function() { return 0; };
+      running.startPagination = function() {}; // no-op: 数据一次到�?      running.getQueueLength = function() { return 0; };
       running.isPaginationDone = function() { return _dataReady; };
       running.hasCache = _hasCache;
       running.getProgress = function() {
         return _dataReady ? 0.98 : 0.05;
       };
       running.getExpectedTotal = function() { return _dataReady ? _totalArrived : 1350; };
-      // ★ 新增：分类全量检查
-      running.isCategoryComplete = function(cat) { return _dataReady; };
+      // �?新增：分类全量检�?      running.isCategoryComplete = function(cat) { return _dataReady; };
       running.getCategoryLoadedCount = function(cat) {
         var o = running[cat];
         return o && o._resolvedData ? o._resolvedData.length : 0;
       };
-      running.prioritizeCategory = function(cat) {}; // no-op: 数据一次到齐
-
+      running.prioritizeCategory = function(cat) {}; // no-op: 数据一次到�?
       return running;
     })();
   </script>
-  <!-- ★ 关键 CSS 内联，消除渲染阻塞请求 -->
+  <!-- �?关键 CSS 内联，消除渲染阻塞请�?-->
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     html{overscroll-behavior-y:contain}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#000;color:#e0e0e0;font-size:14px;min-height:100vh;overflow-x:hidden;overscroll-behavior-y:contain;touch-action:manipulation}
@@ -385,13 +368,13 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   <div class="loading-screen" id="loadingScreen">
   <div class="loading-logo-wrap">
     <div class="loading-logo-glow" id="loadingGlow"></div>
-    <img class="loading-logo-img" id="loadingLogo" src="delta-force-logo.webp" alt="三角洲行动" onerror="this.src='delta-force-logo.png'">
+    <img class="loading-logo-img" id="loadingLogo" src="delta-force-logo.webp" alt="三角洲行�? onerror="this.src='delta-force-logo.png'">
   </div>
   <div class="loading-progress-wrap">
     <div class="loading-progress-track">
       <div class="loading-progress-bar" id="loadingProgressBar"></div>
     </div>
-    <div class="loading-status" id="loadingStatus">正在连接数据源...</div>
+    <div class="loading-status" id="loadingStatus">正在连接数据�?..</div>
     <div class="loading-retry-wrap" id="loadingRetryWrap" style="display:none">
       <div class="loading-error-text" id="loadingErrorText"></div>
       <button class="loading-retry-btn" onclick="location.reload()">重新加载</button>
@@ -402,48 +385,48 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
     <!-- ===== 首页（合并价格异动）===== -->
     <div class="page active" id="page-home">
       <div class="header">
-        <img class="header-logo" src="delta-force-logo.webp" alt="三角洲行动" onerror="this.src='delta-force-logo.png'">
-        <div class="header-title">三角洲行动</div>
-        <div class="header-subtitle">变卖物实时价格查询</div>
+        <img class="header-logo" src="delta-force-logo.webp" alt="三角洲行�? onerror="this.src='delta-force-logo.png'">
+        <div class="header-title">三角洲行�?/div>
+        <div class="header-subtitle">变卖物实时价格查�?/div>
         <div class="header-info">
           <span class="refresh-all" onclick="refreshAllData()">刷新全部</span>
           <span id="autoRefreshTime" style="font-size:10px;color:#555;margin-left:8px"></span>
         </div>
       </div>
 
-      <!-- ★ 筛选工具栏：时间 / 价格 / 分类 / 排序 四个下拉 -->
+      <!-- �?筛选工具栏：时�?/ 价格 / 分类 / 排序 四个下拉 -->
       <div class="filter-toolbar" id="filterToolbar">
         <button class="toolbar-btn" id="btnTime" onclick="toggleTimeDropdown()">
-          <span id="timeLabel">近1天</span><span class="toolbar-arrow">▾</span>
+          <span id="timeLabel">�?�?/span><span class="toolbar-arrow">�?/span>
         </button>
         <button class="toolbar-btn" id="btnPrice" onclick="togglePriceDropdown()">
-          <span id="priceLabel">全部价格</span><span class="toolbar-arrow">▾</span>
+          <span id="priceLabel">全部价格</span><span class="toolbar-arrow">�?/span>
         </button>
         <button class="toolbar-btn" id="btnFilter" onclick="toggleFilterDropdown()">
-          <span id="filterLabel">筛选</span><span class="toolbar-arrow">▾</span>
+          <span id="filterLabel">筛�?/span><span class="toolbar-arrow">�?/span>
         </button>
         <button class="toolbar-btn" id="btnSort" onclick="toggleSortDropdown()">
-          <span id="sortLabel">综合↓</span><span class="toolbar-arrow">▾</span>
+          <span id="sortLabel">综合�?/span><span class="toolbar-arrow">�?/span>
         </button>
       </div>
 
-      <!-- ★ 时间下拉 -->
+      <!-- �?时间下拉 -->
       <div class="dropdown-panel" id="timeDropdown" style="display:none" onclick="event.stopPropagation()">
-        <button class="dropdown-item active" type="button" data-period="bl" onclick="event.stopPropagation();setHomePeriod('bl')">近1天</button>
-        <button class="dropdown-item" type="button" data-period="day_3_bl" onclick="event.stopPropagation();setHomePeriod('day_3_bl')">近3天</button>
-        <button class="dropdown-item" type="button" data-period="day_7_bl" onclick="event.stopPropagation();setHomePeriod('day_7_bl')">近7天</button>
+        <button class="dropdown-item active" type="button" data-period="bl" onclick="event.stopPropagation();setHomePeriod('bl')">�?�?/button>
+        <button class="dropdown-item" type="button" data-period="day_3_bl" onclick="event.stopPropagation();setHomePeriod('day_3_bl')">�?�?/button>
+        <button class="dropdown-item" type="button" data-period="day_7_bl" onclick="event.stopPropagation();setHomePeriod('day_7_bl')">�?�?/button>
       </div>
 
-      <!-- ★ 价格下拉 -->
+      <!-- �?价格下拉 -->
       <div class="dropdown-panel" id="priceDropdown" style="display:none" onclick="event.stopPropagation()">
         <button class="dropdown-item active" type="button" data-range="all" onclick="event.stopPropagation();setHomePriceRange('all')">全部价格</button>
-        <button class="dropdown-item" type="button" data-range="lt1w" onclick="event.stopPropagation();setHomePriceRange('lt1w')">&lt; 1万</button>
-        <button class="dropdown-item" type="button" data-range="1-10w" onclick="event.stopPropagation();setHomePriceRange('1-10w')">1万 ~ 10万</button>
-        <button class="dropdown-item" type="button" data-range="10-100w" onclick="event.stopPropagation();setHomePriceRange('10-100w')">10万 ~ 100万</button>
-        <button class="dropdown-item" type="button" data-range="gt100w" onclick="event.stopPropagation();setHomePriceRange('gt100w')">&gt; 100万</button>
+        <button class="dropdown-item" type="button" data-range="lt1w" onclick="event.stopPropagation();setHomePriceRange('lt1w')">&lt; 1�?/button>
+        <button class="dropdown-item" type="button" data-range="1-10w" onclick="event.stopPropagation();setHomePriceRange('1-10w')">1�?~ 10�?/button>
+        <button class="dropdown-item" type="button" data-range="10-100w" onclick="event.stopPropagation();setHomePriceRange('10-100w')">10�?~ 100�?/button>
+        <button class="dropdown-item" type="button" data-range="gt100w" onclick="event.stopPropagation();setHomePriceRange('gt100w')">&gt; 100�?/button>
       </div>
 
-      <!-- ★ 筛选下拉（仅十大分类） -->
+      <!-- �?筛选下拉（仅十大分类） -->
       <div class="dropdown-panel" id="filterDropdown" style="display:none" onclick="event.stopPropagation()">
         <div class="filter-cat-list" id="filterCatList">
           <button class="filter-cat-chip active" data-cat="all" onclick="event.stopPropagation();setHomeCategory('all')">全部类型</button>
@@ -454,19 +437,19 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
           <button class="filter-cat-chip" data-cat="armor" onclick="event.stopPropagation();setHomeCategory('armor')">护甲</button>
           <button class="filter-cat-chip" data-cat="chest" onclick="event.stopPropagation();setHomeCategory('chest')">胸挂</button>
           <button class="filter-cat-chip" data-cat="bag" onclick="event.stopPropagation();setHomeCategory('bag')">背包</button>
-          <button class="filter-cat-chip" data-cat="key" onclick="event.stopPropagation();setHomeCategory('key')">钥匙卡</button>
-          <button class="filter-cat-chip" data-cat="collection" onclick="event.stopPropagation();setHomeCategory('collection')">收集品</button>
+          <button class="filter-cat-chip" data-cat="key" onclick="event.stopPropagation();setHomeCategory('key')">钥匙�?/button>
+          <button class="filter-cat-chip" data-cat="collection" onclick="event.stopPropagation();setHomeCategory('collection')">收集�?/button>
           <button class="filter-cat-chip" data-cat="consume" onclick="event.stopPropagation();setHomeCategory('consume')">消耗品</button>
         </div>
       </div>
 
-      <!-- ★ 排序下拉 -->
+      <!-- �?排序下拉 -->
       <div class="dropdown-panel" id="sortDropdown" style="display:none" onclick="event.stopPropagation()">
         <button class="dropdown-item active" type="button" data-sort="default" data-dir="" onclick="event.stopPropagation();setHomeSort('default','desc')">默认 (综合热度)</button>
-        <button class="dropdown-item" type="button" data-sort="change" data-dir="desc" onclick="event.stopPropagation();setHomeSort('change','desc')">涨跌幅 ↓ (高到低)</button>
-        <button class="dropdown-item" type="button" data-sort="change" data-dir="asc" onclick="event.stopPropagation();setHomeSort('change','asc')">涨跌幅 ↑ (低到高)</button>
-        <button class="dropdown-item" type="button" data-sort="price" data-dir="desc" onclick="event.stopPropagation();setHomeSort('price','desc')">价格 ↓ (高到低)</button>
-        <button class="dropdown-item" type="button" data-sort="price" data-dir="asc" onclick="event.stopPropagation();setHomeSort('price','asc')">价格 ↑ (低到高)</button>
+        <button class="dropdown-item" type="button" data-sort="change" data-dir="desc" onclick="event.stopPropagation();setHomeSort('change','desc')">涨跌�?�?(高到�?</button>
+        <button class="dropdown-item" type="button" data-sort="change" data-dir="asc" onclick="event.stopPropagation();setHomeSort('change','asc')">涨跌�?�?(低到�?</button>
+        <button class="dropdown-item" type="button" data-sort="price" data-dir="desc" onclick="event.stopPropagation();setHomeSort('price','desc')">价格 �?(高到�?</button>
+        <button class="dropdown-item" type="button" data-sort="price" data-dir="asc" onclick="event.stopPropagation();setHomeSort('price','asc')">价格 �?(低到�?</button>
       </div>
 
       <div class="search-bar" onclick="showSearch()">
@@ -479,16 +462,16 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         <div id="priceChangedItems"></div>
       </div>
 
-      <!-- ★ 首页物品列表 -->
+      <!-- �?首页物品列表 -->
       <div class="home-movers-section" id="homeMoversSection">
         <div id="homeMoversList"></div>
       </div>
     </div>
 
-    <!-- ===== 列表页 ===== -->
+    <!-- ===== 列表�?===== -->
     <div class="page" id="page-list">
       <div class="nav-bar">
-        <div class="nav-back" onclick="goBack()">‹ 返回</div>
+        <div class="nav-back" onclick="goBack()">�?返回</div>
         <div class="nav-title" id="listTitle">物品列表</div>
         <div class="nav-actions">
           <span class="nav-action" onclick="refreshCurrentList()" title="刷新当前分类">刷新</span>
@@ -497,40 +480,40 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
       </div>
       <div class="list-stats" id="listStats"></div>
       <div class="sort-bar" id="sortBar">
-        <button class="sort-btn active" data-sort="price" onclick="setSort('price')">价格<span class="sort-dir" id="dir-price">↓</span></button>
-        <button class="sort-btn" data-sort="change" onclick="setSort('change')">涨跌幅<span class="sort-dir" id="dir-change"></span></button>
+        <button class="sort-btn active" data-sort="price" onclick="setSort('price')">价格<span class="sort-dir" id="dir-price">�?/span></button>
+        <button class="sort-btn" data-sort="change" onclick="setSort('change')">涨跌�?span class="sort-dir" id="dir-change"></span></button>
       </div>
       <div id="listContent"></div>
       <div id="pagination"></div>
     </div>
 
-    <!-- ===== 详情页 ===== -->
+    <!-- ===== 详情�?===== -->
     <div class="page" id="page-detail">
       <div class="nav-bar">
-        <div class="nav-back" onclick="goBack()">‹ 返回</div>
+        <div class="nav-back" onclick="goBack()">�?返回</div>
         <div class="nav-title">物品详情</div>
         <div class="nav-actions">
           <span class="nav-action" id="detailFavBtn" onclick="toggleCurrentFavorite()" title="收藏"></span>
-          <span class="nav-action" onclick="refreshCurrentItem()" title="刷新此物品">刷新</span>
+          <span class="nav-action" onclick="refreshCurrentItem()" title="刷新此物�?>刷新</span>
         </div>
       </div>
       <div id="detailContent">
-        <div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">正在向API请求最新数据...</div></div>
+        <div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">正在向API请求最新数�?..</div></div>
       </div>
     </div>
 
-    <!-- ===== 搜索页 ===== -->
+    <!-- ===== 搜索�?===== -->
     <div class="page slide-in" id="page-search">
       <div class="search-header">
         <div class="search-input-wrap">
           <input type="text" id="searchInput" placeholder="输入物品名称搜索..." autocomplete="off">
-          <span class="search-clear" id="searchClear" onclick="clearSearch()">✕</span>
+          <span class="search-clear" id="searchClear" onclick="clearSearch()">�?/span>
         </div>
         <div class="search-cancel" onclick="hideSearch()">取消</div>
       </div>
       <div class="search-hint" id="searchHint">
         <div class="hint-title">搜索提示</div>
-        <div class="hint-text">支持搜索物品名称关键词<br>例如：头盔、弹匣、钥匙、瞄具...</div>
+        <div class="hint-text">支持搜索物品名称关键�?br>例如：头盔、弹匣、钥匙、瞄�?..</div>
       </div>
       <!-- 搜索历史 -->
       <div class="history-section" id="searchHistory" style="display:none">
@@ -540,10 +523,10 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         </div>
         <div class="history-tags" id="historyTags"></div>
       </div>
-      <!-- 最近浏览 -->
+      <!-- 最近浏�?-->
       <div class="history-section" id="recentViewSection" style="display:none">
         <div class="history-title">
-          <span>最近浏览</span>
+          <span>最近浏�?/span>
           <span class="history-clear" onclick="clearRecentViews()">清空</span>
         </div>
         <div class="recent-items" id="recentViewItems"></div>
@@ -560,10 +543,10 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
     </div>
 
 
-    <!-- ===== 我的收藏页 ===== -->
+    <!-- ===== 我的收藏�?===== -->
     <div class="page" id="page-favtab">
       <div class="nav-bar">
-        <div class="nav-back" onclick="switchTab('home')">‹ 首页</div>
+        <div class="nav-back" onclick="switchTab('home')">�?首页</div>
         <div class="nav-title">我的收藏</div>
         <div class="nav-actions">
           <span class="nav-action" onclick="refreshFavTab()" title="刷新">刷新</span>
@@ -583,9 +566,9 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
     </div>
   </div>
 
-  <!-- Service Worker 注册（必须在 bundle 之前加载） -->
+  <!-- Service Worker 注册（必须在 bundle 之前加载�?-->
   <script src="js/sw-register.js?v=v20260730m" defer></script>
-  <!-- ★ 单文件 bundle：减少 HTTP 请求 6→1，defer 不阻塞解析 -->
+  <!-- �?单文�?bundle：减�?HTTP 请求 6�?，defer 不阻塞解�?-->
   <script src="js/bundle.js?v=v20260730m" defer></script>
 </body>
 </html>
