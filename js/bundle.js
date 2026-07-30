@@ -1,13 +1,14 @@
-// 三角洲行动 — JS Bundle (all modules combined)
-// v20260730m — 自动生成于 2026-07-30 02:47:09
+/* deploy:20260730114358 */
+// 三角洲行�?�?JS Bundle (all modules combined)
+// v20260730m �?自动生成�?2026-07-30 02:47:09
 
 // ===== utils.js =====
-// ===== utils.js — 工具函数集 =====
-// 功能清单: 价格格式化(formatPrice) | 涨跌格式化(formatChange/getChangeClass) | 时间格式化(formatTime)
+// ===== utils.js �?工具函数�?=====
+// 功能清单: 价格格式�?formatPrice) | 涨跌格式�?formatChange/getChangeClass) | 时间格式�?formatTime)
 // 等级文本/颜色(getGradeText/getGradeColor) | Toast提示 | URL清洗(sanitizeUrl) | HTML转义(escapeHtml)
-// JS字符串转义(escapeJSStr) | 分类图标(catIconHTML) | 短价格(shortPrice) | 大数字格式化(formatLargeNum)
-// 依赖: 无(纯函数) | 被依赖: render.js(渲染时格式化) main.js(提示/转义)
-// 改动影响: 修改formatPrice→影响所有价格显示; 修改toast→影响所有用户提示
+// JS字符串转�?escapeJSStr) | 分类图标(catIconHTML) | 短价�?shortPrice) | 大数字格式化(formatLargeNum)
+// 依赖: �?纯函�? | 被依�? render.js(渲染时格式化) main.js(提示/转义)
+// 改动影响: 修改formatPrice→影响所有价格显�? 修改toast→影响所有用户提�?
 
 var _toastTimer = null;
 
@@ -29,12 +30,12 @@ function getChangeClass(bl) {
 function formatTime(ts) {
   if (!ts) return '--';
   const d = new Date(ts * 1000);
-  return `${d.getMonth()+1}月${d.getDate()}日 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return `${d.getMonth()+1}�?{d.getDate()}�?${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
 function getGradeText(g) {
-  const grades = ['', '一级', '二级', '三级', '四级', '五级', '六级'];
-  return grades[g] || (g ? g + '级' : '');
+  const grades = ['', '一�?, '二级', '三级', '四级', '五级', '六级'];
+  return grades[g] || (g ? g + '�? : '');
 }
 
 function getGradeColor(g) {
@@ -51,10 +52,10 @@ function toast(msg, duration) {
   _toastTimer = setTimeout(function() { t.classList.remove('show'); }, duration);
 }
 
-// 安全清洗图片URL（仅允许 http/https 绝对 URL 和绝对路径，拒绝 protocol-relative URL）
+// 安全清洗图片URL（仅允许 http/https 绝对 URL 和绝对路径，拒绝 protocol-relative URL�?
 function sanitizeUrl(url) {
   if (!url || typeof url !== 'string') return '';
-  // ★ 仅允许 https?:// 开头的绝对 URL 或以 / 开头的站点相对路径
+  // �?仅允�?https?:// 开头的绝对 URL 或以 / 开头的站点相对路径
   var safeRegex = /^(https?:\/\/|\/)/i;
   if (safeRegex.test(url)) {
     return url.replace(/["'<>]/g, '');
@@ -70,7 +71,7 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// JS 字符串转义（用于 onclick 等事件属性中的字符串参数）
+// JS 字符串转义（用于 onclick 等事件属性中的字符串参数�?
 function escapeJSStr(str) {
   if (str == null) return '';
   return String(str)
@@ -86,28 +87,28 @@ function catIconHTML(url) {
   return '<img src="' + sanitizeUrl(url) + '" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:6px" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML=this.parentElement.getAttribute(\'data-fallback\')||\'\'">';
 }
 
-// 短格式价格（用于图表标签）
+// 短格式价格（用于图表标签�?
 function shortPrice(p) {
   if (p >= 10000) return (p / 10000).toFixed(1) + 'w';
   if (p >= 1000) return (p / 1000).toFixed(1) + 'k';
   return Math.round(p).toString();
 }
 
-// ★ 大数字格式化（用于物品总数显示）
+// �?大数字格式化（用于物品总数显示�?
 function formatLargeNum(n) {
   if (n == null || n === undefined) return '0';
-  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '�?;
   return Number(n).toLocaleString('zh-CN');
 }
 
 // ===== maps.js =====
-// ===== maps.js — 地图归属映射 =====
-// 功能清单: 5张游戏地图定义(零号大坝/长弓溪谷/航天基地/巴克什/监狱) | 钥匙卡pic URL→地图映射(4规则)
-// 收集品关键词→地图映射(40+关键词) | findItemMap(综合查询) | getKeyMapFromPic(pic URL匹配)
-// 依赖: 无(纯静态数据) | 被依赖: render.js(详情页地图归属显示)
-// 改动影响: 修改关键词→影响收集品/钥匙地图归属; 新增地图→需同步更新MAPS和规则
+// ===== maps.js �?地图归属映射 =====
+// 功能清单: 5张游戏地图定�?零号大坝/长弓溪谷/航天基地/巴克什/监狱) | 钥匙卡pic URL→地图映�?4规则)
+// 收集品关键词→地图映�?40+关键�? | findItemMap(综合查询) | getKeyMapFromPic(pic URL匹配)
+// 依赖: �?纯静态数�? | 被依�? render.js(详情页地图归属显�?
+// 改动影响: 修改关键词→影响收集�?钥匙地图归属; 新增地图→需同步更新MAPS和规�?
 
-// 地图定义（无 emoji）
+// 地图定义（无 emoji�?
 var MAPS = {
   zero_dam:    { key: 'zero_dam',    name: '零号大坝', order: 1 },
   longbow:     { key: 'longbow',     name: '长弓溪谷', order: 2 },
@@ -116,7 +117,7 @@ var MAPS = {
   prison:      { key: 'prison',      name: '监狱',     order: 5 }
 };
 
-// ===== 钥匙卡 pic URL → 地图映射（API 真实数据提取）=====
+// ===== 钥匙�?pic URL �?地图映射（API 真实数据提取�?====
 var KEY_PIC_MAP_RULES = [
   { pattern: '/key/p_%E9%9B%B6%E5%8F%B7%E5%A4%A7%E5%9D%9D', map: 'zero_dam' },   // p_零号大坝白卡
   { pattern: '/key/p_%E9%95%BF%E5%BC%93%E6%BA%AA%E8%B0%B7', map: 'longbow' },     // p_长弓溪谷白卡
@@ -126,35 +127,35 @@ var KEY_PIC_MAP_RULES = [
 
 // ===== 监狱钥匙卡关键词（pic URL 无地图信息，靠名称匹配）=====
 var PRISON_KEY_KEYWORDS = [
-  '监狱', '仓库区', '顶层', '水位控制室'
+  '监狱', '仓库�?, '顶层', '水位控制�?
 ];
 
-// ===== 收集品 → 地图映射（基于游戏知识，API 不提供此数据）=====
+// ===== 收集�?�?地图映射（基于游戏知识，API 不提供此数据�?====
 var COLLECTION_MAP_RULES = [
   // 零号大坝专属
-  { kw: ['纪念奖杯','金条','黄金瞪羚','优秀雇员奖杯','渡鸦项坠','聚乙烯纤维'], map: 'zero_dam' },
+  { kw: ['纪念奖杯','金条','黄金瞪羚','优秀雇员奖杯','渡鸦项坠','聚乙烯纤�?], map: 'zero_dam' },
 
   // 长弓溪谷专属
-  { kw: ['绝密服务器','劳力士怀表','香槟','军用终端','重型突击背心','显卡','阵列服务器','可编程处理器','镜头','动力电池组'], map: 'longbow' },
+  { kw: ['绝密服务�?,'劳力士怀�?,'香槟','军用终端','重型突击背心','显卡','阵列服务�?,'可编程处理器','镜头','动力电池�?], map: 'longbow' },
 
   // 航天基地专属
-  { kw: ['超算单元','军用电台','牌表','滑膛枪','高能瓦斯罐','E型滤毒罐','装甲车电池'], map: 'space_base' },
+  { kw: ['超算单元','军用电台','牌表','滑膛�?,'高能瓦斯�?,'E型滤毒罐','装甲车电�?], map: 'space_base' },
 
   // 巴克什专属
-  { kw: ['非洲之星','留声机','三幻神','海盗弯刀','卫队金扳指','特种钢','OLIGHT','脑机'], map: 'brakkesh' },
+  { kw: ['非洲之星','留声�?,'三幻�?,'海盗弯刀','卫队金扳�?,'特种�?,'OLIGHT','脑机'], map: 'brakkesh' },
 
   // 监狱专属
-  { kw: ['电子脚镣','高出力粉碎钳','军用无人机','潮汐监狱','飞行员眼镜'], map: 'prison' },
+  { kw: ['电子脚镣','高出力粉碎钳','军用无人�?,'潮汐监狱','飞行员眼�?], map: 'prison' },
 
-  // 全地图通用（不标记具体地图）
-  { kw: ['扑克牌'], map: 'all' },
-  { kw: ['八宝粥','神奇八宝粥'], map: 'all' }
+  // 全地图通用（不标记具体地图�?
+  { kw: ['扑克�?], map: 'all' },
+  { kw: ['八宝�?,'神奇八宝�?], map: 'all' }
 ];
 
 /**
- * 根据物品 pic URL 判断钥匙卡所属地图
+ * 根据物品 pic URL 判断钥匙卡所属地�?
  * @param {string} picUrl 物品图片 URL
- * @returns {string|null} 地图 key 或 null
+ * @returns {string|null} 地图 key �?null
  */
 function getKeyMapFromPic(picUrl) {
   if (!picUrl) return null;
@@ -163,27 +164,27 @@ function getKeyMapFromPic(picUrl) {
       return KEY_PIC_MAP_RULES[i].map;
     }
   }
-  // pic URL 无地图前缀（object/ 路径），检查是否监狱钥匙
+  // pic URL 无地图前缀（object/ 路径），检查是否监狱钥�?
   if (picUrl.indexOf('/object/') !== -1) return 'prison';
   return null;
 }
 
 /**
- * 根据物品名称查找所属地图
+ * 根据物品名称查找所属地�?
  * @param {string} name 物品名称
- * @param {string} category 分类（'key' 或 'collection'）
- * @param {string} [picUrl] 物品图片 URL（钥匙卡优先使用）
- * @returns {object|null} 地图信息或 null
+ * @param {string} category 分类�?key' �?'collection'�?
+ * @param {string} [picUrl] 物品图片 URL（钥匙卡优先使用�?
+ * @returns {object|null} 地图信息�?null
  */
 function findItemMap(name, category, picUrl) {
   if (!name) return null;
 
   if (category === 'key') {
-    // 优先使用 pic URL 匹配（100% 准确）
+    // 优先使用 pic URL 匹配�?00% 准确�?
     var picMap = getKeyMapFromPic(picUrl);
     if (picMap) return MAPS[picMap] || null;
 
-    // fallback: 关键词匹配
+    // fallback: 关键词匹�?
     var kw = name.toLowerCase();
     for (var i = 0; i < PRISON_KEY_KEYWORDS.length; i++) {
       if (kw.indexOf(PRISON_KEY_KEYWORDS[i].toLowerCase()) !== -1) {
@@ -193,7 +194,7 @@ function findItemMap(name, category, picUrl) {
     return null;
   }
 
-  // 收集品：关键词匹配
+  // 收集品：关键词匹�?
   if (category === 'collection') {
     var kw2 = name.toLowerCase();
     for (var i = 0; i < COLLECTION_MAP_RULES.length; i++) {
@@ -212,14 +213,14 @@ function findItemMap(name, category, picUrl) {
 }
 
 // ===== store.js =====
-// ===== store.js — 数据持久化层 =====
-// 功能清单: 物品缓存(内存+localStorage双级,5分钟TTL) | 搜索历史(最多20条) | 最近浏览(最多15条)
-// 收藏系统(最多50条) | 价格历史本地快照(每物品14天) | SW后台记录合并(mergeSWPriceHistory)
-// 云端快照缓存(5分钟TTL) | 浏览状态恢复 | 分类图标缓存 | 搜索索引(字符级倒排索引) | 刷新冷却控制
-// 依赖: utils.js(无,纯数据层) | 被依赖: api.js(loadAllItems/setCache/getCache) main.js(初始化/用户操作)
-// 改动影响: 修改缓存键或TTL→影响api.js的缓存命中率; 修改用户数据键→影响main.js/search页功能
+// ===== store.js �?数据持久化层 =====
+// 功能清单: 物品缓存(内存+localStorage双级,5分钟TTL) | 搜索历史(最�?0�? | 最近浏�?最�?5�?
+// 收藏系统(最�?0�? | 价格历史本地快照(每物�?4�? | SW后台记录合并(mergeSWPriceHistory)
+// 云端快照缓存(5分钟TTL) | 浏览状态恢�?| 分类图标缓存 | 搜索索引(字符级倒排索引) | 刷新冷却控制
+// 依赖: utils.js(�?纯数据层) | 被依�? api.js(loadAllItems/setCache/getCache) main.js(初始�?用户操作)
+// 改动影响: 修改缓存键或TTL→影响api.js的缓存命中率; 修改用户数据键→影响main.js/search页功�?
 
-// ===== 缓存（内存 + LocalStorage 双级） =====
+// ===== 缓存（内�?+ LocalStorage 双级�?=====
 
 var CACHE_KEY = 'deltaforce_cache_v10';
 var CACHE_TIME_KEY = 'deltaforce_cache_time_v10';
@@ -231,7 +232,7 @@ var _lastApiDuration = 3000;
 
 var _memoryCache = null;
 
-// IndexedDB（SW 后台价格记录存储，用于 mergeSWPriceHistory）
+// IndexedDB（SW 后台价格记录存储，用�?mergeSWPriceHistory�?
 var MAIN_DB_NAME = 'deltaforce_price_db';
 var MAIN_DB_VERSION = 2;
 
@@ -267,8 +268,8 @@ function checkRefreshCooldown() {
     var remainMin = Math.floor(remainSec / 60);
     var remainS = remainSec % 60;
     var msg = remainMin > 0
-      ? '刷新冷却中，请 ' + remainMin + ' 分 ' + remainS + ' 秒后重试'
-      : '刷新冷却中，请 ' + remainS + ' 秒后重试';
+      ? '刷新冷却中，�?' + remainMin + ' �?' + remainS + ' 秒后重试'
+      : '刷新冷却中，�?' + remainS + ' 秒后重试';
     toast(msg, 2000);
     return false;
   }
@@ -284,7 +285,7 @@ function getCache() {
   if (_memoryCache && _memoryCache.data) {
     if (Date.now() - _memoryCache.time < CACHE_DURATION) return _memoryCache.data;
   }
-  // 降级到 localStorage（用于页面刷新后快速恢复，无需等待网络）
+  // 降级�?localStorage（用于页面刷新后快速恢复，无需等待网络�?
   var t = localStorage.getItem(CACHE_TIME_KEY);
   if (t && (Date.now() - parseInt(t) < CACHE_DURATION)) {
     try {
@@ -293,7 +294,7 @@ function getCache() {
       return data;
     } catch(e) {}
   }
-  // 即使过期也返回缓存数据作为初始渲染（避免白屏），后续网络请求会更新
+  // 即使过期也返回缓存数据作为初始渲染（避免白屏），后续网络请求会更�?
   if (!t) {
     try {
       var raw = localStorage.getItem(CACHE_KEY);
@@ -308,14 +309,14 @@ function getCache() {
   return null;
 }
 
-// 写入缓存（双级：内存 + localStorage）
+// 写入缓存（双级：内存 + localStorage�?
 function setCache(data) {
   _memoryCache = { data: data, time: Date.now() };
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
   } catch(e) {
-    // ★ localStorage 配额满：清除非关键数据后重试一次
+    // �?localStorage 配额满：清除非关键数据后重试一�?
     console.warn('LocalStorage 缓存写入失败（可能配额满），尝试清理...');
     try { localStorage.removeItem(CACHE_KEY); } catch(e2) {}
     try { localStorage.removeItem(CACHE_TIME_KEY); } catch(e2) {}
@@ -324,11 +325,11 @@ function setCache(data) {
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(data));
       localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
-      // ★ 通知用户部分历史数据已被清理
+      // �?通知用户部分历史数据已被清理
       if (typeof toast === 'function') toast('存储空间不足，已清理历史价格数据', 3000);
     } catch(e3) {
       console.error('LocalStorage 缓存写入彻底失败:', e3.message);
-      if (typeof toast === 'function') toast('存储空间已满，部分功能可能异常', 3000);
+      if (typeof toast === 'function') toast('存储空间已满，部分功能可能异�?, 3000);
     }
   }
 }
@@ -362,10 +363,10 @@ function clearSearchHistory() {
   localStorage.removeItem(QUERY_HISTORY_KEY);
   var el = document.getElementById('searchHistory');
   if (el) el.style.display = 'none';
-  toast('搜索历史已清除');
+  toast('搜索历史已清�?);
 }
 
-// ===== 最近浏览 =====
+// ===== 最近浏�?=====
 var RECENT_VIEWS_KEY = 'deltaforce_recent_views';
 var MAX_RECENT = 15;
 
@@ -455,12 +456,12 @@ function clearFavorites() {
   localStorage.removeItem(FAVORITES_KEY);
   var el = document.getElementById('favoritesSection');
   if (el) el.style.display = 'none';
-  toast('收藏已清空');
+  toast('收藏已清�?);
 }
 
 // ===== 价格历史（本地快照） =====
 var PRICE_HISTORY_KEY = 'deltaforce_price_hist';
-var MAX_HIST_PER_ITEM = 14; // 保留近14天
+var MAX_HIST_PER_ITEM = 14; // 保留�?4�?
 
 // 线上快照内存缓存（避免重复请求后端）
 var _cloudSnapCache = {};  // itemId -> { snapshots, fetchedAt }
@@ -487,7 +488,7 @@ function savePriceSnapshot(itemId, item) {
   try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
 }
 
-// 记录所有物品当日价格（页面打开时调用，用于价格历史图表）
+// 记录所有物品当日价格（页面打开时调用，用于价格历史图表�?
 function recordAllItemsPrices(allItems) {
   if (!allItems || allItems.length === 0) return 0;
   var hist = getPriceHistory();
@@ -512,7 +513,7 @@ function recordAllItemsPrices(allItems) {
     }
     if (hist[k].length > MAX_HIST_PER_ITEM) hist[k] = hist[k].slice(0, MAX_HIST_PER_ITEM);
   });
-  // 清理 35 天前的过期数据
+  // 清理 35 天前的过期数�?
   var staleCutoff = Math.floor(Date.now() / 1000) - 35 * 86400;
   var hadStale = false;
   Object.keys(hist).forEach(function(k) {
@@ -523,8 +524,8 @@ function recordAllItemsPrices(allItems) {
   });
   if (added > 0 || hadStale) {
     try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {
-      // ★ 配额满：清理超过 7 天的旧记录后重试
-      console.warn('价格历史写入失败（可能配额满），裁剪旧数据...');
+      // �?配额满：清理超过 7 天的旧记录后重试
+      console.warn('价格历史写入失败（可能配额满），裁剪旧数�?..');
       var weekCutoff = Math.floor(Date.now() / 1000) - 7 * 86400;
       Object.keys(hist).forEach(function(k) {
         hist[k] = hist[k].filter(function(s) { return s.ts >= weekCutoff; });
@@ -597,7 +598,7 @@ async function mergeSWPriceHistory() {
 }
 
 /**
- * 合并获取价格数据点（API锚点 + 线上快照 + 本地快照）
+ * 合并获取价格数据点（API锚点 + 线上快照 + 本地快照�?
  * @param {object} item - 物品对象
  * @param {Array} [cloudSnapshots] - 可选，云端快照 [{d, p, b, s}, ...]
  */
@@ -607,20 +608,20 @@ function getMergedPriceData(item, cloudSnapshots) {
   var SPD = 86400;
   var usedDays = {};
 
-  // ★ 计算日历日期偏移（以午夜为界），避免因快照时间导致同一天的数据点被合并或丢失
+  // �?计算日历日期偏移（以午夜为界），避免因快照时间导致同一天的数据点被合并或丢�?
   function calendarDayAgo(ts) {
     var sd = new Date(ts * 1000); sd.setHours(0,0,0,0);
     var todayDate = new Date(); todayDate.setHours(0,0,0,0);
     return Math.round((todayDate.getTime() / 1000 - sd.getTime() / 1000) / SPD);
   }
 
-  // 优先级1: API 锚点（30天/7天/3天/当前）
+  // 优先�?: API 锚点�?0�?7�?3�?当前�?
   if (item.day_30_price > 0) { pts.push({ day: 30, price: item.day_30_price }); usedDays[30] = true; }
   if (item.day_7_price > 0)  { pts.push({ day: 7,  price: item.day_7_price });  usedDays[7] = true; }
   if (item.day_3_price > 0)  { pts.push({ day: 3,  price: item.day_3_price });  usedDays[3] = true; }
   if (item.price > 0)        { pts.push({ day: 0,  price: item.price });         usedDays[0] = true; }
 
-  // 优先级2: 云端快照（D1 数据库每日记录）
+  // 优先�?: 云端快照（D1 数据库每日记录）
   if (cloudSnapshots && cloudSnapshots.length > 0) {
     cloudSnapshots.forEach(function(s) {
       var snapDate = new Date(s.d + 'T00:00:00+08:00');
@@ -632,7 +633,7 @@ function getMergedPriceData(item, cloudSnapshots) {
     });
   }
 
-  // 优先级3: 本地快照（兜底）— 使用日历日期对齐，确保同一天内的多次记录映射到同一 day 值
+  // 优先�?: 本地快照（兜底）�?使用日历日期对齐，确保同一天内的多次记录映射到同一 day �?
   var hist = getPriceHistory();
   var snaps = hist[String(item.id)] || [];
   snaps.forEach(function(s) {
@@ -647,7 +648,7 @@ function getMergedPriceData(item, cloudSnapshots) {
   return pts;
 }
 
-// 云端快照内存缓存（5分钟 TTL）
+// 云端快照内存缓存�?分钟 TTL�?
 async function getOrFetchCloudSnapshots(itemId) {
   var cacheKey = String(itemId);
   var cached = _cloudSnapCache[cacheKey];
@@ -666,7 +667,7 @@ async function getOrFetchCloudSnapshots(itemId) {
   }
 }
 
-// ===== 浏览状态 =====
+// ===== 浏览状�?=====
 var BROWSE_STATE_KEY = 'deltaforce_browse_state';
 
 function saveBrowseState() {
@@ -697,7 +698,7 @@ function setCatIconsCache(picks) {
   localStorage.setItem(CAT_ICONS_KEY, JSON.stringify(picks));
 }
 
-// ===== 搜索索引（字符级倒排索引） =====
+// ===== 搜索索引（字符级倒排索引�?=====
 
 var _searchIndex = null;
 var _idMapCache = null;
@@ -772,24 +773,24 @@ function hasSearchIndex() {
 }
 
 // ===== api.js =====
-// ===== api.js — 网络请求层 =====
-// 功能清单: API代理请求(带重试+超时) | 请求去重(同端点并发合并) | 分类全量拉取(fetchCategoryAll)
+// ===== api.js �?网络请求�?=====
+// 功能清单: API代理请求(带重�?超时) | 请求去重(同端点并发合�? | 分类全量拉取(fetchCategoryAll)
 // 预取数据收集(loadAllItemsQuick) | 首批物品获取(getFirstBatchItems) | 后台静默加载(warmAllDataBackground)
 // 预取完成等待(loadAllItemsBackground) | 全局统计(getGlobalStats) | 价格历史API(fetchItemHistory)
-// 依赖: store.js(setCache/getCache) render.js(CATEGORIES) utils.js(batchAsync) | 被依赖: main.js(初始化/刷新)
-// 改动影响: 修改PROXY_URL→影响所有API调用; 修改重试策略→影响弱网环境; 修改去重逻辑→影响并发请求
+// 依赖: store.js(setCache/getCache) render.js(CATEGORIES) utils.js(batchAsync) | 被依�? main.js(初始�?刷新)
+// 改动影响: 修改PROXY_URL→影响所有API调用; 修改重试策略→影响弱网环�? 修改去重逻辑→影响并发请�?
 
-// 后端 URL（优先读取 index.html 中定义的全局常量）
+// 后端 URL（优先读�?index.html 中定义的全局常量�?
 var WORKER_BASE = (typeof window !== 'undefined' && window.__WORKER_BASE) || '';
 var PROXY_URL = WORKER_BASE + '/api/proxy';
 
-// ★ 检测微信内置浏览器（缓存策略激进，需特殊处理）
+// �?检测微信内置浏览器（缓存策略激进，需特殊处理�?
 var _isWeChat = false;
 if (typeof navigator !== 'undefined' && navigator.userAgent) {
   _isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 }
 
-// ★ 请求去重：同一端点并发请求合并为一个网络请求（不缓存响应，确保数据新鲜）
+// �?请求去重：同一端点并发请求合并为一个网络请求（不缓存响应，确保数据新鲜�?
 var _apiPending = {};
 
 function getApiCacheKey(endpoint, params) {
@@ -799,12 +800,12 @@ function getApiCacheKey(endpoint, params) {
 async function apiRequest(endpoint, params, retries, noCache) {
   if (retries === undefined || retries === null) retries = 3;
   params = params || {};
-  // ★ 微信浏览器：注入分钟级时间戳破缓存（绕过微信内置缓存和 CDN 残留）
+  // �?微信浏览器：注入分钟级时间戳破缓存（绕过微信内置缓存�?CDN 残留�?
   if (_isWeChat) { params._wc = Math.floor(Date.now() / 60000); }
   var cacheKey = getApiCacheKey(endpoint, params);
   var lastErr;
 
-  // ★ 请求去重：如果已有相同请求在进行中，等待它完成
+  // �?请求去重：如果已有相同请求在进行中，等待它完�?
   var canDedup = endpoint === 'item_price_all' || endpoint === 'item_list';
   if (!noCache && canDedup && _apiPending[cacheKey]) {
     try { return await _apiPending[cacheKey]; } catch(e) { /* fall through to fresh request */ }
@@ -863,7 +864,7 @@ async function apiRequest(endpoint, params, retries, noCache) {
   throw lastErr;
 }
 
-// ★ 使用 item_list（含名称+图标）获取单分类全量数据，支持翻页
+// �?使用 item_list（含名称+图标）获取单分类全量数据，支持翻�?
 async function fetchCategoryAll(catKey) {
   var t0 = Date.now();
   try {
@@ -882,7 +883,7 @@ async function fetchCategoryAll(catKey) {
       return allItems;
     }
 
-    // 剩余页并行加载
+    // 剩余页并行加�?
     var remainingPages = [];
     for (var p = 2; p <= totalPages; p++) remainingPages.push(p);
     var pageResults = await batchAsync(remainingPages.map(function(page) {
@@ -923,10 +924,10 @@ function batchAsync(tasks, concurrency) {
   });
 }
 
-// ★ 从预取数据收集全量物品（所有分类 _quick 同源，任意一个 resolve 即全量就绪）
+// �?从预取数据收集全量物品（所有分�?_quick 同源，任意一�?resolve 即全量就绪）
 async function loadAllItemsQuick() {
   var prefetched = window.__prefetch || {};
-  // 取第一个可用的 _quick promise 等待（所有分类共享同一 API 响应）
+  // 取第一个可用的 _quick promise 等待（所有分类共享同一 API 响应�?
   for (var i = 0; i < CATEGORIES.length; i++) {
     var p = prefetched[CATEGORIES[i].key];
     if (p && p._quick) {
@@ -945,7 +946,7 @@ async function loadAllItemsQuick() {
     }
   });
   if (allItems.length === 0) {
-    // fallback: 直接调 API（所有分类，首页）
+    // fallback: 直接�?API（所有分类，首页�?
     try {
       var fallbackAll = [];
       var catResults = await Promise.all(CATEGORIES.map(function(cat) {
@@ -963,7 +964,7 @@ async function loadAllItemsQuick() {
   return allItems;
 }
 
-// ★ 获取首批物品：等所有分类首页到齐 → 按涨跌幅+价格排序 → 取前 N 件
+// �?获取首批物品：等所有分类首页到�?�?按涨跌幅+价格排序 �?取前 N �?
 async function getFirstBatchItems(targetCount) {
   if (targetCount === undefined || targetCount === null) targetCount = 50;
   var prefetched = window.__prefetch || {};
@@ -978,7 +979,7 @@ async function getFirstBatchItems(targetCount) {
     } catch(e) { /* 降级 */ }
   }
 
-  // 降级：收集已就绪数据，手动排序
+  // 降级：收集已就绪数据，手动排�?
   var all = [];
   try {
     all = await loadAllItemsQuick();
@@ -995,7 +996,7 @@ async function getFirstBatchItems(targetCount) {
   return all.slice(0, targetCount);
 }
 
-// ★ 后台静默加载全部数据（使用 requestIdleCallback 或分段执行）
+// �?后台静默加载全部数据（使�?requestIdleCallback 或分段执行）
 function warmAllDataBackground(onProgress) {
   var prefetched = window.__prefetch || {};
   var catsLoaded = 0;
@@ -1006,7 +1007,7 @@ function warmAllDataBackground(onProgress) {
     // 如果预取对象已存在且 _quick 可用，等待它
     if (p && p._quick) {
       return p._quick.then(function() {
-        // 等待该分类 _complete
+        // 等待该分�?_complete
         return new Promise(function(resolve) {
           if (p._complete) { catsLoaded++; if (onProgress) onProgress(catsLoaded, totalCats); resolve(true); return; }
           var checkTimer;
@@ -1055,7 +1056,7 @@ function isPrefetchComplete() {
 function loadAllItemsBackground(currentItems) {
   var prefetched = window.__prefetch || {};
 
-  // 先等待所有 _quick promise（page1 全部到齐）
+  // 先等待所�?_quick promise（page1 全部到齐�?
   return Promise.all(CATEGORIES.map(function(cat) {
     var p = prefetched[cat.key];
     if (p && p._quick) return p._quick.catch(function() { return null; });
@@ -1079,7 +1080,7 @@ function loadAllItemsBackground(currentItems) {
       if (typeof renderHomeTopMover === 'function') renderHomeTopMover();
     }
 
-    // ★ 不再重复拉取！等待 prefetch 翻页池自然完成
+    // �?不再重复拉取！等�?prefetch 翻页池自然完�?
     return _waitForPagination(prefetched, 20000).then(function() {
       var fullItems = [];
       var seen = {};
@@ -1103,7 +1104,7 @@ function loadAllItemsBackground(currentItems) {
   }).catch(function() { return currentItems || []; });
 }
 
-// ★ 轮询等待 prefetch 翻页完成
+// �?轮询等待 prefetch 翻页完成
 function _waitForPagination(prefetched, timeout) {
   return new Promise(function(resolve) {
     if (typeof prefetched.isPaginationDone === 'function' && prefetched.isPaginationDone()) {
@@ -1135,7 +1136,7 @@ async function loadAllItems(forceRefresh) {
     if (typeof updateCategoryIcons === 'function') updateCategoryIcons(allItems);
   }
 
-  // 后台记录当日价格快照 + SW历史合并 + 检查收藏变动
+  // 后台记录当日价格快照 + SW历史合并 + 检查收藏变�?
   setTimeout(function() {
     if (typeof mergeSWPriceHistory === 'function') {
       mergeSWPriceHistory().then(function() {
@@ -1181,7 +1182,7 @@ function getGlobalStats() {
 // ===== 历史数据 API =====
 
 /**
- * 从后端 D1 数据库获取物品的云端价格历史快照
+ * 从后�?D1 数据库获取物品的云端价格历史快照
  * @param {number} itemId
  * @returns {Promise<object>} { code, data: { itemId, name, snapshots: [{d, p, b, s}] } }
  */
@@ -1197,33 +1198,33 @@ async function fetchItemHistory(itemId) {
       if (attempt < MAX_RETRIES) {
         await new Promise(function(r) { setTimeout(r, 500 * (attempt + 1)); });
       } else {
-        console.error('[fetchItemHistory] 最终失败 (itemId=' + itemId + '):', err.message);
+        console.error('[fetchItemHistory] 最终失�?(itemId=' + itemId + '):', err.message);
         return { code: -1, msg: err.message };
       }
     }
   }
 }
 
-// ===== 数据净化层（所有原始 API 数据的唯一入口） =====
-// 把字段类型不稳定、id/tid 关系混乱、极端数值、命名不一致等问题在源头一次性解决
-// 下游所有渲染/排序/收藏比对代码只需假设"数据是干净的"，不用逐处防御
+// ===== 数据净化层（所有原�?API 数据的唯一入口�?=====
+// 把字段类型不稳定、id/tid 关系混乱、极端数值、命名不一致等问题在源头一次性解�?
+// 下游所有渲�?排序/收藏比对代码只需假设"数据是干净�?，不用逐处防御
 
 /**
- * 归一化物品 ID：id 优先，为空时用 tid 兜底，最终保证 Number 类型
- * 统一入口后，所有下游比较只需 i.id === itemId，不再需要 || tid
+ * 归一化物�?ID：id 优先，为空时�?tid 兜底，最终保�?Number 类型
+ * 统一入口后，所有下游比较只需 i.id === itemId，不再需�?|| tid
  */
 function canonicalId(rawItem) {
   var id = Number(rawItem.id) || Number(rawItem.tid) || 0;
   return id || 0;
 }
 
-/** 安全数字转换：NaN / ±Infinity → 0 */
+/** 安全数字转换：NaN / ±Infinity �?0 */
 function safeNum(v) {
   var n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
-/** 价格钳位：非有限值/负数 → 0，不做上限过滤（游戏内真实高价可达上亿） */
+/** 价格钳位：非有限�?负数 �?0，不做上限过滤（游戏内真实高价可达上亿） */
 function clampPrice(v) {
   var n = Number(v);
   if (!Number.isFinite(n) || n < 0) return 0;
@@ -1237,16 +1238,16 @@ function _warnIdMismatch(rawItem) {
     var key = rawItem.id + '|' + rawItem.tid;
     if (!_idMismatchWarned[key]) {
       _idMismatchWarned[key] = true;
-      console.warn('[canonicalId] id/tid 不一致:',
+      console.warn('[canonicalId] id/tid 不一�?',
         { id: rawItem.id, tid: rawItem.tid, name: rawItem.name || '(未知)' },
-        '已使用 id=' + canonicalId(rawItem));
+        '已使�?id=' + canonicalId(rawItem));
     }
   }
 }
 
 /**
- * 净化 item_price_all 单条（仅价格字段，不含元数据）
- * 调用场景：refreshAllData / refreshCurrentList / openDetail / refreshFavTab 拿到价格后
+ * 净�?item_price_all 单条（仅价格字段，不含元数据�?
+ * 调用场景：refreshAllData / refreshCurrentList / openDetail / refreshFavTab 拿到价格�?
  */
 function sanitizePriceItem(p) {
   _warnIdMismatch(p);
@@ -1267,7 +1268,7 @@ function sanitizePriceItem(p) {
 }
 
 /**
- * 净化 item_list 单条（元数据 + 可能附带的价格字段）
+ * 净�?item_list 单条（元数据 + 可能附带的价格字段）
  * 调用场景：fetchCategoryAll / loadAllItemsQuick fallback / prefetch 原始数据
  */
 function sanitizeListItem(item) {
@@ -1283,7 +1284,7 @@ function sanitizeListItem(item) {
     secondClassCN: item.secondClassCN || '',
     length: safeNum(item.length),
     width: safeNum(item.width),
-    weight: safeNum(item.weight || item.Weight),   // ★ 统一 Weight → weight
+    weight: safeNum(item.weight || item.Weight),   // �?统一 Weight �?weight
     objectID: item.objectID || '',
     price: clampPrice(item.price),
     bl: safeNum(item.bl),
@@ -1299,9 +1300,9 @@ function sanitizeListItem(item) {
 }
 
 /**
- * 净化数组：非数组返回 []、过滤无核心字段条目、逐条净化
- * @param {*} data - API 返回的 data 字段（可能是数组/null/{}/undefined）
- * @param {string} source - 'price' 用 sanitizePriceItem，其他用 sanitizeListItem
+ * 净化数组：非数组返�?[]、过滤无核心字段条目、逐条净�?
+ * @param {*} data - API 返回�?data 字段（可能是数组/null/{}/undefined�?
+ * @param {string} source - 'price' �?sanitizePriceItem，其他用 sanitizeListItem
  */
 function sanitizeItemArray(data, source) {
   if (!Array.isArray(data)) return [];
@@ -1312,13 +1313,13 @@ function sanitizeItemArray(data, source) {
 }
 
 // ===== render.js =====
-// ===== render.js — 视图渲染层 =====
-// 功能清单: 首页(renderHome/TopMover/MoversList+筛选排序分页) | 列表页(renderList+排序分页)
-// 详情页(renderDetail+价格图表Canvas+地图归属) | 搜索页(renderSearch+实时搜索+混合结果)
-// 收藏Tab(renderFavTab+价格变动检测) | 分类图标提取(updateCategoryIcons) | 分页控件(renderPagination)
-// 价格变动提醒(checkFavoritePriceChanges) | 下拉刷新+全部刷新 | Canvas价格趋势图(30天锚点+云端快照+本地快照)
-// 依赖: store.js(收藏/历史/缓存) api.js(API请求) maps.js(地图归属) utils.js(格式化/转义/toast)
-// 改动影响: 修改HTML模板→影响相应页面DOM; 修改renderHome→影响首页展示; 修改筛选排序→影响所有列表
+// ===== render.js �?视图渲染�?=====
+// 功能清单: 首页(renderHome/TopMover/MoversList+筛选排序分�? | 列表�?renderList+排序分页)
+// 详情�?renderDetail+价格图表Canvas+地图归属) | 搜索�?renderSearch+实时搜索+混合结果)
+// 收藏Tab(renderFavTab+价格变动检�? | 分类图标提取(updateCategoryIcons) | 分页控件(renderPagination)
+// 价格变动提醒(checkFavoritePriceChanges) | 下拉刷新+全部刷新 | Canvas价格趋势�?30天锚�?云端快照+本地快照)
+// 依赖: store.js(收藏/历史/缓存) api.js(API请求) maps.js(地图归属) utils.js(格式�?转义/toast)
+// 改动影响: 修改HTML模板→影响相应页面DOM; 修改renderHome→影响首页展�? 修改筛选排序→影响所有列�?
 
 // ===== 分类常量 =====
 var CATEGORIES = [
@@ -1329,8 +1330,8 @@ var CATEGORIES = [
   { key: 'armor', name: '护甲', icon: '' },
   { key: 'chest', name: '胸挂', icon: '' },
   { key: 'bag', name: '背包', icon: '' },
-  { key: 'key', name: '钥匙卡', icon: '' },
-  { key: 'collection', name: '收集品', icon: '' },
+  { key: 'key', name: '钥匙�?, icon: '' },
+  { key: 'collection', name: '收集�?, icon: '' },
   { key: 'consume', name: '消耗品', icon: '' }
 ];
 
@@ -1339,17 +1340,17 @@ CATEGORIES.forEach(function(c) { CATEGORY_MAP[c.key] = c.name; });
 
 var itemsPerPage = 20;
 
-// ★ 首页（合并后）筛选/排序状态
-var homeCategoryFilter = 'all';    // 'all' 或分类 key
+// �?首页（合并后）筛�?排序状�?
+var homeCategoryFilter = 'all';    // 'all' 或分�?key
 var homePeriod = 'bl';            // 'bl', 'day_3_bl', 'day_7_bl'
 var homePriceRange = 'all';       // 'all', 'lt1w', '1-10w', '10-100w', 'gt100w'
 var homeSortBy = 'default';       // 'default' | 'change' | 'price'
 var homeSortDir = 'desc';         // 'desc' | 'asc'
 var HOME_PAGE_SIZE = 40;         // 每页显示条数
 var homeCurrentPage = 1;         // 当前页码
-var _homeAllFiltered = [];       // 当前筛选排序后的全量数据
+var _homeAllFiltered = [];       // 当前筛选排序后的全量数�?
 
-// ★ 物品显著性评分：|涨跌幅| × 价格档位
+// �?物品显著性评分：|涨跌幅| × 价格档位
 function getItemSignificance(item) {
   var bl = Math.abs(item.bl || item.day_3_bl || item.day_7_bl || 0);
   var p = item.price || 0;
@@ -1364,7 +1365,7 @@ function renderHome() {
   renderHomeMovers();
 }
 
-// ★ 通用：关闭所有下拉
+// �?通用：关闭所有下�?
 function closeAllDropdowns() {
   ['timeDropdown','priceDropdown','filterDropdown','sortDropdown'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.style.display = 'none';
@@ -1373,23 +1374,23 @@ function closeAllDropdowns() {
   if (toolbar) toolbar.classList.remove('dropdown-open');
 }
 
-// ★ 时间下拉
+// �?时间下拉
 function toggleTimeDropdown() { toggleDropdown('timeDropdown', 'btnTime'); }
 function closeTimeDropdown() { document.getElementById('timeDropdown').style.display = 'none'; }
 
-// ★ 价格下拉
+// �?价格下拉
 function togglePriceDropdown() { toggleDropdown('priceDropdown', 'btnPrice'); }
 function closePriceDropdown() { document.getElementById('priceDropdown').style.display = 'none'; }
 
-// ★ 筛选下拉
+// �?筛选下�?
 function toggleFilterDropdown() { toggleDropdown('filterDropdown', 'btnFilter'); }
 function closeFilterDropdown() { document.getElementById('filterDropdown').style.display = 'none'; }
 
-// ★ 排序下拉
+// �?排序下拉
 function toggleSortDropdown() { toggleDropdown('sortDropdown', 'btnSort'); }
 function closeSortDropdown() { document.getElementById('sortDropdown').style.display = 'none'; }
 
-// ★ 启动时将下拉面板移到 body，解决移动端 fixed 定位被父容器裁剪的问题
+// �?启动时将下拉面板移到 body，解决移动端 fixed 定位被父容器裁剪的问�?
 function moveDropdownsToBody() {
   ['timeDropdown','priceDropdown','filterDropdown','sortDropdown'].forEach(function(id) {
     var el = document.getElementById(id);
@@ -1404,11 +1405,11 @@ function toggleDropdown(panelId, btnId) {
   var isOpen = panel.style.display === 'block';
   closeAllDropdowns();
   if (isOpen) return;
-  // 确保面板在 body 下（解决移动端 fixed 定位失效）
+  // 确保面板�?body 下（解决移动�?fixed 定位失效�?
   if (panel.parentNode !== document.body) {
     document.body.appendChild(panel);
   }
-  // 先显示（不可见）以测量真实宽度
+  // 先显示（不可见）以测量真实宽�?
   panel.style.visibility = 'hidden';
   panel.style.display = 'block';
   var panelW = panel.offsetWidth;
@@ -1428,7 +1429,7 @@ function toggleDropdown(panelId, btnId) {
   if (toolbar) toolbar.classList.add('dropdown-open');
 }
 
-// ★ 点击页面其他地方关闭所有下拉
+// �?点击页面其他地方关闭所有下�?
 document.addEventListener('click', function(e) {
   var ids = ['timeDropdown','priceDropdown','filterDropdown','sortDropdown'];
   var btns = ['btnTime','btnPrice','btnFilter','btnSort'];
@@ -1440,11 +1441,11 @@ document.addEventListener('click', function(e) {
   if (!inside) closeAllDropdowns();
 });
 
-// ★ 首页筛选：设置时间段
+// �?首页筛选：设置时间�?
 function setHomePeriod(period) {
   homePeriod = period;
-  var labels = { bl: '近1天', day_3_bl: '近3天', day_7_bl: '近7天' };
-  document.getElementById('timeLabel').textContent = labels[period] || '近1天';
+  var labels = { bl: '�?�?, day_3_bl: '�?�?, day_7_bl: '�?�? };
+  document.getElementById('timeLabel').textContent = labels[period] || '�?�?;
   document.querySelectorAll('#timeDropdown .dropdown-item').forEach(function(item) {
     item.classList.toggle('active', item.dataset.period === period);
   });
@@ -1452,10 +1453,10 @@ function setHomePeriod(period) {
   renderHomeMovers();
 }
 
-// ★ 首页筛选：设置价格区间
+// �?首页筛选：设置价格区间
 function setHomePriceRange(range) {
   homePriceRange = range;
-  var labels = { all: '全部价格', lt1w: '< 1万', '1-10w': '1万~10万', '10-100w': '10万~100万', gt100w: '> 100万' };
+  var labels = { all: '全部价格', lt1w: '< 1�?, '1-10w': '1万~10�?, '10-100w': '10万~100�?, gt100w: '> 100�? };
   document.getElementById('priceLabel').textContent = labels[range] || '全部价格';
   document.querySelectorAll('#priceDropdown .dropdown-item').forEach(function(item) {
     item.classList.toggle('active', item.dataset.range === range);
@@ -1464,10 +1465,10 @@ function setHomePriceRange(range) {
   renderHomeMovers();
 }
 
-// ★ 首页筛选：设置分类（v3：非 all 时确保全量数据就绪）
+// �?首页筛选：设置分类（v3：非 all 时确保全量数据就绪）
 function setHomeCategory(cat) {
   homeCategoryFilter = cat;
-  var label = cat === 'all' ? '筛选' : (CATEGORY_MAP[cat] || cat);
+  var label = cat === 'all' ? '筛�? : (CATEGORY_MAP[cat] || cat);
   document.getElementById('filterLabel').textContent = label;
   document.querySelectorAll('.filter-cat-chip').forEach(function(chip) {
     chip.classList.toggle('active', chip.dataset.cat === cat);
@@ -1497,17 +1498,17 @@ function setHomeCategory(cat) {
   }
 }
 
-// ★ 首页排序
+// �?首页排序
 function setHomeSort(sortBy, sortDir) {
   homeSortBy = sortBy;
   homeSortDir = sortDir;
   var labelText;
   if (sortBy === 'default') {
-    labelText = '综合↓';
+    labelText = '综合�?;
   } else if (sortBy === 'change') {
-    labelText = '涨跌幅' + (sortDir === 'desc' ? '↓' : '↑');
+    labelText = '涨跌�? + (sortDir === 'desc' ? '�? : '�?);
   } else {
-    labelText = '价格' + (sortDir === 'desc' ? '↓' : '↑');
+    labelText = '价格' + (sortDir === 'desc' ? '�? : '�?);
   }
   document.getElementById('sortLabel').textContent = labelText;
   document.querySelectorAll('#sortDropdown .dropdown-item').forEach(function(item) {
@@ -1517,7 +1518,7 @@ function setHomeSort(sortBy, sortDir) {
   renderHomeMovers();
 }
 
-// ★ 重置所有筛选
+// �?重置所有筛�?
 function resetAllFilters() {
   homeCategoryFilter = 'all';
   homePeriod = 'bl';
@@ -1525,10 +1526,10 @@ function resetAllFilters() {
   homeSortBy = 'default';
   homeSortDir = 'desc';
 
-  document.getElementById('timeLabel').textContent = '近1天';
+  document.getElementById('timeLabel').textContent = '�?�?;
   document.getElementById('priceLabel').textContent = '全部价格';
-  document.getElementById('filterLabel').textContent = '筛选';
-  document.getElementById('sortLabel').textContent = '综合↓';
+  document.getElementById('filterLabel').textContent = '筛�?;
+  document.getElementById('sortLabel').textContent = '综合�?;
   document.querySelectorAll('#timeDropdown .dropdown-item').forEach(function(c) { c.classList.toggle('active', c.dataset.period === 'bl'); });
   document.querySelectorAll('#priceDropdown .dropdown-item').forEach(function(c) { c.classList.toggle('active', c.dataset.range === 'all'); });
   document.querySelectorAll('.filter-cat-chip').forEach(function(c) { c.classList.toggle('active', c.dataset.cat === 'all'); });
@@ -1538,7 +1539,7 @@ function resetAllFilters() {
   renderHomeMovers();
 }
 
-// ★ 首页物品列表（分页：每页 HOME_PAGE_SIZE 件，底部分页栏）
+// �?首页物品列表（分页：每页 HOME_PAGE_SIZE 件，底部分页栏）
 var _homeDataArriveListener = null;
 function renderHomeMovers(resetPage) {
   if (resetPage !== false) homeCurrentPage = 1;
@@ -1551,11 +1552,11 @@ function renderHomeMovers(resetPage) {
     all = getPrefetchItems();
   }
   if (all.length === 0) {
-    listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-text" style="font-size:12px">数据加载中...</div></div>';
+    listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-text" style="font-size:12px">数据加载�?..</div></div>';
     _homeAllFiltered = [];
     if (!_homeDataArriveListener) {
       _homeDataArriveListener = true;
-      // ★ 超时重置：15 秒后强制重置标志，防止回调永不触发导致永久锁定
+      // �?超时重置�?5 秒后强制重置标志，防止回调永不触发导致永久锁�?
       var _arriveTimeout = setTimeout(function() {
         if (_homeDataArriveListener) {
           _homeDataArriveListener = null;
@@ -1578,7 +1579,7 @@ function renderHomeMovers(resetPage) {
     return;
   }
 
-  // 筛选
+  // 筛�?
   var filtered = all;
   if (homeCategoryFilter !== 'all') {
     filtered = all.filter(function(item) { return item._category === homeCategoryFilter; });
@@ -1633,13 +1634,13 @@ function renderHomeMovers(resetPage) {
     return _renderHomeItemCard(item, field, maxAbsBl);
   }).join('');
 
-  // 分页栏
+  // 分页�?
   html += _renderPagination(totalPages, homeCurrentPage, filtered.length);
 
   listEl.innerHTML = html;
 }
 
-// ★ 分页跳转
+// �?分页跳转
 function goToHomePage(n) {
   homeCurrentPage = n;
   var listEl = document.getElementById('homeMoversList');
@@ -1661,15 +1662,15 @@ function goToHomePage(n) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ★ 生成分页栏 HTML
+// �?生成分页�?HTML
 function _renderPagination(totalPages, current, totalItems) {
   if (totalPages <= 1) {
-    return '<div class="home-pagination" style="text-align:center;padding:14px 12px;color:#666;font-size:12px">共 ' + totalItems + ' 件</div>';
+    return '<div class="home-pagination" style="text-align:center;padding:14px 12px;color:#666;font-size:12px">�?' + totalItems + ' �?/div>';
   }
   var html = '<div class="home-pagination" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:14px 8px;flex-wrap:wrap">';
-  // 上一页
+  // 上一�?
   if (current > 1) {
-    html += '<button class="page-btn" onclick="goToHomePage(' + (current - 1) + ')" style="font-size:12px">‹</button>';
+    html += '<button class="page-btn" onclick="goToHomePage(' + (current - 1) + ')" style="font-size:12px">�?/button>';
   } else {
     html += '<span style="width:34px"></span>';
   }
@@ -1685,25 +1686,25 @@ function _renderPagination(totalPages, current, totalItems) {
       html += '<span style="color:#555;width:34px;text-align:center">...</span>';
     }
   }
-  // 下一页
+  // 下一�?
   if (current < totalPages) {
-    html += '<button class="page-btn" onclick="goToHomePage(' + (current + 1) + ')" style="font-size:12px">›</button>';
+    html += '<button class="page-btn" onclick="goToHomePage(' + (current + 1) + ')" style="font-size:12px">�?/button>';
   } else {
     html += '<span style="width:34px"></span>';
   }
-  html += '<span style="color:#555;font-size:11px;margin-left:8px">共 ' + totalItems + ' 件</span>';
+  html += '<span style="color:#555;font-size:11px;margin-left:8px">�?' + totalItems + ' �?/span>';
   html += '</div>';
   return html;
 }
 
-// ★ 使用已排序数据渲染首页（用于首批快速展示，复用 renderHomeMovers 逻辑）
+// �?使用已排序数据渲染首页（用于首批快速展示，复用 renderHomeMovers 逻辑�?
 function renderHomeMoversWithData(items) {
   var listEl = document.getElementById('homeMoversList');
   if (!listEl || !items || items.length === 0) {
-    if (listEl) listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-text" style="font-size:12px">数据加载中...</div></div>';
+    if (listEl) listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-text" style="font-size:12px">数据加载�?..</div></div>';
     return;
   }
-  // 筛选 + 排序 + 存储
+  // 筛�?+ 排序 + 存储
   var filtered = items;
   if (homeCategoryFilter !== 'all') {
     filtered = items.filter(function(item) { return item._category === homeCategoryFilter; });
@@ -1741,7 +1742,7 @@ function renderHomeMoversWithData(items) {
   listEl.innerHTML = html;
 }
 
-// ★ 渲染单个首页物品卡片（复用逻辑）
+// �?渲染单个首页物品卡片（复用逻辑�?
 function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
   var bl = getFieldByPeriod(item, field) || 0;
   var absBl = Math.abs(bl);
@@ -1750,7 +1751,7 @@ function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
   var loadingAttr = isEager ? 'loading="eager" decoding="sync"' : 'loading="lazy" decoding="async"';
   var picHtml = item.pic ? '<img src="' + sanitizeUrl(item.pic) + '" alt="" ' + loadingAttr + ' onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">' : '<span class="pic-placeholder">-</span>';
   var gradeTag = (item._category !== 'gun' && item.grade) ? '<span class="item-grade" style="color:' + getGradeColor(item.grade) + '">' + getGradeText(item.grade) + '</span>' : '';
-  // ★ 迷你折线图：用 API 锚点（30d/7d/3d/当前）画趋势，无 localStorage 开销
+  // �?迷你折线图：�?API 锚点�?0d/7d/3d/当前）画趋势，无 localStorage 开销
   var sparkHtml = _renderMiniSparkline(item);
   return '<div class="item-card fade-in" data-item-id="' + item.id + '" onclick="openPriceMover(' + JSON.stringify(item.id) + ')" style="position:relative;' + gradeBg + '">' +
     gradeDiamond +
@@ -1766,11 +1767,11 @@ function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
       '</div>' +
       sparkHtml +
     '</div>' +
-    '<span class="item-arrow">›</span>' +
+    '<span class="item-arrow">�?/span>' +
   '</div>';
 }
 
-// ★ 迷你折线图（统一使用 getMergedPriceData，整合 API 锚点 + 本地历史 + 云端快照）
+// �?迷你折线图（统一使用 getMergedPriceData，整�?API 锚点 + 本地历史 + 云端快照�?
 function _renderMiniSparkline(item) {
   var pts = getMergedPriceData(item);
   if (!pts || pts.length < 2) return '';
@@ -1797,13 +1798,13 @@ function _renderMiniSparkline(item) {
   '</div>';
 }
 
-// ★ 后台追加物品到首页（重新渲染当前页）
+// �?后台追加物品到首页（重新渲染当前页）
 function appendHomeItems(newItems) {
   if (!newItems || newItems.length === 0) return;
   renderHomeMovers(false);
 }
 
-// ★ 静默更新首页数据（后台加载完成后更新，保留滚动位置）
+// �?静默更新首页数据（后台加载完成后更新，保留滚动位置）
 var _homeSilentUpdateTimer = null;
 function scheduleHomeSilentUpdate() {
   if (_homeSilentUpdateTimer) clearTimeout(_homeSilentUpdateTimer);
@@ -1815,7 +1816,7 @@ function scheduleHomeSilentUpdate() {
     var all = cached && cached._allItems ? cached._allItems : [];
     if (all.length === 0) all = getPrefetchItems();
     if (all.length === 0) return;
-    // ★ 如果数据量增加了，用 renderHomeMovers 完整更新（应用当前筛选）
+    // �?如果数据量增加了，用 renderHomeMovers 完整更新（应用当前筛选）
     if (all.length > _homeAllFiltered.length) {
       renderHomeMovers(false);
       checkFavoritePriceChanges();
@@ -1829,7 +1830,7 @@ function updateCategoryIcons(allItems) {
   if (!allItems || allItems.length === 0) return;
   const existing = getCatIconsCache() || {};
   const picks = {};
-  // 浅拷贝 existing 到 picks
+  // 浅拷�?existing �?picks
   Object.keys(existing).forEach(function(k) { picks[k] = existing[k]; });
   allItems.forEach(function(item) {
     const cat = item._category;
@@ -1837,7 +1838,7 @@ function updateCategoryIcons(allItems) {
       picks[cat] = item.pic;
     }
   });
-  const logisticsItem = allItems.find(function(i) { return i.name === '物流信息单' && i.pic; });
+  const logisticsItem = allItems.find(function(i) { return i.name === '物流信息�? && i.pic; });
   if (logisticsItem) picks['all'] = logisticsItem.pic;
 
   setCatIconsCache(picks);
@@ -1866,7 +1867,7 @@ function renderList(items, showCategory) {
   var sorted = sortItems(items);
   var loadedCount = sorted.length;
 
-  // ★ 从预取数据获取 API 真实总数（用于显示准确分页信息）
+  // �?从预取数据获�?API 真实总数（用于显示准确分页信息）
   var realTotal = 0;
   var isLoadingMore = false;
   if (currentCategory && currentCategory.key && currentCategory.key !== 'fav' && currentCategory.key !== 'all') {
@@ -1888,23 +1889,23 @@ function renderList(items, showCategory) {
   var start = (currentPage - 1) * itemsPerPage;
   var pageItems = sorted.slice(start, start + itemsPerPage);
 
-  // ★ 列表统计：显示真实总数 + 加载状态
-  var statsHtml = '<span>共 ' + (realTotal > 0 ? formatLargeNum(realTotal) : loadedCount) + ' 件';
+  // �?列表统计：显示真实总数 + 加载状�?
+  var statsHtml = '<span>�?' + (realTotal > 0 ? formatLargeNum(realTotal) : loadedCount) + ' �?;
   if (realTotal > 0 && realTotal > loadedCount) {
-    statsHtml += ' <span style="font-size:10px;color:#888">(已加载 ' + formatLargeNum(loadedCount) + ')</span>';
+    statsHtml += ' <span style="font-size:10px;color:#888">(已加�?' + formatLargeNum(loadedCount) + ')</span>';
   }
   if (isLoadingMore) {
-    statsHtml += ' <span style="font-size:10px;color:#6366f1">加载中...</span>';
+    statsHtml += ' <span style="font-size:10px;color:#6366f1">加载�?..</span>';
   }
-  statsHtml += ' \xB7 第 ' + currentPage + '/' + totalPages + ' 页</span>';
+  statsHtml += ' \xB7 �?' + currentPage + '/' + totalPages + ' �?/span>';
   if (sorted.length > 0) {
-    statsHtml += '<span>更新于 ' + formatTime(sorted[0].is_get_time) + '</span>';
+    statsHtml += '<span>更新�?' + formatTime(sorted[0].is_get_time) + '</span>';
   }
   document.getElementById('listStats').innerHTML = statsHtml;
 
   const content = document.getElementById('listContent');
   if (sorted.length === 0) {
-    var emptyMsg = isLoadingMore ? '正在加载数据，请稍候...' : '暂无物品数据';
+    var emptyMsg = isLoadingMore ? '正在加载数据，请稍�?..' : '暂无物品数据';
     content.innerHTML = '<div class="empty-container"><div class="empty-icon">' + (isLoadingMore ? '' : '-') + '</div><div class="empty-text">' + emptyMsg + '</div></div>';
     document.getElementById('pagination').innerHTML = '';
     return;
@@ -1930,7 +1931,7 @@ function renderList(items, showCategory) {
     var sparkHtml = pts.length >= 2 ? '<div class="item-sparkline">' + generateSparklineSVG(pts) + '</div>' : '';
     var favIndicator = isFavorited(item.id) ? '<span class="item-fav-indicator"></span>' : '';
 
-    return '<div class="item-card fade-in" style="position:relative;' + gradeBg + '" onclick="openDetail(' + JSON.stringify(item.id) + ')">\n          ' + gradeDiamond + '\n          <div class="item-pic">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              ' + catGradeTag + '\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n            ' + attrHtml + '\n            ' + trendHtml + '\n          </div>\n          ' + sparkHtml + '\n          <span class="item-arrow">›</span>\n          ' + favIndicator + '\n        </div>';
+    return '<div class="item-card fade-in" style="position:relative;' + gradeBg + '" onclick="openDetail(' + JSON.stringify(item.id) + ')">\n          ' + gradeDiamond + '\n          <div class="item-pic">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              ' + catGradeTag + '\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n            ' + attrHtml + '\n            ' + trendHtml + '\n          </div>\n          ' + sparkHtml + '\n          <span class="item-arrow">�?/span>\n          ' + favIndicator + '\n        </div>';
   }).join('');
   renderPagination(totalPages);
 }
@@ -1951,16 +1952,16 @@ function renderPagination(totalPages) {
   html += '<button class="page-btn arrow ' + (currentPage <= 1 ? 'disabled' : '') + '" onclick="goToPage(' + (currentPage - 1) + ')">◀</button>';
   if (startPage > 1) {
     html += '<button class="page-btn" onclick="goToPage(1)">1</button>';
-    if (startPage > 2) html += '<span style="color:#666;padding:0 2px">…</span>';
+    if (startPage > 2) html += '<span style="color:#666;padding:0 2px">�?/span>';
   }
   for (var i = startPage; i <= endPage; i++) {
     html += '<button class="page-btn' + (i === currentPage ? ' active' : '') + '" onclick="goToPage(' + i + ')">' + i + '</button>';
   }
   if (endPage < totalPages) {
-    if (endPage < totalPages - 1) html += '<span style="color:#666;padding:0 2px">…</span>';
+    if (endPage < totalPages - 1) html += '<span style="color:#666;padding:0 2px">�?/span>';
     html += '<button class="page-btn" onclick="goToPage(' + totalPages + ')">' + totalPages + '</button>';
   }
-  html += '<button class="page-btn arrow ' + (currentPage >= totalPages ? 'disabled' : '') + '" onclick="goToPage(' + (currentPage + 1) + ')">▶</button>';
+  html += '<button class="page-btn arrow ' + (currentPage >= totalPages ? 'disabled' : '') + '" onclick="goToPage(' + (currentPage + 1) + ')">�?/button>';
   html += '</div>';
   pagination.innerHTML = html;
 }
@@ -1980,7 +1981,7 @@ function renderSearchHistory() {
   }).join('');
 }
 
-// ===== 最近浏览 =====
+// ===== 最近浏�?=====
 function renderRecentViews() {
   const views = getRecentViews();
   const section = document.getElementById('recentViewSection');
@@ -1995,7 +1996,7 @@ function renderRecentViews() {
     var picHtml = item.pic
       ? '<img src="' + sanitizeUrl(item.pic) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
       : '<span class="pic-placeholder" style="font-size:20px">-</span>';
-    return '\n        <div class="result-item fade-in" onclick="openDetailFromRecent(' + JSON.stringify(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
+    return '\n        <div class="result-item fade-in" onclick="openDetailFromRecent(' + JSON.stringify(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">�?/span>\n        </div>';
   }).join('');
 }
 
@@ -2014,11 +2015,11 @@ function renderFavorites() {
     var picHtml = item.pic
       ? '<img src="' + sanitizeUrl(item.pic) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
       : '<span class="pic-placeholder" style="font-size:20px">-</span>';
-    return '\n        <div class="result-item fade-in" onclick="openDetailFromFavorite(' + JSON.stringify(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
+    return '\n        <div class="result-item fade-in" onclick="openDetailFromFavorite(' + JSON.stringify(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">�?/span>\n        </div>';
   }).join('');
 }
 
-// ===== 详情页 =====
+// ===== 详情�?=====
 function renderDetail(item) {
   const bl = item.bl || 0;
   const d3bl = item.day_3_bl || 0;
@@ -2046,11 +2047,11 @@ function renderDetail(item) {
     if (item.weight || item.Weight) propItems += '<div class="info-item"><span class="info-label">重量</span><span class="info-value">' + (item.weight || item.Weight) + ' kg</span></div>';
     if (item.grade) propItems += '<div class="info-item"><span class="info-label">等级</span><span class="info-value" style="color:' + getGradeColor(item.grade) + '">' + getGradeText(item.grade) + '</span></div>';
     if (item.objectID) propItems += '<div class="info-item"><span class="info-label">ID</span><span class="info-value" style="font-size:13px">' + escapeHtml(item.objectID) + '</span></div>';
-    propsHtml = '\n      <div class="section">\n        <div class="section-title">物品属性</div>\n        <div class="info-grid">' + propItems + '</div>\n      </div>';
+    propsHtml = '\n      <div class="section">\n        <div class="section-title">物品属�?/div>\n        <div class="info-grid">' + propItems + '</div>\n      </div>';
   }
 
   const detailContent = document.getElementById('detailContent');
-  detailContent.innerHTML = '\n      <div class="detail-header">\n        <div class="detail-pic">\n          ' + picHtml + '\n        </div>\n        <div class="detail-basic">\n          <div class="detail-name">' + escapeHtml(item.name) + '</div>\n          <div class="detail-meta">\n            ' + metaHtml + '\n          </div>\n          ' + descHtml + '\n        </div>\n      </div>\n\n      <div class="price-card">\n        <div class="price-card-header">\n          <span class="price-card-title">当前价格</span>\n          <span class="price-card-time">更新于 ' + formatTime(item.is_get_time) + '</span>\n        </div>\n        <div class="price-main">\n          <span class="price-currency">\xA5</span>\n          <span class="price-value">' + formatPrice(price) + '</span>\n        </div>\n        <div class="price-sub">\n          <div class="sub-item">\n            <span class="sub-label">今日开盘</span>\n            <span class="sub-value">\xA5' + formatPrice(item.price_start || item.priceStart || 0) + '</span>\n          </div>\n          <div class="sub-item">\n            <span class="sub-label">今日涨跌</span>\n            <span class="sub-value ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n          </div>\n        </div>\n      </div>\n\n      <div class="section">\n        <div class="section-title">近30天价格趋势</div>\n        <div class="price-curve-box">\n          ' + generatePriceCurveSVG(pricePoints) + '\n          <div class="curve-legend">\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#888"></span>30天前 \xA5' + formatPrice(d30p) + ' <span class="' + getChangeClass(d30bl) + '" style="font-size:10px">' + formatChange(d30bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#667eea"></span>7天前 \xA5' + formatPrice(d7p) + ' <span class="' + getChangeClass(d7bl) + '" style="font-size:10px">' + formatChange(d7bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#4caf50"></span>3天前 \xA5' + formatPrice(d3p) + ' <span class="' + getChangeClass(d3bl) + '" style="font-size:10px">' + formatChange(d3bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#ffd700"></span>当前 \xA5' + formatPrice(price) + '</div>\n          </div>\n        </div>\n      </div>\n\n      ' + propsHtml + '\n\n      <div class="source-note">\n        <span>数据来源：三角洲数据帝 orzice.com 开放平台</span>\n        <span>禁止编造或篡改任何价格信息</span>\n      </div>\n    ';
+  detailContent.innerHTML = '\n      <div class="detail-header">\n        <div class="detail-pic">\n          ' + picHtml + '\n        </div>\n        <div class="detail-basic">\n          <div class="detail-name">' + escapeHtml(item.name) + '</div>\n          <div class="detail-meta">\n            ' + metaHtml + '\n          </div>\n          ' + descHtml + '\n        </div>\n      </div>\n\n      <div class="price-card">\n        <div class="price-card-header">\n          <span class="price-card-title">当前价格</span>\n          <span class="price-card-time">更新�?' + formatTime(item.is_get_time) + '</span>\n        </div>\n        <div class="price-main">\n          <span class="price-currency">\xA5</span>\n          <span class="price-value">' + formatPrice(price) + '</span>\n        </div>\n        <div class="price-sub">\n          <div class="sub-item">\n            <span class="sub-label">今日开�?/span>\n            <span class="sub-value">\xA5' + formatPrice(item.price_start || item.priceStart || 0) + '</span>\n          </div>\n          <div class="sub-item">\n            <span class="sub-label">今日涨跌</span>\n            <span class="sub-value ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n          </div>\n        </div>\n      </div>\n\n      <div class="section">\n        <div class="section-title">�?0天价格趋�?/div>\n        <div class="price-curve-box">\n          ' + generatePriceCurveSVG(pricePoints) + '\n          <div class="curve-legend">\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#888"></span>30天前 \xA5' + formatPrice(d30p) + ' <span class="' + getChangeClass(d30bl) + '" style="font-size:10px">' + formatChange(d30bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#667eea"></span>7天前 \xA5' + formatPrice(d7p) + ' <span class="' + getChangeClass(d7bl) + '" style="font-size:10px">' + formatChange(d7bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#4caf50"></span>3天前 \xA5' + formatPrice(d3p) + ' <span class="' + getChangeClass(d3bl) + '" style="font-size:10px">' + formatChange(d3bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#ffd700"></span>当前 \xA5' + formatPrice(price) + '</div>\n          </div>\n        </div>\n      </div>\n\n      ' + propsHtml + '\n\n      <div class="source-note">\n        <span>数据来源：三角洲数据�?orzice.com 开放平�?/span>\n        <span>禁止编造或篡改任何价格信息</span>\n      </div>\n    ';
   updateFavoriteButton(item.id);
 
   // 异步拉取云端历史数据，直接更新图表（不做淡入淡出，避免闪烁）
@@ -2061,13 +2062,13 @@ function renderDetail(item) {
     var svgContainer = document.querySelector('.price-curve-box');
     if (!svgContainer || cloudPricePoints.length < 2) return;
 
-    // ★ 检查当前详情页是否已切换（页面守卫）
+    // �?检查当前详情页是否已切换（页面守卫�?
     if (pageStack[pageStack.length - 1] !== 'detail') return;
 
     var legendEl = svgContainer.querySelector('.curve-legend');
     var newSvg = generatePriceCurveSVG(cloudPricePoints);
 
-    // 直接替换 SVG，保留 legend。数据点多几个少几个肉眼不可分辨，不需要动画
+    // 直接替换 SVG，保�?legend。数据点多几个少几个肉眼不可分辨，不需要动�?
     var oldSvg = svgContainer.querySelector('svg');
     if (oldSvg) {
       oldSvg.insertAdjacentHTML('afterend', newSvg);
@@ -2076,11 +2077,11 @@ function renderDetail(item) {
       svgContainer.insertAdjacentHTML('afterbegin', newSvg);
     }
   }).catch(function(e) {
-    console.log('[详情] 云端历史获取失败，使用本地数据');
+    console.log('[详情] 云端历史获取失败，使用本地数�?);
   });
 }
 
-// ★ 轻量更新详情页价格和图表（不重建整个 DOM，避免闪烁）
+// �?轻量更新详情页价格和图表（不重建整个 DOM，避免闪烁）
 function updateDetailPrices(item) {
   var container = document.getElementById('detailContent');
   if (!container) return;
@@ -2093,9 +2094,9 @@ function updateDetailPrices(item) {
   if (priceVal) priceVal.textContent = formatPrice(price);
 
   var priceTime = container.querySelector('.price-card-time');
-  if (priceTime) priceTime.textContent = '更新于 ' + formatTime(item.is_get_time);
+  if (priceTime) priceTime.textContent = '更新�?' + formatTime(item.is_get_time);
 
-  // 更新今日开盘 + 涨跌
+  // 更新今日开�?+ 涨跌
   var subValues = container.querySelectorAll('.sub-value');
   if (subValues.length >= 2) {
     subValues[0].textContent = '\xA5' + formatPrice(item.price_start || item.priceStart || 0);
@@ -2116,7 +2117,7 @@ function updateDetailPrices(item) {
     }
   }
 
-  // 更新图例数值
+  // 更新图例数�?
   var legendItems = container.querySelectorAll('.curve-legend-item');
   if (legendItems.length >= 4) {
     var d30bl = item.day_30_bl || 0;
@@ -2131,7 +2132,7 @@ function updateDetailPrices(item) {
     }
   }
 
-  // 异步拉取云端历史，增强图表
+  // 异步拉取云端历史，增强图�?
   getOrFetchCloudSnapshots(item.id).then(function(cloudSnaps) {
     if (!cloudSnaps || cloudSnaps.length === 0) return;
     if (pageStack[pageStack.length - 1] !== 'detail') return;
@@ -2161,22 +2162,22 @@ function updateFavoriteButton(itemId) {
 function renderSearchResults(results, keyword) {
   const container = document.getElementById('searchResults');
   if (results.length === 0) {
-    container.innerHTML = '<div class="empty-container"><div class="empty-icon">-</div><div class="empty-text">未找到 "' + escapeHtml(keyword) + '" 相关物品</div></div>';
+    container.innerHTML = '<div class="empty-container"><div class="empty-icon">-</div><div class="empty-text">未找�?"' + escapeHtml(keyword) + '" 相关物品</div></div>';
     return;
   }
-  container.innerHTML = '<div style="padding:10px 16px;font-size:12px;color:#888">找到 ' + results.length + ' 个结果</div>' +
+  container.innerHTML = '<div style="padding:10px 16px;font-size:12px;color:#888">找到 ' + results.length + ' 个结�?/div>' +
     results.map(function(item) {
       const bl = item.bl || 0;
       var picHtml = item.pic
         ? '<img src="' + sanitizeUrl(item.pic) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
         : '<span class="pic-placeholder" style="font-size:20px">-</span>';
-      return '\n          <div class="result-item fade-in" onclick="openDetailFromSearch(' + JSON.stringify(item.id) + ')">\n            <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n              ' + picHtml + '\n            </div>\n            <div class="item-info">\n              <div class="item-name-row">\n                <span class="item-name">' + escapeHtml(item.name) + '</span>\n                <span class="item-grade" style="background:rgba(102,126,234,0.15);color:#667eea;font-size:10px;padding:2px 8px;border-radius:8px;margin-left:8px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n              </div>\n              <div class="item-price-row">\n                <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n                <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n              </div>\n            </div>\n            <span class="item-arrow">›</span>\n          </div>';
+      return '\n          <div class="result-item fade-in" onclick="openDetailFromSearch(' + JSON.stringify(item.id) + ')">\n            <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n              ' + picHtml + '\n            </div>\n            <div class="item-info">\n              <div class="item-name-row">\n                <span class="item-name">' + escapeHtml(item.name) + '</span>\n                <span class="item-grade" style="background:rgba(102,126,234,0.15);color:#667eea;font-size:10px;padding:2px 8px;border-radius:8px;margin-left:8px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n              </div>\n              <div class="item-price-row">\n                <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n                <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n              </div>\n            </div>\n            <span class="item-arrow">�?/span>\n          </div>';
     }).join('');
 }
 
 // ===== 价格异动工具函数 =====
 function getFieldByPeriod(item, field) {
-  // ★ 容错：字段不存在或为 null/undefined 时返回 0，防止筛选把旧缓存数据全部滤掉
+  // �?容错：字段不存在或为 null/undefined 时返�?0，防止筛选把旧缓存数据全部滤�?
   if (field === 'bl') return (item.bl != null) ? item.bl : 0;
   if (field === 'day_3_bl') return (item.day_3_bl != null) ? item.day_3_bl : 0;
   if (field === 'day_7_bl') return (item.day_7_bl != null) ? item.day_7_bl : 0;
@@ -2187,7 +2188,7 @@ function getPrefetchItems() {
   var prefetched = window.__prefetch;
   if (!prefetched) return [];
   var all = [];
-  // ★ 白名单迭代：仅遍历已知分类 key，防止遍历到 _error/getError/retry 等非分类属性
+  // �?白名单迭代：仅遍历已知分�?key，防止遍历到 _error/getError/retry 等非分类属�?
   for (var i = 0; i < CATEGORIES.length; i++) {
     var p = prefetched[CATEGORIES[i].key];
     if (p && p._resolvedData && p._resolvedData.length > 0) {
@@ -2197,7 +2198,7 @@ function getPrefetchItems() {
   return all;
 }
 
-// ===== 首页涨跌幅推送卡片 (v3：数据来自 prefetch 合并的 item_price_all) =====
+// ===== 首页涨跌幅推送卡�?(v3：数据来�?prefetch 合并�?item_price_all) =====
 var _topMoverApiDone = false;
 function renderHomeTopMover() {
   var el = document.getElementById('topMover');
@@ -2211,14 +2212,14 @@ function renderHomeTopMover() {
     return;
   }
 
-  // ★ v3：prefetch 已将 item_price_all 真实价格注入所有物品
+  // �?v3：prefetch 已将 item_price_all 真实价格注入所有物�?
   var prefetched = window.__prefetch || {};
   _topMoverApiDone = !!(prefetched._topMoverApiDone);
 
   _renderTopMoverFromData(all);
 }
 
-/** 从给定数据中提取涨幅前二并渲染 */
+/** 从给定数据中提取涨幅前二并渲�?*/
 function _renderTopMoverFromData(all) {
   var el = document.getElementById('topMover');
   if (!el) return;
@@ -2244,8 +2245,8 @@ function _renderTopMoverFromData(all) {
       var item = t.item;
       var val = t.val;
       var label = idx === 0 ? '涨幅第一' : '涨幅第二';
-      var periodText = t.isDay7 ? '近7天' : '今日';
-      var freshness = _topMoverApiDone ? ' <span style="font-size:9px;color:#4fc3f7;font-weight:normal">●实时</span>' : '';
+      var periodText = t.isDay7 ? '�?�? : '今日';
+      var freshness = _topMoverApiDone ? ' <span style="font-size:9px;color:#4fc3f7;font-weight:normal">●实�?/span>' : '';
       var picHtml = item.pic
         ? '<img src="' + sanitizeUrl(item.pic) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:36px;height:36px;border-radius:6px;object-fit:contain;margin-right:10px" onerror="this.style.display=\'none\'">'
         : '';
@@ -2264,12 +2265,12 @@ function _renderTopMoverFromData(all) {
   '</div>';
 }
 
-// ===== 收藏标签页 =====
+// ===== 收藏标签�?=====
 function renderFavTab() {
   const content = document.getElementById('favtabContent');
   const favs = getFavorites();
   if (favs.length === 0) {
-    content.innerHTML = '<div class="empty-container"><div class="empty-icon">-</div><div class="empty-text">暂无收藏物品，在物品详情页收藏</div></div>';
+    content.innerHTML = '<div class="empty-container"><div class="empty-icon">-</div><div class="empty-text">暂无收藏物品，在物品详情页收�?/div></div>';
     return;
   }
   const cached = getCache();
@@ -2278,19 +2279,19 @@ function renderFavTab() {
     const full = allItems.find(function(i) { return i.id === fav.id; });
     return full ? Object.assign({}, fav, full) : fav;
   });
-  content.innerHTML = '\n      <div class="list-stats">\n        <span>共 ' + items.length + ' 件收藏</span>\n        <span class="history-clear" onclick="clearFavorites(); renderFavTab();" style="color:#f44336;cursor:pointer">清空收藏</span>\n      </div>\n      ' + items.map(function(item) {
+  content.innerHTML = '\n      <div class="list-stats">\n        <span>�?' + items.length + ' 件收�?/span>\n        <span class="history-clear" onclick="clearFavorites(); renderFavTab();" style="color:#f44336;cursor:pointer">清空收藏</span>\n      </div>\n      ' + items.map(function(item) {
         const bl = item.bl || 0;
         var picHtml = item.pic
           ? '<img src="' + sanitizeUrl(item.pic) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">'
           : '<span class="pic-placeholder">-</span>';
-        return '\n        <div class="item-card fade-in" onclick="openPriceMover(' + JSON.stringify(item.id) + ')" style="position:relative">\n          <div class="item-pic">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
+        return '\n        <div class="item-card fade-in" onclick="openPriceMover(' + JSON.stringify(item.id) + ')" style="position:relative">\n          <div class="item-pic">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">�?/span>\n        </div>';
       }).join('');
 }
 
 // ===== SVG 图表 =====
 function generatePriceCurveSVG(pricePoints) {
-  if (!pricePoints || pricePoints.length < 2) return '<div style="text-align:center;color:#666;padding:30px">数据不足，无法生成曲线</div>';
-  var _gradId = 'grad_' + (generatePriceCurveSVG._seq = (generatePriceCurveSVG._seq || 0) + 1); // 自增计数器，防止同时存在多个 SVG 时 ID 冲突
+  if (!pricePoints || pricePoints.length < 2) return '<div style="text-align:center;color:#666;padding:30px">数据不足，无法生成曲�?/div>';
+  var _gradId = 'grad_' + (generatePriceCurveSVG._seq = (generatePriceCurveSVG._seq || 0) + 1); // 自增计数器，防止同时存在多个 SVG �?ID 冲突
   var pts = pricePoints.slice().sort(function(a, b) { return b.day - a.day; });
   var allPrices = pts.map(function(p) { return p.price; });
   var minPrice = Math.min.apply(null, allPrices);
@@ -2315,8 +2316,8 @@ function generatePriceCurveSVG(pricePoints) {
   var yStep = niceStepSize(roughRange, 4);
   var yMin = Math.floor(paddedMin / yStep) * yStep;
   var yMax = Math.ceil(maxPrice / yStep) * yStep;
-  var paddedMax = yMax;         // 上限对齐刻度线
-  paddedMin = yMin;             // 下限也对齐
+  var paddedMax = yMax;         // 上限对齐刻度�?
+  paddedMin = yMin;             // 下限也对�?
   var paddedRange = paddedMax - paddedMin || 1;
 
   var dataPoints = pts.map(function(p) {
@@ -2362,7 +2363,7 @@ function generatePriceCurveSVG(pricePoints) {
   var bottomY = (PAD.top + plotH).toFixed(1);
   var areaD = pathD + 'L' + lastX + ',' + bottomY + ' L' + firstX + ',' + bottomY + ' Z';
 
-  // 生成均匀 Y 轴刻度标签
+  // 生成均匀 Y 轴刻度标�?
   var yTicks = [];
   for (var p = yMin; p <= yMax + yStep * 0.01; p += yStep) {
     yTicks.push({
@@ -2405,7 +2406,7 @@ function generatePriceCurveSVG(pricePoints) {
     '<path d="' + pathD + '" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
     markers.map(function(m) {
       var dotColor = m.isCurrent ? '#ffd700' : '#667eea';
-      // 微小点标注（当前日稍大，其余统一小点，无描边）
+      // 微小点标注（当前日稍大，其余统一小点，无描边�?
       var r = m.isCurrent ? 2.5 : 1.5;
       return '<circle cx="' + m.x.toFixed(1) + '" cy="' + m.y.toFixed(1) + '" r="' + r + '" fill="' + dotColor + '"/>';
     }).join('') +
@@ -2438,15 +2439,15 @@ function generateSparklineSVG(pricePoints) {
 }
 
 // ===== main.js =====
-// ===== main.js — 应用入口 =====
-// 功能清单: 页面路由(showPage/pushPage/goBack) | 底部Tab导航 | 首页渲染+筛选排序+分页 | 列表页渲染+排序+分页
-// 详情页渲染+价格图表 | 搜索页(实时搜索+历史+最近浏览+收藏) | 收藏Tab页 | 下拉刷新 | 自动刷新定时器(5分钟)
-// 每日价格记录 | 加载动画+进度条 | 全局事件(下拉关闭/返回键) | 初始化流程(preload)
+// ===== main.js �?应用入口 =====
+// 功能清单: 页面路由(showPage/pushPage/goBack) | 底部Tab导航 | 首页渲染+筛选排�?分页 | 列表页渲�?排序+分页
+// 详情页渲�?价格图表 | 搜索�?实时搜索+历史+最近浏�?收藏) | 收藏Tab�?| 下拉刷新 | 自动刷新定时�?5分钟)
+// 每日价格记录 | 加载动画+进度�?| 全局事件(下拉关闭/返回�? | 初始化流�?preload)
 // 依赖: store.js(getCache/setCache/clearCache/...) api.js(apiRequest/loadAllItems/...) render.js(所有render函数)
 //    maps.js(findItemMap) utils.js(toast/formatPrice/...)
-// 改动影响: 修改路由→影响所有页面跳转; 修改刷新逻辑→影响数据新鲜度; 修改初始化→影响启动体验
+// 改动影响: 修改路由→影响所有页面跳�? 修改刷新逻辑→影响数据新鲜度; 修改初始化→影响启动体验
 
-// ===== 状态变量 =====
+// ===== 状态变�?=====
 const pages = {};
 ['home', 'list', 'detail', 'search', 'favtab'].forEach(function(id) {
   pages[id] = document.getElementById('page-' + id);
@@ -2529,7 +2530,7 @@ function updateSortBar() {
   });
   ['price', 'change'].forEach(function(f) {
     const el = document.getElementById('dir-' + f);
-    if (el) el.textContent = (f === sortBy) ? (sortDir === 'desc' ? '↓' : '↑') : '';
+    if (el) el.textContent = (f === sortBy) ? (sortDir === 'desc' ? '�? : '�?) : '';
   });
 }
 
@@ -2547,10 +2548,10 @@ var _favTabPreWarmed = false;
 function preWarmFavTab() {
   if (_favTabPreWarmed) return;
   _favTabPreWarmed = true;
-  // 确保收藏数据与缓存数据合并完成
+  // 确保收藏数据与缓存数据合并完�?
   var cached = getCache();
   if (cached && cached._allItems && cached._allItems.length > 0) {
-    // 数据已就绪，标记收藏页可用
+    // 数据已就绪，标记收藏页可�?
     _favTabDataReady = true;
   }
 }
@@ -2565,15 +2566,15 @@ function switchTab(tabName) {
     target.classList.add('active');
     pageStack = [tabName];
     if (tabName === 'home') {
-      // ★ 切回首页：不重新渲染列表（保持滚动+分页），仅更新轻量的提醒和涨幅卡片
-      // 因为在收藏页期间数据不会变（auto-refresh 只在首页active时运行，且已移除 loadAllItems）
+      // �?切回首页：不重新渲染列表（保持滚�?分页），仅更新轻量的提醒和涨幅卡�?
+      // 因为在收藏页期间数据不会变（auto-refresh 只在首页active时运行，且已移除 loadAllItems�?
       checkFavoritePriceChanges();
       renderHomeTopMover();
-      // ★ 后台预暖收藏页数据
+      // �?后台预暖收藏页数�?
       setTimeout(function() { preWarmFavTab(); }, 300);
     }
     if (tabName === 'favtab') {
-      // ★ 渲染收藏页（直接从缓存读取，不触发 loadAllItems 避免影响首页缓存）
+      // �?渲染收藏页（直接从缓存读取，不触�?loadAllItems 避免影响首页缓存�?
       if (!_favTabDataReady) {
         var cached = getCache();
         if (cached && cached._allItems && cached._allItems.length > 0) {
@@ -2602,7 +2603,7 @@ async function openCategory(key, name) {
     var items;
     var fromCache = false;
 
-    // ★ 优先使用预取数据（即使不完整也先展示出来）
+    // �?优先使用预取数据（即使不完整也先展示出来�?
     var prefetched = window.__prefetch || {};
     var pCat = prefetched[key];
     if (pCat && pCat._resolvedData && pCat._resolvedData.length > 0) {
@@ -2645,11 +2646,11 @@ async function openCategory(key, name) {
     listItems = items;
     renderList(items, false);
 
-    // ★ 如果用的是首页不完整数据，后台加载完整数据
+    // �?如果用的是首页不完整数据，后台加载完整数�?
     if (fromCache && pCat && pCat._loadingMore) {
-      // _onComplete 已注册，会在后台加载完成后自动更新列表
+      // _onComplete 已注册，会在后台加载完成后自动更新列�?
     } else if (fromCache) {
-      // 缓存数据存在时后台静默刷新
+      // 缓存数据存在时后台静默刷�?
       fetchCategoryAll(key).then(function(freshItems) {
         if (currentCategory && currentCategory.key !== key) return;
         if (freshItems && freshItems.length > 0 && freshItems.length !== listItems.length) {
@@ -2684,7 +2685,7 @@ async function openAllItems() {
 
   var items = null;
 
-  // ★ 优先用预取首页数据快速展示
+  // �?优先用预取首页数据快速展�?
   var prefetched = window.__prefetch || {};
   var hasAnyPage1 = false;
   var page1All = [];
@@ -2699,7 +2700,7 @@ async function openAllItems() {
     items = page1All;
   }
 
-  // 检查缓存
+  // 检查缓�?
   if (!items || items.length === 0) {
     try {
       var cached = getCache();
@@ -2714,7 +2715,7 @@ async function openAllItems() {
     try { items = await loadAllItems(); } catch(e) { console.error('loadAllItems error:', e); }
   }
 
-  // 最后兜底
+  // 最后兜�?
   if (!items || items.length === 0) {
     try {
       var allResults = await Promise.all(CATEGORIES.map(function(cat) {
@@ -2733,7 +2734,7 @@ async function openAllItems() {
   listItems = items;
   renderList(items, true);
 
-  // ★ 后台静默加载完整数据
+  // �?后台静默加载完整数据
   if (!isPrefetchComplete() && typeof loadAllItemsBackground === 'function') {
     loadAllItemsBackground(items).then(function(fullItems) {
       if (currentCategory && currentCategory.key !== 'all') return;
@@ -2757,7 +2758,7 @@ function findItemAnywhere(itemId) {
     var found2 = pf.find(function(i) { return i.id === itemId; });
     if (found2) return found2;
   }
-  // ★ 兜底：从收藏/最近浏览中恢复已从 API 删除的物品数据
+  // �?兜底：从收藏/最近浏览中恢复已从 API 删除的物品数�?
   var locals = (getFavorites()).concat(getRecentViews());
   for (var li = 0; li < locals.length; li++) {
     if (locals[li].id === itemId) return locals[li];
@@ -2765,7 +2766,7 @@ function findItemAnywhere(itemId) {
   return null;
 }
 
-// ===== 详情页 =====
+// ===== 详情�?=====
 async function openDetail(itemId) {
   const item = listItems.find(function(i) { return i.id === itemId; });
   if (!item) {
@@ -2802,12 +2803,12 @@ async function openDetail(itemId) {
           setCache(cached);
         }
       }
-      updateDetailPrices(currentItem);   // ★ 只更新价格和图表，不重建整页 DOM
+      updateDetailPrices(currentItem);   // �?只更新价格和图表，不重建整页 DOM
     }
   } catch (err) {}
 }
 
-// ★ 统一入口：从任意来源打开物品详情
+// �?统一入口：从任意来源打开物品详情
 function openDetailFromSource(itemId, notFoundMsg) {
   var item = findItemAnywhere(itemId);
   if (!item) {
@@ -2820,8 +2821,8 @@ function openDetailFromSource(itemId, notFoundMsg) {
   openDetail(itemId);
 }
 
-function openDetailFromRecent(itemId) { openDetailFromSource(itemId, '该物品数据已过期，请刷新后重试'); }
-function openDetailFromFavorite(itemId) { openDetailFromSource(itemId, '该物品数据已过期，请刷新后重试'); }
+function openDetailFromRecent(itemId) { openDetailFromSource(itemId, '该物品数据已过期，请刷新后重�?); }
+function openDetailFromFavorite(itemId) { openDetailFromSource(itemId, '该物品数据已过期，请刷新后重�?); }
 function openDetailFromSearch(itemId) { openDetailFromSource(itemId, '未找到该物品数据'); }
 function openPriceMover(itemId) { openDetailFromSource(itemId, '未找到该物品'); }
 function openTopMover(itemId) { if (itemId) openDetailFromSource(itemId, '未找到该物品'); }
@@ -2843,7 +2844,7 @@ function checkFavoritePriceChanges() {
   favs.forEach(function(fav) {
     const current = allItems.find(function(item) { return item.id === fav.id; });
     if (!current || !fav.price || fav.price <= 0) return;
-    if (!current.price || current.price <= 0) return; // 修复：current.price无效时不更新基准价
+    if (!current.price || current.price <= 0) return; // 修复：current.price无效时不更新基准�?
     const changePct = (current.price - fav.price) / fav.price * 100;
     if (Math.abs(changePct) >= 25) {
       changes.push({
@@ -2872,7 +2873,7 @@ function checkFavoritePriceChanges() {
 
   const text = changes.map(function(c) {
     return '<span class="price-alert-item ' + c.dir + '">' + escapeHtml(c.name) + ' ' + (c.pct > 0 ? '+' : '') + c.pct.toFixed(1) + '%</span>';
-  }).join('、');
+  }).join('�?);
   alertEl.innerHTML = '收藏提醒: ' + text;
   alertEl.classList.add('show');
 
@@ -2900,7 +2901,7 @@ function toggleCurrentFavorite() {
   if (document.getElementById('page-home').classList.contains('active')) {
     renderHome();
   }
-  toast(isNowFav ? '已加入收藏' : '已取消收藏');
+  toast(isNowFav ? '已加入收�? : '已取消收�?);
 }
 
 // ===== 搜索 =====
@@ -2950,7 +2951,7 @@ async function doSearch(keyword) {
   document.getElementById('searchHistory').style.display = 'none';
   document.getElementById('recentViewSection').style.display = 'none';
   document.getElementById('favoritesSection').style.display = 'none';
-  document.getElementById('searchResults').innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">搜索中...</div></div>';
+  document.getElementById('searchResults').innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">搜索�?..</div></div>';
 
   var kw = keyword.toLowerCase();
   var allItems;
@@ -2958,7 +2959,7 @@ async function doSearch(keyword) {
   if (cached && cached._allItems && cached._allItems.length > 0) {
     allItems = cached._allItems;
   } else {
-    // ★ 优先用 _quick 首页数据快速搜索
+    // �?优先�?_quick 首页数据快速搜�?
     try {
       var prefetched = window.__prefetch || {};
       // 先用已就绪的 _resolvedData
@@ -2985,7 +2986,7 @@ async function doSearch(keyword) {
       }
     } catch(e) { allItems = []; }
     if (!allItems || allItems.length === 0) {
-      document.getElementById('searchResults').innerHTML = '<div class="error-container"><div class="error-text">数据加载中，请稍后重试</div><button class="retry-btn" onclick="doSearch(document.getElementById(\'searchInput\').value)">重试</button></div>';
+      document.getElementById('searchResults').innerHTML = '<div class="error-container"><div class="error-text">数据加载中，请稍后重�?/div><button class="retry-btn" onclick="doSearch(document.getElementById(\'searchInput\').value)">重试</button></div>';
       return;
     }
   }
@@ -3006,7 +3007,7 @@ async function refreshCurrentList() {
   if (!checkRefreshCooldown()) return;
   if (!currentCategory) return;
   const content = document.getElementById('listContent');
-  content.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">刷新中...</div></div>';
+  content.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">刷新�?..</div></div>';
   document.getElementById('listStats').innerHTML = '';
 
   try {
@@ -3024,7 +3025,7 @@ async function refreshCurrentList() {
       var backupCache = getCache();
       clearCache();
       try {
-        // ★ 保存元数据用于合并
+        // �?保存元数据用于合�?
         var oldItems2 = (backupCache && backupCache._allItems) || [];
         var metaMap2 = {};
         oldItems2.forEach(function(item) {
@@ -3032,7 +3033,7 @@ async function refreshCurrentList() {
             metaMap2[canonicalId(item)] = { name: item.name, pic: item.pic, _category: item._category, grade: item.grade, ShopSellType: item.ShopSellType, desc: item.desc, secondClassCN: item.secondClassCN, length: item.length, width: item.width, weight: item.weight, objectID: item.objectID, tid: item.tid };
           }
         });
-        // ★ 直接从 API 拉取最新价格
+        // �?直接�?API 拉取最新价�?
         var priceRes2 = await apiRequest('item_price_all', null, 3, true);
         var cleanPrices = sanitizeItemArray(priceRes2 && priceRes2.data, 'price');
         if (cleanPrices.length > 0) {
@@ -3052,14 +3053,14 @@ async function refreshCurrentList() {
           listItems = items;
           renderList(items, true);
         } else {
-          throw new Error('API 返回空');
+          throw new Error('API 返回�?);
         }
       } catch (e) {
         if (backupCache && backupCache._allItems) {
           setCache(backupCache);
           listItems = backupCache._allItems;
           renderList(backupCache._allItems, true);
-          toast('刷新失败，显示缓存数据');
+          toast('刷新失败，显示缓存数�?);
           refreshFailed = true;
         } else {
           throw e;
@@ -3080,7 +3081,7 @@ async function refreshCurrentList() {
       markRefreshed();
       toast('刷新完成');
     }
-    // 仅首页可见时才更新首页 DOM（避免无效 DOM 操作和 localStorage 写入）
+    // 仅首页可见时才更新首�?DOM（避免无�?DOM 操作�?localStorage 写入�?
     if (document.getElementById('page-home').classList.contains('active')) {
       checkFavoritePriceChanges();
       renderHomeTopMover();
@@ -3096,7 +3097,7 @@ async function refreshCurrentItem() {
   if (!checkRefreshCooldown()) return;
   if (!currentItem) return;
   const content = document.getElementById('detailContent');
-  content.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">正在向API请求最新数据...</div></div>';
+  content.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">正在向API请求最新数�?..</div></div>';
 
   try {
     const res = await apiRequest('item_price_all', null, 3, true);
@@ -3122,7 +3123,7 @@ async function refreshCurrentItem() {
   } catch (err) {
     console.error('刷新物品失败:', err);
     renderDetail(currentItem);
-    toast('刷新失败，显示已有数据');
+    toast('刷新失败，显示已有数�?);
   }
 }
 
@@ -3131,7 +3132,7 @@ async function refreshAllData() {
   var prevPage = pageStack[pageStack.length - 1];
   var prevItemId = currentItem ? currentItem.id : null;
 
-  // ★ 保存旧缓存中的元数据（名称/图标/分类），刷新只更新价格
+  // �?保存旧缓存中的元数据（名�?图标/分类），刷新只更新价�?
   var oldCache = getCache();
   var oldItems = (oldCache && oldCache._allItems) || [];
   var metaMap = {};
@@ -3140,7 +3141,7 @@ async function refreshAllData() {
       metaMap[canonicalId(item)] = { name: item.name, pic: item.pic, _category: item._category, grade: item.grade, ShopSellType: item.ShopSellType, desc: item.desc, secondClassCN: item.secondClassCN, length: item.length, width: item.width, weight: item.weight, objectID: item.objectID, tid: item.tid };
     }
   });
-  // ★ 如果缓存没有完整元数据，从 prefetch 中补充
+  // �?如果缓存没有完整元数据，�?prefetch 中补�?
   var prefetched = window.__prefetch || {};
   if (Object.keys(metaMap).length < 100 && prefetched._resolvedData) {
     CATEGORIES.forEach(function(cat) {
@@ -3162,14 +3163,14 @@ async function refreshAllData() {
 
   toast('正在刷新全部数据...');
   try {
-    // ★ 直接从 API 拉取最新价格（强制刷新，跳过缓存）
+    // �?直接�?API 拉取最新价格（强制刷新，跳过缓存）
     var priceRes = await apiRequest('item_price_all', null, 3, true);
     var cleanPrices = sanitizeItemArray(priceRes && priceRes.data, 'price');
     if (cleanPrices.length === 0) {
-      throw new Error('API 返回空数据');
+      throw new Error('API 返回空数�?);
     }
 
-    // ★ 合并：API 价格 + 元数据
+    // �?合并：API 价格 + 元数�?
     var merged = cleanPrices.map(function(p) {
       var meta = metaMap[p.id] || {};
       return Object.assign({}, p, {
@@ -3196,7 +3197,7 @@ async function refreshAllData() {
       renderHomeMovers();
       checkFavoritePriceChanges();
       renderHomeTopMover();
-      toast('全部数据已刷新！（' + merged.length + ' 件）');
+      toast('全部数据已刷新！�? + merged.length + ' 件）');
     } else if (prevPage === 'list') {
       if (isAllMode) {
         listItems = merged;
@@ -3205,16 +3206,16 @@ async function refreshAllData() {
         listItems = merged.filter(function(i) { return i._category === currentCategory.key; });
         renderList(listItems, false);
       }
-      toast('全部数据已刷新！（' + merged.length + ' 件）');
+      toast('全部数据已刷新！�? + merged.length + ' 件）');
     } else if (prevPage === 'detail' && prevItemId) {
       currentItem = merged.find(function(i) { return i.id === prevItemId; });
       if (currentItem) renderDetail(currentItem);
-      toast('全部数据已刷新！（' + merged.length + ' 件）');
+      toast('全部数据已刷新！�? + merged.length + ' 件）');
     }
   } catch (err) {
     console.error('刷新全部数据失败:', err);
-    toast('刷新失败，请检查网络');
-    // ★ 恢复旧缓存数据（仅当缓存未被其他操作修改时）
+    toast('刷新失败，请检查网�?);
+    // �?恢复旧缓存数据（仅当缓存未被其他操作修改时）
     var currentCache = getCache();
     if (oldCache && oldCache._allItems && oldCache._allItems.length > 0 &&
         (!currentCache || !currentCache._allItems || currentCache._allItems.length === 0)) {
@@ -3227,7 +3228,7 @@ async function refreshAllData() {
 function refreshFavTab() {
   if (!checkRefreshCooldown()) return;
   toast('正在刷新收藏价格...');
-  // ★ 直接从 API 拉取最新价格，不再依赖缓存
+  // �?直接�?API 拉取最新价格，不再依赖缓存
   apiRequest('item_price_all', null, 3, true).then(function(res) {
     if (res && res.data && res.data.length > 0) {
       var cached = getCache();
@@ -3256,11 +3257,11 @@ function refreshFavTab() {
     }
     markRefreshed();
     renderFavTab();
-    toast('收藏价格已刷新');
+    toast('收藏价格已刷�?);
   }).catch(function(err) {
     console.error('刷新收藏失败:', err);
     renderFavTab();
-    toast('刷新失败，显示已有数据');
+    toast('刷新失败，显示已有数�?);
   });
 }
 
@@ -3281,9 +3282,9 @@ function startHomeAutoRefresh() {
     var hadAlert = alertEl && alertEl.classList.contains('show');
     checkFavoritePriceChanges();
     renderHomeTopMover();
-    // ★ 不再每次重新渲染整个列表，只更新涨跌幅数据提示
+    // �?不再每次重新渲染整个列表，只更新涨跌幅数据提�?
     if (alertEl && alertEl.classList.contains('show') && !hadAlert) {
-      toast('收藏物品价格发生变动，点击查看', 3000);
+      toast('收藏物品价格发生变动，点击查�?, 3000);
     }
     var refreshIndicator = document.getElementById('autoRefreshTime');
     if (refreshIndicator) {
@@ -3329,7 +3330,7 @@ function stopGlobalDailyRecord() {
 
 // ===== 事件绑定 =====
 document.addEventListener('DOMContentLoaded', function() {
-  // ★ 移动端修复：将下拉面板移到 body 下，确保 fixed 定位可靠
+  // �?移动端修复：将下拉面板移�?body 下，确保 fixed 定位可靠
   if (typeof moveDropdownsToBody === 'function') moveDropdownsToBody();
 
   document.getElementById('searchInput').addEventListener('input', function(e) {
@@ -3359,10 +3360,10 @@ document.addEventListener('visibilitychange', function() {
     stopHomeAutoRefresh();
     stopGlobalDailyRecord();
   } else {
-    // ★ 页面恢复可见：刷新数据、恢复自动刷新、确保数据持续加载
+    // �?页面恢复可见：刷新数据、恢复自动刷新、确保数据持续加�?
     startHomeAutoRefresh();
     startGlobalDailyRecord();
-    // 如果缓存数据不足，后台继续加载
+    // 如果缓存数据不足，后台继续加�?
     var cached = getCache();
     if (!cached || !cached._allItems || cached._allItems.length < 50) {
       loadAllItems(false).then(function() {
@@ -3380,8 +3381,8 @@ document.addEventListener('visibilitychange', function() {
   }
 });
 
-// ===== 启动初始化 =====
-// 从本地已有数据中直接提取图标缓存（无视过期时间，图标永不失效）
+// ===== 启动初始�?=====
+// 从本地已有数据中直接提取图标缓存（无视过期时间，图标永不失效�?
 if (!getCatIconsCache()) {
   try {
     const raw = JSON.parse(localStorage.getItem(CACHE_KEY));
@@ -3391,7 +3392,7 @@ if (!getCatIconsCache()) {
         const cat = item._category;
         if (cat && !picks[cat] && item.pic) picks[cat] = item.pic;
       });
-      const logisticsItem = raw._allItems.find(function(i) { return i.name === '物流信息单' && i.pic; });
+      const logisticsItem = raw._allItems.find(function(i) { return i.name === '物流信息�? && i.pic; });
       if (logisticsItem) picks['all'] = logisticsItem.pic;
       if (Object.keys(picks).length > 0) setCatIconsCache(picks);
     }
@@ -3399,19 +3400,19 @@ if (!getCatIconsCache()) {
 }
 renderHome();
 
-// ★ 检测元数据降级：metadata 加载失败时显示警告横幅
+// �?检测元数据降级：metadata 加载失败时显示警告横�?
 (function checkMetadataDegraded() {
   var prefetched = window.__prefetch || {};
   if (typeof prefetched.isMetadataDegraded === 'function' && prefetched.isMetadataDegraded()) {
     var alertEl = document.getElementById('priceAlert');
     if (alertEl) {
-      alertEl.innerHTML = '⚠️ 物品元数据加载失败，部分物品名称可能显示为"物品#ID"。请刷新重试。';
+      alertEl.innerHTML = '⚠️ 物品元数据加载失败，部分物品名称可能显示�?物品#ID"。请刷新重试�?;
       alertEl.classList.add('show');
     }
   }
 })();
 
-// ===== 预加载（★ loading 期内全力拉取，10 秒硬超时，真实进度） =====
+// ===== 预加载（�?loading 期内全力拉取�?0 秒硬超时，真实进度） =====
 (async function preload() {
   var cached = getCache();
   var loadingScreen = document.getElementById('loadingScreen');
@@ -3421,7 +3422,7 @@ renderHome();
   var loadingStatus = document.getElementById('loadingStatus');
   var loadStart = Date.now();
   var minDisplayMs = 300;
-  var LOADING_TIMEOUT = 10000; // ★ 10 秒硬超时
+  var LOADING_TIMEOUT = 10000; // �?10 秒硬超时
   var _loadingHidden = false;
 
   function setProgress(ratio, statusText) {
@@ -3443,22 +3444,22 @@ renderHome();
     }, 200);
   }
 
-  // ★ 渲染首屏 + 持续更新 loading 进度条
+  // �?渲染首屏 + 持续更新 loading 进度�?
   function showAndContinueLoading(allItems, skipCache) {
     if (!allItems || allItems.length === 0) {
       hideLoading();
       return;
     }
-    // 写入缓存 + 渲染（但不隐藏 loading）
+    // 写入缓存 + 渲染（但不隐�?loading�?
     if (!skipCache) setCache({ _allItems: allItems });
     if (typeof buildSearchIndex === 'function') buildSearchIndex(allItems);
     updateCategoryIcons(allItems);
     checkFavoritePriceChanges();
     renderHomeTopMover();
     renderHomeMoversWithData(allItems, false);
-    setProgress(0.55, '已展示 ' + allItems.length + ' 件，继续加载更多...');
+    setProgress(0.55, '已展�?' + allItems.length + ' 件，继续加载更多...');
 
-    // ★ loading 期内实时追踪预取进度
+    // �?loading 期内实时追踪预取进度
     var _pollTimer = setInterval(function() {
       if (_loadingHidden) { clearInterval(_pollTimer); return; }
       var prefetched = window.__prefetch || {};
@@ -3471,11 +3472,11 @@ renderHome();
       var arrived = (typeof prefetched.getTotalArrived === 'function')
         ? prefetched.getTotalArrived()
         : allItems.length;
-      // 进度：首屏 50% + 翻页进度 50%
+      // 进度：首�?50% + 翻页进度 50%
       var displayProgress = 0.55 + realProgress * 0.43;
       if (displayProgress > 0.98) displayProgress = 0.98;
-      setProgress(displayProgress, '已加载 ' + arrived + (expected > 0 ? '/' + expected : '') + ' 件...');
-      // ★ 数据量足够或翻页完成 → 提前结束 loading
+      setProgress(displayProgress, '已加�?' + arrived + (expected > 0 ? '/' + expected : '') + ' �?..');
+      // �?数据量足够或翻页完成 �?提前结束 loading
       if (arrived >= expected && expected > 0 && arrived > 100) {
         clearInterval(_pollTimer);
         hideLoading();
@@ -3486,7 +3487,7 @@ renderHome();
       }
     }, 400);
 
-    // ★ 后台监听翻页完成 → 更新缓存 + 搜索结果
+    // �?后台监听翻页完成 �?更新缓存 + 搜索结果
     if (!skipCache) {
       setTimeout(function() {
         loadAllItemsBackground(allItems).then(function(fullItems) {
@@ -3502,7 +3503,7 @@ renderHome();
 
   // ===== 有缓存：快速展示，后台刷新 =====
   if (cached && cached._allItems && cached._allItems.length > 0) {
-    // ★ 先清空首页内容，防止旧数据闪现
+    // �?先清空首页内容，防止旧数据闪�?
     var homeList = document.getElementById('homeMoversList');
     if (homeList) homeList.innerHTML = '';
     var topMover = document.getElementById('topMover');
@@ -3511,11 +3512,11 @@ renderHome();
     updateCategoryIcons(cached._allItems);
     buildSearchIndex(cached._allItems);
     mergeSWPriceHistory().then(function() { recordAllItemsPrices(cached._allItems); });
-    // 加速动画：缓存命中时快速展示
+    // 加速动画：缓存命中时快速展�?
     var steps = [0, 0.2, 0.45, 0.7, 0.9, 1];
     steps.forEach(function(ratio, i) {
       setTimeout(function() {
-        setProgress(ratio, ratio < 0.3 ? '正在准备...' : ratio < 0.7 ? '正在同步最新价格' : ratio < 1 ? '即将就绪' : '数据就绪');
+        setProgress(ratio, ratio < 0.3 ? '正在准备...' : ratio < 0.7 ? '正在同步最新价�? : ratio < 1 ? '即将就绪' : '数据就绪');
         if (ratio === 1) {
           setTimeout(function() { renderHomeMovers(); renderHomeTopMover(); }, 50);
           setTimeout(function() { hideLoading(); }, 150);
@@ -3530,15 +3531,15 @@ renderHome();
     return;
   }
 
-  // ===== 无缓存：★ v3 双请求合并，2-3s 全量 1350 件一次到齐 =====
+  // ===== 无缓存：�?v3 双请求合并，2-3s 全量 1350 件一次到�?=====
   var prefetched = window.__prefetch || {};
-  setProgress(0.05, '正在连接数据源...');
+  setProgress(0.05, '正在连接数据�?..');
 
   var _noCacheAllItems = [];
   var _noCacheDone = false;
   var _progressTimer = null;
 
-  // ★ 监听数据到达（v3: metadata+price 合并后一次性通知全部物品）
+  // �?监听数据到达（v3: metadata+price 合并后一次性通知全部物品�?
   if (typeof prefetched.onItemsArrive === 'function') {
     prefetched.onItemsArrive(function(newItems, totalArrived) {
       _noCacheAllItems = _noCacheAllItems.concat(newItems);
@@ -3551,24 +3552,24 @@ renderHome();
         checkFavoritePriceChanges();
         renderHomeTopMover();
         renderHomeMoversWithData(_noCacheAllItems, false);
-        setProgress(1, '已加载 ' + totalArrived + ' 件');
+        setProgress(1, '已加�?' + totalArrived + ' �?);
         setTimeout(function() { hideLoading(); }, 300);
       }
     });
   }
 
-  // 进度条：~3 秒平滑动画
+  // 进度条：~3 秒平滑动�?
   setProgress(0.08, '正在请求数据...');
   var _progressStage = 0;
   _progressTimer = setInterval(function() {
     _progressStage++;
     if (_loadingHidden || _noCacheDone) { clearInterval(_progressTimer); return; }
-    // 0-3s: 线性提升到 90%，给用户"在加载"的感觉
+    // 0-3s: 线性提升到 90%，给用户"在加�?的感�?
     var fakeRatio = Math.min(0.08 + _progressStage * 0.06, 0.9);
     setProgress(fakeRatio, '正在拉取实时价格...');
   }, 200);
 
-  // ★ 全部数据到齐
+  // �?全部数据到齐
   if (prefetched._allPage1Ready) {
     prefetched._allPage1Ready.then(function(sortedAll) {
       if (!sortedAll || sortedAll.length === 0 || _noCacheDone) return;
@@ -3580,12 +3581,12 @@ renderHome();
       checkFavoritePriceChanges();
       renderHomeTopMover();
       renderHomeMoversWithData(sortedAll, false);
-      setProgress(1, '已加载 ' + sortedAll.length + ' 件');
+      setProgress(1, '已加�?' + sortedAll.length + ' �?);
       setTimeout(function() { hideLoading(); }, 300);
     }).catch(function() {});
   }
 
-  // ★ 8 秒硬超时（v3 数据量小，2-3s 正常完成；8s 兜底足够）
+  // �?8 秒硬超时（v3 数据量小�?-3s 正常完成�?s 兜底足够�?
   setTimeout(function() {
     if (_loadingHidden || (loadingScreen && loadingScreen.classList.contains('fade-out'))) return;
     if (_progressTimer) clearInterval(_progressTimer);
@@ -3602,7 +3603,7 @@ renderHome();
         renderHomeMoversWithData(items, false);
         hideLoading();
       } else {
-        // ★ 数据为空 → 显示重试按钮，不隐藏 loading
+        // �?数据为空 �?显示重试按钮，不隐藏 loading
         var errWrap = document.getElementById('loadingRetryWrap');
         var errText = document.getElementById('loadingErrorText');
         var statusEl = document.getElementById('loadingStatus');
@@ -3653,7 +3654,7 @@ renderHome();
     var ratio = Math.min(vh / sh, 1);
     var thumbH = Math.max(ratio * th, 28);
     thumb.style.height = thumbH + 'px';
-    // ★ 拖拽中不重置滑钮位置（由 onMove 控制），仅更新高度适配内容变化
+    // �?拖拽中不重置滑钮位置（由 onMove 控制），仅更新高度适配内容变化
     if (dragging) return;
     var maxScroll = sh - vh;
     var scrollY = window.pageYOffset || html.scrollTop;
@@ -3665,14 +3666,14 @@ renderHome();
   window.addEventListener('scroll', updateThumb, { passive: true });
   window.addEventListener('resize', updateThumb);
   var observer = new MutationObserver(updateThumb);
-  observer.observe(body, { childList: true, subtree: true }); // 属性变化不影响页面总高度，不需要监听
+  observer.observe(body, { childList: true, subtree: true }); // 属性变化不影响页面总高度，不需要监�?
 
   thumb.addEventListener('mousedown', onStart);
   thumb.addEventListener('touchstart', onStart, { passive: false });
   function onStart(e) {
     e.preventDefault();
     dragging = true;
-    document.addEventListener('mousemove', onMove);   // 仅在拖拽时注册
+    document.addEventListener('mousemove', onMove);   // 仅在拖拽时注�?
     document.addEventListener('touchmove', onMove, { passive: false });
     thumb.style.background = '#ffaa00';
     thumb.style.boxShadow = '0 0 10px rgba(255,170,0,0.7)';
@@ -3705,7 +3706,7 @@ renderHome();
   function onEnd() {
     if (!dragging) return;
     dragging = false;
-    document.removeEventListener('mousemove', onMove);  // 拖拽结束时移除
+    document.removeEventListener('mousemove', onMove);  // 拖拽结束时移�?
     document.removeEventListener('touchmove', onMove);
     thumb.style.background = '#ffd700';
     thumb.style.boxShadow = '0 0 6px rgba(255,215,0,0.5)';
