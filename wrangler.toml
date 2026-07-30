@@ -8,5 +8,9 @@ binding = "DB"
 database_name = "delta-force-prices"
 database_id = "b1a4f06e-4236-4a79-9ab4-1cd0fa72b224"
 
+[[kv_namespaces]]
+binding = "METADATA_KV"
+id = "252ac6dfa5ab47f491d6f5752abae6db"
+
 # Cron 触发器: Dashboard → Workers & Pages → 项目 → Settings → Functions → Cron Triggers
 # 表达式: 0 22 * * * （UTC 22:00 = 北京时间 06:00）

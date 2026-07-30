@@ -7,6 +7,11 @@ body {
   font-size: 14px;
   min-height: 100vh;
   overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  touch-action: manipulation;
+}
+html {
+  overscroll-behavior-y: contain;
 }
 .container { max-width: 500px; margin: 0 auto; min-height: 100vh; padding-bottom: 64px; }
 

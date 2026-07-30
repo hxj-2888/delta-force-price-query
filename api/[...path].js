@@ -1,7 +1,8 @@
-// API 代理 - Vercel Serverless Function
-// 协议与 Cloudflare Pages Functions 保持一致：
-//   POST /api/proxy       body: { endpoint, params } → 转发到 orzice.com
-//   GET  /api/history/:id → Vercel 无 D1，返回降级提示（前端会回退到本地快照）
+// ===== api/[...path].js — Vercel Serverless API 代理 =====
+// 功能清单: POST /api/proxy(转发到orzice.com,含重试+超时) | GET /api/history/:id(降级,无D1)
+// /api/metadata(静态文件读取) | 来源鉴权(同源+localhost) | CORS处理 | 路径校验
+// 依赖: Vercel环境变量(API_TOKEN) fs模块(metadata读取) | 与Cloudflare版本协议一致
+// 改动影响: 修改API_TOKEN→影响所有代理; 修改重试策略→影响Vercel部署用户
 
 const https = require('https');
 
@@ -40,6 +41,31 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  // ─── /api/metadata — 返回打包的静态 metadata.json ───
+  if ((req.url || '').split('?')[0] === '/api/metadata' && req.method === 'GET') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = path.join(__dirname, '..', 'data', 'metadata.json');
+      const raw = fs.readFileSync(filePath, 'utf8');
+      res
+        .status(200)
+        .setHeader('Content-Type', 'application/json; charset=utf-8')
+        .setHeader('Access-Control-Allow-Origin', '*')
+        .setHeader('Cache-Control', 'public, max-age=1800, s-maxage=3600')
+        .send(raw);
+      return;
+    } catch (err) {
+      console.error('[metadata] 读取静态文件失败:', err.message);
+      res
+        .status(200)
+        .setHeader('Content-Type', 'application/json; charset=utf-8')
+        .setHeader('Access-Control-Allow-Origin', '*')
+        .json({});
+      return;
+    }
+  }
+
   // ─── /api/history/:id — Vercel 无 D1，优雅降级 ───
   const historyMatch = (req.url || '').split('?')[0].match(/^\/api\/history\/(\d+)$/);
   if (historyMatch) {
@@ -76,10 +102,21 @@ module.exports = async function handler(req, res) {
   // ★ 解析 POST body { endpoint, params }
   let endpoint = '';
   let queryParams = {};
+
   if (req.method === 'POST' && req.body && typeof req.body === 'object') {
     endpoint = req.body.endpoint || '';
     queryParams = req.body.params || {};
   }
+
+  // ★ GET 请求：从查询参数解析 endpoint（对齐 Cloudflare Functions 行为）
+  if (!endpoint && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, 'http://localhost');
+    endpoint = parsedUrl.searchParams.get('endpoint') || '';
+    parsedUrl.searchParams.forEach((value, key) => {
+      if (key !== 'endpoint') queryParams[key] = value;
+    });
+  }
+
   // Fallback：从 URL path 推导 endpoint
   if (!endpoint) {
     const urlPath = (req.url || '').split('?')[0];
@@ -103,7 +140,8 @@ module.exports = async function handler(req, res) {
   console.log('[API代理]', req.url, '→', endpoint, '(params:', Object.keys(queryParams).join(','), ')');
 
   try {
-    const data = await proxyRequest(targetPath);
+    const timeoutMs = endpoint === 'item_price_all' ? 25000 : 15000;
+    const data = await proxyRequest(targetPath, timeoutMs);
     res
       .status(200)
       .setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -120,7 +158,7 @@ module.exports = async function handler(req, res) {
   }
 };
 
-function proxyRequest(targetPath) {
+function proxyRequest(targetPath, timeoutMs) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: API_HOST,
@@ -131,7 +169,7 @@ function proxyRequest(targetPath) {
         'User-Agent': 'DeltaForcePriceQuery/1.0',
         'Accept': 'application/json',
       },
-      timeout: 9000,
+      timeout: timeoutMs,
     };
 
     const proxyReq = https.request(options, (proxyRes) => {

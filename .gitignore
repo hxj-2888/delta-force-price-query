@@ -3,7 +3,6 @@ node_modules/
 
 # 敏感文件 — 绝不上传
 .env
-.env.example
 .env.local
 .env.production
 
@@ -18,8 +17,15 @@ installer.iss
 setup.bat
 start.bat
 server.js
-package.json
 package-lock.json
+
+# 源 JS 文件（线上仅使用 js/bundle.js，避免上传未压缩源码）
+js/utils.js
+js/maps.js
+js/store.js
+js/api.js
+js/render.js
+js/main.js
 
 # 版本控制
 .git/
@@ -33,6 +39,12 @@ miniprogram.zip
 # 文档
 README.md
 DEPLOY.md
+
+# 构建工具
+scripts/
+
+# 数据库迁移（仅开发用）
+migrations/
 
 # 系统垃圾
 .DS_Store
