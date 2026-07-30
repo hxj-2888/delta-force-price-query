@@ -452,7 +452,17 @@ function saveBrowseState() {
   var state = {
     page: pageStack[pageStack.length - 1] || 'home',
     category: typeof currentCategory !== 'undefined' ? currentCategory : null,
-    isAllMode: typeof isAllMode !== 'undefined' ? isAllMode : false
+    isAllMode: typeof isAllMode !== 'undefined' ? isAllMode : false,
+    // ★ 首页状态完整保存：筛选/排序/分页/滚动位置
+    homeCategoryFilter: typeof homeCategoryFilter !== 'undefined' ? homeCategoryFilter : 'all',
+    homePeriod: typeof homePeriod !== 'undefined' ? homePeriod : 'bl',
+    homePriceRange: typeof homePriceRange !== 'undefined' ? homePriceRange : 'all',
+    homeSortBy: typeof homeSortBy !== 'undefined' ? homeSortBy : 'default',
+    homeSortDir: typeof homeSortDir !== 'undefined' ? homeSortDir : 'desc',
+    homeCurrentPage: typeof homeCurrentPage !== 'undefined' ? homeCurrentPage : 1,
+    homeScrollTop: (function() {
+      try { return window.pageYOffset || document.documentElement.scrollTop || 0; } catch(e) { return 0; }
+    })()
   };
   localStorage.setItem(BROWSE_STATE_KEY, JSON.stringify(state));
 }

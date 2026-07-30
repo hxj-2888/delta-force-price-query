@@ -224,6 +224,50 @@ function resetAllFilters() {
   renderHomeMovers();
 }
 
+// ★ 恢复首页浏览状态（筛选/排序/分页 + UI 标签同步）
+function applyHomeBrowseState(state) {
+  if (!state) return;
+  if (state.homeCategoryFilter !== undefined) homeCategoryFilter = state.homeCategoryFilter;
+  if (state.homePeriod !== undefined) homePeriod = state.homePeriod;
+  if (state.homePriceRange !== undefined) homePriceRange = state.homePriceRange;
+  if (state.homeSortBy !== undefined) homeSortBy = state.homeSortBy;
+  if (state.homeSortDir !== undefined) homeSortDir = state.homeSortDir;
+  if (state.homeCurrentPage !== undefined) homeCurrentPage = state.homeCurrentPage;
+
+  // 同步所有下拉标签文字
+  var timeLabels = { bl: '近1天', day_3_bl: '近3天', day_7_bl: '近7天' };
+  var timeEl = document.getElementById('timeLabel');
+  if (timeEl) timeEl.textContent = timeLabels[homePeriod] || '近1天';
+
+  var priceLabels = { all: '全部价格', lt1w: '< 1万', '1-10w': '1万~10万', '10-100w': '10万~100万', gt100w: '> 100万' };
+  var priceEl = document.getElementById('priceLabel');
+  if (priceEl) priceEl.textContent = priceLabels[homePriceRange] || '全部价格';
+
+  var filterEl = document.getElementById('filterLabel');
+  if (filterEl) filterEl.textContent = homeCategoryFilter === 'all' ? '筛选' : (CATEGORY_MAP[homeCategoryFilter] || homeCategoryFilter);
+
+  var sortLabelText;
+  if (homeSortBy === 'default') sortLabelText = '综合↓';
+  else if (homeSortBy === 'change') sortLabelText = '涨跌幅' + (homeSortDir === 'desc' ? '↓' : '↑');
+  else sortLabelText = '价格' + (homeSortDir === 'desc' ? '↓' : '↑');
+  var sortEl = document.getElementById('sortLabel');
+  if (sortEl) sortEl.textContent = sortLabelText;
+
+  // 同步下拉面板选中态
+  document.querySelectorAll('#timeDropdown .dropdown-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.period === homePeriod);
+  });
+  document.querySelectorAll('#priceDropdown .dropdown-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.range === homePriceRange);
+  });
+  document.querySelectorAll('.filter-cat-chip').forEach(function(chip) {
+    chip.classList.toggle('active', chip.dataset.cat === homeCategoryFilter);
+  });
+  document.querySelectorAll('#sortDropdown .dropdown-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.sort === homeSortBy && (homeSortBy === 'default' || item.dataset.dir === homeSortDir));
+  });
+}
+
 // ★ 首页物品列表（分页：每页 HOME_PAGE_SIZE 件，底部分页栏）
 var _homeDataArriveListener = null;
 function renderHomeMovers(resetPage) {
