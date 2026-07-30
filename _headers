@@ -1,0 +1,57 @@
+# Cloudflare Pages 自定义 HTTP 头
+# ★ 缓存策略：简短 TTL，确保版本更新后用户能及时获取最新文件
+# HTML 入口：多重禁用头覆盖所有浏览器（含微信/QQ/UC 等国内浏览器）
+# JS/CSS 5分钟；图片/字体 1天；API 不缓存
+/
+  Cache-Control: no-cache, no-store, must-revalidate, max-age=0
+  CDN-Cache-Control: no-store
+  Surrogate-Control: no-store
+  Pragma: no-cache
+  Expires: 0
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://orzice.com; frame-ancestors 'none'; base-uri 'self'; form-action 'none'
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate, max-age=0
+  CDN-Cache-Control: no-store
+  Surrogate-Control: no-store
+  Pragma: no-cache
+  Expires: 0
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://orzice.com; frame-ancestors 'none'; base-uri 'self'; form-action 'none'
+
+/js/*
+  Cache-Control: public, max-age=300, must-revalidate
+
+/css/*
+  Cache-Control: public, max-age=300, must-revalidate
+
+/delta-force-logo.webp
+  Cache-Control: public, max-age=86400
+
+/delta-force-logo.png
+  Cache-Control: public, max-age=86400
+
+/icon-192.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/icon-512.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/icon-maskable-512.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.json
+  Cache-Control: no-cache
+
+/data/metadata.json
+  Cache-Control: public, max-age=3600
+
+/api/metadata
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=1800, s-maxage=1800
+
+/api/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-cache, no-store, must-revalidate, max-age=0, s-maxage=60

@@ -1,148 +1,408 @@
+<!--
+index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v20260730m
+功能清单: 预取v3(item_price_all+metadata双请求合并) | 加载动画+进度条 | 首页(筛选/排序/分页/涨跌Top2)
+列表页(分类/排序/分页) | 详情页(价格图表/收藏) | 搜索页(实时搜索/历史/最近浏览/收藏) | 底部Tab导航
+依赖: js/bundle.js(合并所有JS模块) css/layout.css css/components.css
+改动影响: 修改预取逻辑→影响加载速度和数据完整性; 修改DOM结构→影响render.js的innerHTML选择器
+修复(v20260730m): Tab切回首页不重渲染(保持滚动+分页) | 收藏页不触发loadAllItems | 图表数据点日历对齐
+-->
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>三角洲行动 - 变卖物价格查询</title>
-  <link rel="icon" type="image/png" href="/delta-force-logo.png">
+  <link rel="icon" type="image/webp" href="/delta-force-logo.webp">
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="三角洲价格查询">
-  <link rel="preload" href="/delta-force-logo.png" as="image" fetchpriority="high">
+  <!-- ★ 预连接上游 API 域名，减少 TLS 握手延迟 -->
+  <link rel="preconnect" href="https://orzice.com" crossorigin>
+  <link rel="dns-prefetch" href="https://orzice.com">
+  <link rel="preload" href="/delta-force-logo.webp" as="image" fetchpriority="high">
   <script>
     // ★ 同源：使用部署站点自带的 /api 代理（Cloudflare Pages Functions）
-    // 不再依赖外部 Worker 域，统一部署链路
     window.__WORKER_BASE = '';
   </script>
   <script>
-    // ★ 渐进式预取 — 首页立即 resolve（仅第一页），剩余分页后台静默加载
+    // ★ 预取 v3：metadata.json（静态元数据）+ item_price_all（实时价格）→ 客户端合并
+    // 2 请求替代 143 请求，~2s 拿到全量 1350 件，排序/筛选纯本地
     window.__prefetch = (function() {
       var CATS = ['gun','ammo','acc','helmet','armor','chest','bag','key','collection','consume'];
-      var limit = 5000;
       var proxyUrl = window.__WORKER_BASE + '/api/proxy';
       var running = {};
 
-      function fetchPage(cat, page, signal) {
-        return fetch(proxyUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: 'item_list', params: { types: cat, p: page, limit: limit } }),
-          signal: signal
-        }).then(function(r) { return r.json(); })
-          .then(function(r) { return { data: (r && r.data) ? r.data : [], count: (r && r.count) ? r.count : 0 }; })
-          .catch(function() { return { data: [], count: 0 }; });
+      var _allMerged = [];
+      var _allResolve, _allReject;
+      var _allReady = new Promise(function(res, rej) { _allResolve = res; _allReject = rej; });
+      var _dataReady = false;
+      var _totalArrived = 0;
+      var _onArriveCallbacks = [];
+
+      // 物品显著性评分：|涨跌幅| × 价格档位
+      function _significanceScore(item) {
+        var bl = Math.abs(item.bl || item.day_3_bl || item.day_7_bl || 0);
+        var price = item.price || 0;
+        if (price <= 0) return bl;
+        var priceFactor = price >= 1000000 ? 4 : price >= 100000 ? 3 : price >= 10000 ? 2 : 1;
+        return bl * priceFactor;
       }
 
-      /** 后台拉取剩余分页，完成后更新 _resolvedData 为全量 */
-      async function fetchRemainingPages(cat, page1Items, totalCount, perPage) {
-        var all = page1Items.slice();
-        var totalPages = totalCount > 0 ? Math.ceil(totalCount / perPage) : 1;
-        if (totalPages <= 1 && page1Items.length >= limit) { totalPages = 2; }
-        if (totalPages <= 1) { return all; }
-        try {
-          var nextP = 2;
-          var maxPages = 200;
-          while (nextP <= totalPages && nextP <= maxPages) {
-            var batchFns = [];
-            var batchEnd = Math.min(nextP + 7, totalPages, maxPages);
-            for (var p = nextP; p <= batchEnd; p++) {
-              batchFns.push((function(page) {
-                var ac = new AbortController();
-                var tid = setTimeout(function() { ac.abort(); }, 15000);
-                return fetchPage(cat, page, ac.signal).then(function(r) { clearTimeout(tid); return r; });
-              })(p));
+      function _notifyArrive(items) {
+        _totalArrived += items.length;
+        running._totalArrived = _totalArrived;
+        for (var i = 0; i < _onArriveCallbacks.length; i++) {
+          try { _onArriveCallbacks[i](items, _totalArrived); } catch(e) {}
+        }
+      }
+
+      // 初始化分类对象（保持与 v2 兼容）
+      CATS.forEach(function(cat) {
+        var quickResolve, quickReject;
+        var obj = {
+          _resolvedData: [],
+          _totalCount: 0,
+          _complete: false,
+          _loadingMore: true,
+          _hasPage1: false,
+          _onComplete: null,
+          _quick: new Promise(function(res, rej) { quickResolve = res; quickReject = rej; })
+        };
+        obj._qr = quickResolve;
+        obj._qj = quickReject;
+        running[cat] = obj;
+      });
+
+      // ★ 检查 localStorage 是否有缓存（用于加速加载动画）
+      var _hasCache = false;
+      try {
+        var _raw = localStorage.getItem('deltaforce_cache_v10');
+        if (_raw) {
+          var _parsed = JSON.parse(_raw);
+          if (_parsed && _parsed._allItems && _parsed._allItems.length > 50) _hasCache = true;
+        }
+      } catch(e) {}
+
+      // ★ 涨幅前二数据（item_price_all 返回后填充）
+      var _topMoverData = null;
+      var _topMoverApiDone = false;
+      running._topMoverData = null;
+      running._topMoverApiDone = false;
+
+      // ★ 核心：并行拉取价格 + 元数据，客户端合并
+      // metadata 优先从 /api/metadata（KV动态更新）获取，失败降级到静态文件
+      var metadataPromise = fetch('/api/metadata')
+        .then(function(r) { return r.json(); })
+        .catch(function() {
+          console.warn('[prefetch] /api/metadata 不可用，降级到静态文件');
+          return fetch('/data/metadata.json')
+            .then(function(r) { return r.json(); })
+            .catch(function() {
+              console.error('[prefetch] 静态 metadata 也失败，物品将显示为"物品#ID"');
+              running._metadataFailed = true;
+              return {};
+            });
+        });
+
+      // ★ 带超时 + 1次重试的 fetch
+      function _fetchWithTimeout(url, timeoutMs) {
+        return new Promise(function(resolve, reject) {
+          var controller = new AbortController();
+          var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+          fetch(url, { signal: controller.signal })
+            .then(function(r) { clearTimeout(timer); resolve(r); })
+            .catch(function(e) { clearTimeout(timer); reject(e); });
+        });
+      }
+
+      function _fetchPriceAllWithRetry() {
+        var url = proxyUrl + '?endpoint=item_price_all';
+        return _fetchWithTimeout(url, 15000).catch(function(err) {
+          console.warn('[prefetch] item_price_all 首次失败(' + err.message + ')，1秒后重试...');
+          return new Promise(function(resolve) {
+            setTimeout(function() { resolve(_fetchWithTimeout(url, 15000)); }, 1000);
+          });
+        }).catch(function(err) {
+          console.warn('[prefetch] item_price_all 重试也失败(' + err.message + ')');
+          return new Promise(function(resolve) {
+            setTimeout(function() { resolve(_fetchWithTimeout(url, 20000)); }, 1500);
+          });
+        });
+      }
+
+      // ★ 错误状态（loading 层可检查）
+      running._error = null;
+      running._metadataFailed = false;  // metadata 加载失败标志
+      running.getError = function() { return running._error; };
+      running.isMetadataDegraded = function() { return running._metadataFailed; };
+
+      // ★ 暴露重试入口
+      running.retry = function() { location.reload(); };
+
+      Promise.all([
+        _fetchPriceAllWithRetry().then(function(r) { return r.json(); }),
+        metadataPromise
+      ]).then(async function(results) {
+        var priceRes = results[0];
+        var metadata = results[1];
+
+        if (!priceRes || priceRes.code !== 0 || !Array.isArray(priceRes.data)) {
+          console.error('[prefetch] item_price_all 返回异常');
+          _allReject(new Error('price data unavailable'));
+          return;
+        }
+
+        // ★ 合并：item_price_all 提供价格，metadata 提供名称/图标/分类
+        var merged = priceRes.data.map(function(item) {
+          var meta = metadata[item.id] || metadata[item.tid] || {};
+          var result = Object.assign({}, item, meta);
+          if (!result._category) {
+            // 尝试用 tid 在 metadata 中查找
+            var metaByTid = metadata[item.tid];
+            if (metaByTid) {
+              result = Object.assign({}, item, metaByTid);
+            } else {
+              result._category = 'unknown';
+              result.name = result.name || ('物品#' + item.id);
             }
-            var results = await Promise.all(batchFns);
-            var gotData = false;
-            results.forEach(function(result) {
-              if (result.data && result.data.length > 0) {
-                all = all.concat(result.data);
-                gotData = true;
+          }
+          return result;
+        });
+
+        // ★ 补充 metadata 中有但 item_price_all 中没有的物品（已下架/过期物品）
+        var priceIds = {};
+        merged.forEach(function(item) { priceIds[item.id] = true; if (item.tid) priceIds[item.tid] = true; });
+        Object.keys(metadata).forEach(function(id) {
+          if (!priceIds[Number(id)] && !priceIds[id]) {
+            var meta = metadata[id];
+            merged.push(Object.assign(
+              { id: Number(id), price: 0, bl: 0, day_3_bl: 0, day_7_bl: 0, tid: meta.tid },
+              meta
+            ));
+          }
+        });
+
+        // ★ 元数据自动补全：检测合并后仍有未知分类/无名物品，从 item_list API 补全
+        var _unknownItems = merged.filter(function(item) {
+          return !item._category || item._category === 'unknown' || !item.name || item.name.indexOf('物品#') === 0;
+        });
+
+        if (_unknownItems.length > 0) {
+          console.warn('[prefetch] 发现 ' + _unknownItems.length + ' 个未知物品，启动补全...');
+
+          // Phase 1: 用已获取的 metadata 按 tid 二次匹配
+          if (Object.keys(metadata).length > 0) {
+            _unknownItems.forEach(function(item) {
+              if (item.tid && metadata[item.tid]) {
+                Object.assign(item, metadata[item.tid]);
               }
             });
-            nextP = batchEnd + 1;
-            if (!gotData) break;
-            if (nextP > totalPages && gotData && nextP <= maxPages) {
-              totalPages = Math.min(nextP + 1, maxPages);
+            _unknownItems = merged.filter(function(item) {
+              return !item._category || item._category === 'unknown' || !item.name || item.name.indexOf('物品#') === 0;
+            });
+          }
+
+          // Phase 2: 从 item_list 第1页并行拉取 10 个分类补全
+          if (_unknownItems.length > 0) {
+            var _unknownIds = {};
+            _unknownItems.forEach(function(item) { _unknownIds[item.id] = true; if (item.tid) _unknownIds[item.tid] = true; });
+
+            var _itemListPromises = CATS.map(function(cat) {
+              return fetch(proxyUrl + '?endpoint=item_list&types=' + cat + '&p=1')
+                .then(function(r) { return r.json(); })
+                .catch(function() { return null; });
+            });
+
+            try {
+              var _itemListResults = await Promise.all(_itemListPromises);
+              var _patched = 0;
+
+              for (var ci = 0; ci < CATS.length; ci++) {
+                var cat = CATS[ci];
+                var result = _itemListResults[ci];
+                if (!result || result.code !== 0 || !Array.isArray(result.data)) continue;
+                for (var ii = 0; ii < result.data.length; ii++) {
+                  var apiItem = result.data[ii];
+                  var apiId = apiItem.id;
+                  if (!apiId) continue;
+                  if (_unknownIds[apiId] || (apiItem.tid && _unknownIds[apiItem.tid])) {
+                    for (var mi = 0; mi < _unknownItems.length; mi++) {
+                      var uItem = _unknownItems[mi];
+                      if (uItem.id === apiId || (apiItem.tid && uItem.tid === apiItem.tid) || uItem.id === apiItem.tid) {
+                        uItem._category = cat;
+                        uItem.name = apiItem.name || uItem.name;
+                        uItem.pic = apiItem.pic || uItem.pic || '';
+                        if (apiItem.grade !== undefined && apiItem.grade !== null) uItem.grade = apiItem.grade;
+                        if (apiItem.objectID !== undefined && apiItem.objectID !== null) uItem.objectID = apiItem.objectID;
+                        if (apiItem.tid !== undefined && apiItem.tid !== null) uItem.tid = apiItem.tid;
+                        if (apiItem.secondClassCN) uItem.secondClassCN = apiItem.secondClassCN;
+                        if (apiItem.ShopSellType) uItem.ShopSellType = apiItem.ShopSellType;
+                        _patched++;
+                      }
+                    }
+                  }
+                }
+              }
+
+              if (_patched > 0) {
+                console.log('[prefetch] 补全完成: ' + _patched + ' 个物品获得元数据');
+              } else {
+                console.warn('[prefetch] item_list page1 未找到剩余未知物品的元数据');
+              }
+            } catch(e) {
+              console.warn('[prefetch] item_list 补全失败:', e.message);
             }
           }
-        } catch(e) { /* 后台失败不影响首页数据 */ }
-        var items = all.map(function(item) { item._category = cat; return item; });
-        // 更新为完整数据
-        running[cat]._resolvedData = items;
-        running[cat]._complete = true;
-        running[cat]._loadingMore = false;
-        if (typeof running[cat]._onComplete === 'function') {
-          running[cat]._onComplete(items);
         }
-        return items;
-      }
 
-      CATS.forEach(function(cat) {
-        // _quick: 仅等待首页数据的快速 promise，UI 可用它立即渲染
-        var quickResolve, quickReject;
-        running[cat]._quick = new Promise(function(res, rej) { quickResolve = res; quickReject = rej; });
+        _allMerged = merged;
 
-        running[cat] = (async function() {
-          try {
-            var res1 = await fetchPage(cat, 1);
-            if (!res1 || !res1.data || res1.data.length === 0) {
-              quickResolve({ code: 0, count: 0, data: [], _complete: true });
-              return null;
-            }
-            var page1Items = res1.data.slice().map(function(item) { item._category = cat; return item; });
-            var totalCount = res1.count || 0;
-            var perPage = res1.data.length > 0 ? res1.data.length : limit;
-
-            // ★ 立即暴露首页数据 + 真实总数，UI 马上可用
-            running[cat]._resolvedData = page1Items;
-            running[cat]._totalCount = totalCount;
-            running[cat]._totalPages = Math.max(1, Math.ceil(totalCount / perPage));
-            running[cat]._hasPage1 = true;
-            running[cat]._complete = (page1Items.length >= totalCount);
-            running[cat]._loadingMore = !running[cat]._complete;
-
-            // ★ 用首页数据立即 resolve _quick
-            quickResolve({ code: 0, count: totalCount, data: page1Items, _complete: running[cat]._complete });
-
-            // 后台继续拉取剩余分页
-            if (!running[cat]._complete) {
-              var allItems = await fetchRemainingPages(cat, page1Items, totalCount, perPage);
-              return { code: 0, count: allItems.length, data: allItems, _complete: true };
-            }
-            return { code: 0, count: totalCount, data: page1Items, _complete: true };
-          } catch(e) {
-            quickReject(e);
-            return null;
+        // ★ 按分类分配
+        var catMap = {};
+        CATS.forEach(function(c) { catMap[c] = []; });
+        merged.forEach(function(item) {
+          var cat = item._category;
+          if (cat && catMap[cat]) {
+            catMap[cat].push(item);
           }
-        })();
+        });
+
+        // 填充各分类对象
+        CATS.forEach(function(cat) {
+          var items = catMap[cat];
+          items.sort(function(a, b) { return _significanceScore(b) - _significanceScore(a); });
+          var o = running[cat];
+          o._resolvedData = items;
+          o._totalCount = items.length;
+          o._complete = true;
+          o._hasPage1 = true;
+          o._loadingMore = false;
+          var page1Result = { code: 0, count: items.length, data: items, _complete: true };
+          o._qr(page1Result);
+          if (typeof o._onComplete === 'function') o._onComplete(items);
+        });
+
+        // ★ 涨幅前二数据就绪
+        _topMoverData = priceRes.data;
+        _topMoverApiDone = true;
+        running._topMoverData = _topMoverData;
+        running._topMoverApiDone = true;
+
+        _dataReady = true;
+        _notifyArrive(merged);
+        _allResolve(merged.slice().sort(function(a, b) { return _significanceScore(b) - _significanceScore(a); }));
+
+        // 写入缓存
+        if (typeof setCache === 'function') {
+          try { setCache({ _allItems: merged }); } catch(e) {}
+        }
+        if (typeof buildSearchIndex === 'function') {
+          try { buildSearchIndex(merged); } catch(e) {}
+        }
+        if (typeof updateCategoryIcons === 'function') {
+          try { updateCategoryIcons(merged); } catch(e) {}
+        }
+      }).catch(function(err) {
+        console.error('[prefetch] 加载失败:', err);
+        running._error = err.message || '数据加载失败，请检查网络连接';
+        _allReject(err);
+        // ★ 3 秒后仍未恢复 → 显示重试按钮（loading 层的 8s 超时可能已隐藏 loading）
+        var errWrap = document.getElementById('loadingRetryWrap');
+        var errText = document.getElementById('loadingErrorText');
+        var statusEl = document.getElementById('loadingStatus');
+        if (errWrap) errWrap.style.display = 'flex';
+        if (errText) errText.textContent = running._error;
+        if (statusEl) statusEl.textContent = '连接超时';
       });
+
+      // ★ 暴露 API（保持与 v2 兼容）
+      running._allPage1Ready = _allReady;
+      running._totalArrived = 0;
+      running.getTotalArrived = function() { return _totalArrived; };
+      running.onItemsArrive = function(cb) { _onArriveCallbacks.push(cb); };
+      running.getAllPage1Items = function() { return _allMerged.slice(); };
+      running.isAllPage1Ready = function() { return _dataReady; };
+      running.startPagination = function() {}; // no-op: 数据一次到齐
+      running.getQueueLength = function() { return 0; };
+      running.isPaginationDone = function() { return _dataReady; };
+      running.hasCache = _hasCache;
+      running.getProgress = function() {
+        return _dataReady ? 0.98 : 0.05;
+      };
+      running.getExpectedTotal = function() { return _dataReady ? _totalArrived : 1350; };
+      // ★ 新增：分类全量检查
+      running.isCategoryComplete = function(cat) { return _dataReady; };
+      running.getCategoryLoadedCount = function(cat) {
+        var o = running[cat];
+        return o && o._resolvedData ? o._resolvedData.length : 0;
+      };
+      running.prioritizeCategory = function(cat) {}; // no-op: 数据一次到齐
+
       return running;
     })();
   </script>
-  <link rel="stylesheet" href="css/base.css?v=20260727">
-  <link rel="stylesheet" href="css/layout.css?v=20260727">
-  <link rel="stylesheet" href="css/components.css?v=20260727">
+  <!-- ★ 关键 CSS 内联，消除渲染阻塞请求 -->
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{overscroll-behavior-y:contain}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#000;color:#e0e0e0;font-size:14px;min-height:100vh;overflow-x:hidden;overscroll-behavior-y:contain;touch-action:manipulation}
+    .container{max-width:500px;margin:0 auto;min-height:100vh;padding-bottom:64px;touch-action:pan-y}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+    @keyframes progressShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .fade-in{animation:fadeIn .3s ease}
+    .loading-container{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 0}
+    .loading-spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.1);border-top-color:#667eea;border-radius:50%;animation:spin .8s linear infinite}
+    .loading-text{color:#888;font-size:13px;margin-top:16px}
+    .loading-retry-wrap{display:flex;flex-direction:column;align-items:center;margin-top:8px}
+    .loading-error-text{color:#ff6b6b;font-size:13px;text-align:center}
+    .loading-retry-btn{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:20px;padding:8px 28px;font-size:13px;cursor:pointer;margin-top:10px}
+    .loading-retry-btn:active{opacity:.8}
+    .error-container{text-align:center;padding:80px 20px}
+    .error-text{color:#ff6b6b;font-size:14px;margin-bottom:20px}
+    .retry-btn{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:20px;padding:10px 36px;font-size:14px;cursor:pointer}
+    .retry-btn:active{opacity:.8}
+    .empty-container{text-align:center;padding:80px 20px}
+    .empty-icon{font-size:48px;margin-bottom:12px;opacity:.3}
+    .empty-text{color:#666;font-size:14px}
+    ::-webkit-scrollbar{width:0;height:0}
+    button.dropdown-item{background:0;border:none;width:100%;text-align:left;font-family:inherit;outline:none;-webkit-tap-highlight-color:transparent}
+    button.dropdown-item:active{background:rgba(102,126,234,.2)}
+    button.filter-cat-chip{-webkit-tap-highlight-color:transparent}
+    button.toolbar-btn{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  </style>
+  <link rel="preload" href="css/layout.css?v=v20260730m-3de064f6" as="style">
+  <link rel="preload" href="css/components.css?v=v20260730m-cdc84d11" as="style">
+  <link rel="stylesheet" href="css/layout.css?v=v20260730m-3de064f6">
+  <link rel="stylesheet" href="css/components.css?v=v20260730m-cdc84d11">
 </head>
 <body>
   <div class="loading-screen" id="loadingScreen">
   <div class="loading-logo-wrap">
     <div class="loading-logo-glow" id="loadingGlow"></div>
-    <img class="loading-logo-img" id="loadingLogo" src="delta-force-logo.png" alt="三角洲行动">
+    <img class="loading-logo-img" id="loadingLogo" src="delta-force-logo.webp" alt="三角洲行动" onerror="this.src='delta-force-logo.png'">
   </div>
   <div class="loading-progress-wrap">
     <div class="loading-progress-track">
       <div class="loading-progress-bar" id="loadingProgressBar"></div>
     </div>
     <div class="loading-status" id="loadingStatus">正在连接数据源...</div>
+    <div class="loading-retry-wrap" id="loadingRetryWrap" style="display:none">
+      <div class="loading-error-text" id="loadingErrorText"></div>
+      <button class="loading-retry-btn" onclick="location.reload()">重新加载</button>
+    </div>
   </div>
 </div>
 <div class="container" id="app">
-    <!-- ===== 首页 ===== -->
+    <!-- ===== 首页（合并价格异动）===== -->
     <div class="page active" id="page-home">
       <div class="header">
-        <img class="header-logo" src="delta-force-logo.png" alt="三角洲行动" onerror="this.style.display='none'">
+        <img class="header-logo" src="delta-force-logo.webp" alt="三角洲行动" onerror="this.src='delta-force-logo.png'">
         <div class="header-title">三角洲行动</div>
         <div class="header-subtitle">变卖物实时价格查询</div>
         <div class="header-info">
@@ -150,6 +410,65 @@
           <span id="autoRefreshTime" style="font-size:10px;color:#555;margin-left:8px"></span>
         </div>
       </div>
+
+      <!-- ★ 筛选工具栏：时间 / 价格 / 分类 / 排序 四个下拉 -->
+      <div class="filter-toolbar" id="filterToolbar">
+        <button class="toolbar-btn" id="btnTime" onclick="toggleTimeDropdown()">
+          <span id="timeLabel">近1天</span><span class="toolbar-arrow">▾</span>
+        </button>
+        <button class="toolbar-btn" id="btnPrice" onclick="togglePriceDropdown()">
+          <span id="priceLabel">全部价格</span><span class="toolbar-arrow">▾</span>
+        </button>
+        <button class="toolbar-btn" id="btnFilter" onclick="toggleFilterDropdown()">
+          <span id="filterLabel">筛选</span><span class="toolbar-arrow">▾</span>
+        </button>
+        <button class="toolbar-btn" id="btnSort" onclick="toggleSortDropdown()">
+          <span id="sortLabel">综合↓</span><span class="toolbar-arrow">▾</span>
+        </button>
+      </div>
+
+      <!-- ★ 时间下拉 -->
+      <div class="dropdown-panel" id="timeDropdown" style="display:none" onclick="event.stopPropagation()">
+        <button class="dropdown-item active" type="button" data-period="bl" onclick="event.stopPropagation();setHomePeriod('bl')">近1天</button>
+        <button class="dropdown-item" type="button" data-period="day_3_bl" onclick="event.stopPropagation();setHomePeriod('day_3_bl')">近3天</button>
+        <button class="dropdown-item" type="button" data-period="day_7_bl" onclick="event.stopPropagation();setHomePeriod('day_7_bl')">近7天</button>
+      </div>
+
+      <!-- ★ 价格下拉 -->
+      <div class="dropdown-panel" id="priceDropdown" style="display:none" onclick="event.stopPropagation()">
+        <button class="dropdown-item active" type="button" data-range="all" onclick="event.stopPropagation();setHomePriceRange('all')">全部价格</button>
+        <button class="dropdown-item" type="button" data-range="lt1w" onclick="event.stopPropagation();setHomePriceRange('lt1w')">&lt; 1万</button>
+        <button class="dropdown-item" type="button" data-range="1-10w" onclick="event.stopPropagation();setHomePriceRange('1-10w')">1万 ~ 10万</button>
+        <button class="dropdown-item" type="button" data-range="10-100w" onclick="event.stopPropagation();setHomePriceRange('10-100w')">10万 ~ 100万</button>
+        <button class="dropdown-item" type="button" data-range="gt100w" onclick="event.stopPropagation();setHomePriceRange('gt100w')">&gt; 100万</button>
+      </div>
+
+      <!-- ★ 筛选下拉（仅十大分类） -->
+      <div class="dropdown-panel" id="filterDropdown" style="display:none" onclick="event.stopPropagation()">
+        <div class="filter-cat-list" id="filterCatList">
+          <button class="filter-cat-chip active" data-cat="all" onclick="event.stopPropagation();setHomeCategory('all')">全部类型</button>
+          <button class="filter-cat-chip" data-cat="gun" onclick="event.stopPropagation();setHomeCategory('gun')">枪械</button>
+          <button class="filter-cat-chip" data-cat="ammo" onclick="event.stopPropagation();setHomeCategory('ammo')">子弹</button>
+          <button class="filter-cat-chip" data-cat="acc" onclick="event.stopPropagation();setHomeCategory('acc')">配件</button>
+          <button class="filter-cat-chip" data-cat="helmet" onclick="event.stopPropagation();setHomeCategory('helmet')">头盔</button>
+          <button class="filter-cat-chip" data-cat="armor" onclick="event.stopPropagation();setHomeCategory('armor')">护甲</button>
+          <button class="filter-cat-chip" data-cat="chest" onclick="event.stopPropagation();setHomeCategory('chest')">胸挂</button>
+          <button class="filter-cat-chip" data-cat="bag" onclick="event.stopPropagation();setHomeCategory('bag')">背包</button>
+          <button class="filter-cat-chip" data-cat="key" onclick="event.stopPropagation();setHomeCategory('key')">钥匙卡</button>
+          <button class="filter-cat-chip" data-cat="collection" onclick="event.stopPropagation();setHomeCategory('collection')">收集品</button>
+          <button class="filter-cat-chip" data-cat="consume" onclick="event.stopPropagation();setHomeCategory('consume')">消耗品</button>
+        </div>
+      </div>
+
+      <!-- ★ 排序下拉 -->
+      <div class="dropdown-panel" id="sortDropdown" style="display:none" onclick="event.stopPropagation()">
+        <button class="dropdown-item active" type="button" data-sort="default" data-dir="" onclick="event.stopPropagation();setHomeSort('default','desc')">默认 (综合热度)</button>
+        <button class="dropdown-item" type="button" data-sort="change" data-dir="desc" onclick="event.stopPropagation();setHomeSort('change','desc')">涨跌幅 ↓ (高到低)</button>
+        <button class="dropdown-item" type="button" data-sort="change" data-dir="asc" onclick="event.stopPropagation();setHomeSort('change','asc')">涨跌幅 ↑ (低到高)</button>
+        <button class="dropdown-item" type="button" data-sort="price" data-dir="desc" onclick="event.stopPropagation();setHomeSort('price','desc')">价格 ↓ (高到低)</button>
+        <button class="dropdown-item" type="button" data-sort="price" data-dir="asc" onclick="event.stopPropagation();setHomeSort('price','asc')">价格 ↑ (低到高)</button>
+      </div>
+
       <div class="search-bar" onclick="showSearch()">
         <span class="search-placeholder">搜索物品名称...</span>
       </div>
@@ -159,7 +478,11 @@
         <div class="price-changed-title">收藏价格提醒</div>
         <div id="priceChangedItems"></div>
       </div>
-      <div class="category-grid" id="categoryGrid"></div>
+
+      <!-- ★ 首页物品列表 -->
+      <div class="home-movers-section" id="homeMoversSection">
+        <div id="homeMoversList"></div>
+      </div>
     </div>
 
     <!-- ===== 列表页 ===== -->
@@ -236,19 +559,6 @@
       <div id="searchResults"></div>
     </div>
 
-    <!-- ===== 价格异动页 ===== -->
-    <div class="page" id="page-price">
-      <div class="nav-bar">
-        <div class="nav-back" onclick="switchTab('home')">‹ 首页</div>
-        <div class="nav-title">价格异动</div>
-        <div class="nav-actions" style="width:auto;gap:6px">
-          <button class="sort-btn" id="btnGainers" style="font-size:11px;padding:5px 10px;border-radius:14px" onclick="setPriceDirection('up')">涨幅榜</button>
-          <button class="sort-btn" id="btnLosers" style="font-size:11px;padding:5px 10px;border-radius:14px" onclick="setPriceDirection('down')">跌幅榜</button>
-          <span class="nav-action" onclick="refreshPriceMovers()" title="刷新">刷新</span>
-        </div>
-      </div>
-      <div id="priceContent"></div>
-    </div>
 
     <!-- ===== 我的收藏页 ===== -->
     <div class="page" id="page-favtab">
@@ -268,20 +578,14 @@
     <div class="tab active" data-tab="home" onclick="switchTab('home')">
       <span class="tab-label">首页</span>
     </div>
-    <div class="tab" data-tab="price" onclick="switchTab('price')">
-      <span class="tab-label">价格异动</span>
-    </div>
     <div class="tab" data-tab="favtab" onclick="switchTab('favtab')">
       <span class="tab-label">我的收藏</span>
     </div>
   </div>
 
-  <!-- 模块加载顺序：依赖方在后 -->
-  <script src="js/utils.js?v=20260728"></script>
-  <script src="js/store.js?v=20260728"></script>
-  <script src="js/render.js?v=20260728"></script>
-  <script src="js/api.js?v=20260728"></script>
-  <script src="js/sw-register.js?v=20260728"></script>
-  <script src="js/main.js?v=20260728"></script>
+  <!-- Service Worker 注册（必须在 bundle 之前加载） -->
+  <script src="js/sw-register.js?v=v20260730m" defer></script>
+  <!-- ★ 单文件 bundle：减少 HTTP 请求 6→1，defer 不阻塞解析 -->
+  <script src="js/bundle.js?v=v20260730m" defer></script>
 </body>
 </html>

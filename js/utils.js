@@ -1,4 +1,9 @@
-// ===== 工具函数 =====
+// ===== utils.js — 工具函数集 =====
+// 功能清单: 价格格式化(formatPrice) | 涨跌格式化(formatChange/getChangeClass) | 时间格式化(formatTime)
+// 等级文本/颜色(getGradeText/getGradeColor) | Toast提示 | URL清洗(sanitizeUrl) | HTML转义(escapeHtml)
+// JS字符串转义(escapeJSStr) | 分类图标(catIconHTML) | 短价格(shortPrice) | 大数字格式化(formatLargeNum)
+// 依赖: 无(纯函数) | 被依赖: render.js(渲染时格式化) main.js(提示/转义)
+// 改动影响: 修改formatPrice→影响所有价格显示; 修改toast→影响所有用户提示
 
 var _toastTimer = null;
 
@@ -42,10 +47,11 @@ function toast(msg, duration) {
   _toastTimer = setTimeout(function() { t.classList.remove('show'); }, duration);
 }
 
-// 安全清洗图片URL
+// 安全清洗图片URL（仅允许 http/https 绝对 URL 和绝对路径，拒绝 protocol-relative URL）
 function sanitizeUrl(url) {
   if (!url || typeof url !== 'string') return '';
-  const safeRegex = /^(https?:\/\/|\/)/i;
+  // ★ 仅允许 https?:// 开头的绝对 URL 或以 / 开头的站点相对路径
+  var safeRegex = /^(https?:\/\/|\/)/i;
   if (safeRegex.test(url)) {
     return url.replace(/["'<>]/g, '');
   }
@@ -73,7 +79,7 @@ function escapeJSStr(str) {
 
 // 分类图标 HTML
 function catIconHTML(url) {
-  return '<img src="' + sanitizeUrl(url) + '" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:6px" onerror="this.parentElement.innerHTML=this.parentElement.getAttribute(\'data-fallback\')||\'\'">';
+  return '<img src="' + sanitizeUrl(url) + '" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:6px" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML=this.parentElement.getAttribute(\'data-fallback\')||\'\'">';
 }
 
 // 短格式价格（用于图表标签）

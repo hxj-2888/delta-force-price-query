@@ -4,14 +4,14 @@
 .slide-in { animation: slideIn 0.3s ease; }
 
 /* ========== 棣栭〉澶撮儴 ========== */
-.header { padding: 32px 20px 16px; text-align: center; background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2)); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.header { padding: 32px 12px 16px; text-align: center; background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2)); border-bottom: 1px solid rgba(255,255,255,0.05); }
 .header-logo { width: 84px; height: 84px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
 .header-title { font-size: 24px; font-weight: bold; color: #fff; letter-spacing: 2px; margin-bottom: 4px; }
 .header-subtitle { font-size: 13px; color: #8890b0; margin-bottom: 6px; }
 .header-info { font-size: 11px; color: #555; margin-top: 4px; }
 
 /* ========== 鎼滅储鏍?========== */
-.search-bar { display: flex; align-items: center; margin: 16px 20px; padding: 12px 18px; background: rgba(255,255,255,0.08); border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+.search-bar { display: flex; align-items: center; margin: 16px 12px; padding: 12px 18px; background: rgba(255,255,255,0.08); border-radius: 0; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
 .search-placeholder { color: #666; font-size: 14px; }
 
 /* ========== 鍒嗙被缃戞牸 ========== */
@@ -66,13 +66,9 @@
 .page-btn.arrow { font-size: 16px; }
 .page-info { font-size: 11px; color: #666; text-align: center; padding: 4px 12px; }
 
-/* ========== 椤佃剼 ========== */
-.footer { padding: 30px 20px; text-align: center; }
-.footer-text { display: block; font-size: 11px; color: #444; line-height: 1.8; }
-
 /* ========== 鎼滅储椤靛ご閮?========== */
 .search-header { display: flex; align-items: center; padding: 10px 14px; background: #1a1a2e; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.search-input-wrap { flex: 1; display: flex; align-items: center; background: rgba(255,255,255,0.08); border-radius: 22px; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.1); }
+.search-input-wrap { flex: 1; display: flex; align-items: center; background: rgba(255,255,255,0.08); border-radius: 0; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.1); }
 .search-input-wrap input { flex: 1; background: none; border: none; outline: none; color: #fff; font-size: 14px; }
 .search-input-wrap input::placeholder { color: #555; }
 .search-clear { color: #666; font-size: 16px; padding: 0 6px; cursor: pointer; display: none; }
@@ -81,5 +77,58 @@
 .search-hint { text-align: center; padding: 40px 30px 20px; }
 .search-hint .hint-title { font-size: 16px; color: #aaa; margin-bottom: 10px; }
 .search-hint .hint-text { font-size: 13px; color: #666; }
+
+/* ========== 筛选工具栏 ========== */
+.filter-toolbar {
+  display: flex; align-items: center; justify-content: space-evenly; gap: 4px;
+  padding: 6px 12px; background: #1a1a2e;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: sticky; top: 0; z-index: 20;
+}
+.toolbar-btn {
+  flex: 1; font-size: 11px; padding: 6px 4px; border-radius: 0; text-align: center;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
+  color: #ccc; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+}
+.toolbar-btn:active { transform: scale(0.95); }
+.toolbar-arrow { font-size: 8px; color: #666; }
+
+/* 下拉展开时按钮高亮 */
+.filter-toolbar.dropdown-open .toolbar-btn { background: rgba(255,255,255,0.14); }
+
+/* ========== 下拉面板（筛选 / 排序） ========== */
+.dropdown-panel {
+  position: fixed; z-index: 101;
+  min-width: 175px; max-width: 240px;
+  background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+  overflow: hidden; animation: fadeIn 0.15s ease;
+}
+/* 分类纵列（小号紧凑） */
+.filter-cat-list {
+  display: flex; flex-direction: column; padding: 0 8px;
+}
+.filter-cat-chip {
+  font-size: 12px; padding: 8px 12px; border-radius: 0; text-align: left;
+  background: transparent; border: none; color: #aaa; cursor: pointer;
+  transition: all 0.12s; white-space: nowrap;
+}
+.filter-cat-chip:active { background: rgba(102,126,234,0.2); }
+.filter-cat-chip.active {
+  background: rgba(102,126,234,0.18); color: #aab8ff; font-weight: 500;
+}
+
+/* 下拉菜单项 */
+.dropdown-item {
+  padding: 10px 14px; font-size: 13px; color: #aaa; cursor: pointer;
+  transition: background 0.12s; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:active { background: rgba(102,126,234,0.2); }
+.dropdown-item.active { color: #aab8ff; background: rgba(102,126,234,0.12); }
+
+/* ========== 首页物品列表 ========== */
+.home-movers-section { margin: 0 12px 12px; }
 
 /* ========== 浜壊涓婚瑕嗙洊 ========== */

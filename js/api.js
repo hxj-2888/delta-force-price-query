@@ -1,59 +1,39 @@
-// ===== 网络请求层（fetch 封装、API 代理请求） =====
+// ===== api.js — 网络请求层 =====
+// 功能清单: API代理请求(带重试+超时) | 请求去重(同端点并发合并) | 分类全量拉取(fetchCategoryAll)
+// 预取数据收集(loadAllItemsQuick) | 首批物品获取(getFirstBatchItems) | 后台静默加载(warmAllDataBackground)
+// 预取完成等待(loadAllItemsBackground) | 全局统计(getGlobalStats) | 价格历史API(fetchItemHistory)
+// 依赖: store.js(setCache/getCache) render.js(CATEGORIES) utils.js(batchAsync) | 被依赖: main.js(初始化/刷新)
+// 改动影响: 修改PROXY_URL→影响所有API调用; 修改重试策略→影响弱网环境; 修改去重逻辑→影响并发请求
 
-// 后端 后端（API 代理 + 价格历史记录）
-// 优先读取 index.html 中定义的全局常量，避免域名散落多处
+// 后端 URL（优先读取 index.html 中定义的全局常量）
 var WORKER_BASE = (typeof window !== 'undefined' && window.__WORKER_BASE) || '';
 var PROXY_URL = WORKER_BASE + '/api/proxy';
 
-// 内存缓存 + 请求去重
-var _apiMemCache = {};
-var _apiMemCacheKeys = [];  // LRU 顺序，最近使用的在末尾
-var _MAX_MEM_CACHE = 10;    // 最多缓存 10 个端点响应
+// ★ 检测微信内置浏览器（缓存策略激进，需特殊处理）
+var _isWeChat = false;
+if (typeof navigator !== 'undefined' && navigator.userAgent) {
+  _isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+}
+
+// ★ 请求去重：同一端点并发请求合并为一个网络请求（不缓存响应，确保数据新鲜）
 var _apiPending = {};
 
 function getApiCacheKey(endpoint, params) {
   return endpoint + '?' + JSON.stringify(params);
 }
 
-function getApiFromCache(key, ttl) {
-  var entry = _apiMemCache[key];
-  if (entry && Date.now() - entry.time < ttl) {
-    // LRU: 命中时移到末尾
-    var idx = _apiMemCacheKeys.indexOf(key);
-    if (idx >= 0) { _apiMemCacheKeys.splice(idx, 1); _apiMemCacheKeys.push(key); }
-    return entry.data;
-  }
-  return null;
-}
-
-function setApiCache(key, data) {
-  // LRU 淘汰：超过最大容量时移除最旧的条目
-  var idx = _apiMemCacheKeys.indexOf(key);
-  if (idx >= 0) { _apiMemCacheKeys.splice(idx, 1); }
-  _apiMemCacheKeys.push(key);
-  if (_apiMemCacheKeys.length > _MAX_MEM_CACHE) {
-    var evictKey = _apiMemCacheKeys.shift();
-    delete _apiMemCache[evictKey];
-  }
-  _apiMemCache[key] = { data: data, time: Date.now() };
-}
-
 async function apiRequest(endpoint, params, retries, noCache) {
   if (retries === undefined || retries === null) retries = 3;
-  var cacheKey = getApiCacheKey(endpoint, params || {});
+  params = params || {};
+  // ★ 微信浏览器：注入分钟级时间戳破缓存（绕过微信内置缓存和 CDN 残留）
+  if (_isWeChat) { params._wc = Math.floor(Date.now() / 60000); }
+  var cacheKey = getApiCacheKey(endpoint, params);
   var lastErr;
 
-  if (!noCache) {
-    var _ttl = endpoint === 'item_price_all' ? 5 * 60 * 1000
-             : endpoint === 'item_list'       ? 2 * 60 * 1000
-             : 0;
-    if (_ttl > 0) {
-      var cached = getApiFromCache(cacheKey, _ttl);
-      if (cached) return cached;
-      if (_apiPending[cacheKey]) {
-        try { return await _apiPending[cacheKey]; } catch(e) { /* fall through to fresh request */ }
-      }
-    }
+  // ★ 请求去重：如果已有相同请求在进行中，等待它完成
+  var canDedup = endpoint === 'item_price_all' || endpoint === 'item_list';
+  if (!noCache && canDedup && _apiPending[cacheKey]) {
+    try { return await _apiPending[cacheKey]; } catch(e) { /* fall through to fresh request */ }
   }
 
   for (var attempt = 0; attempt <= retries; attempt++) {
@@ -75,21 +55,16 @@ async function apiRequest(endpoint, params, retries, noCache) {
           })
           .then(function(data) {
             if (data.code !== 0) throw new Error(data.msg || 'API返回错误');
-            if (endpoint === 'item_price_all' || endpoint === 'item_list') {
-              setApiCache(cacheKey, data);
-              delete _apiPending[cacheKey];
-            }
+            delete _apiPending[cacheKey];
             resolve(data);
           })
           .catch(function(err) {
             clearTimeout(timeoutId);
-            if (endpoint === 'item_price_all' || endpoint === 'item_list') {
-              delete _apiPending[cacheKey];
-            }
+            if (canDedup) { delete _apiPending[cacheKey]; }
             reject(err);
           });
 
-        if ((endpoint === 'item_price_all' || endpoint === 'item_list') && attemptN === 0) {
+        if (canDedup && attemptN === 0) {
           _apiPending[cacheKey] = new Promise(function(res, rej) {
             fetchPromise.then(res).catch(rej);
           });
@@ -114,161 +89,261 @@ async function apiRequest(endpoint, params, retries, noCache) {
   throw lastErr;
 }
 
+// ★ 使用 item_list（含名称+图标）获取单分类全量数据，支持翻页
 async function fetchCategoryAll(catKey) {
   var t0 = Date.now();
-  var PAGE_LIMIT = 5000;
-  var res1;
   try {
-    res1 = await apiRequest('item_list', { types: catKey, p: 1, limit: PAGE_LIMIT });
-  } catch (e) {
-    console.error('[fetchCategoryAll] 首页请求失败 (' + catKey + '):', e.message);
-    return [];
-  }
-  var allItems = (res1.data || []).map(function(item) { return Object.assign({}, item, { _category: catKey }); });
-  var totalCount = res1.count || 0;
-  // 修复：第一页返回0条时（API异常），不按0计算perPage，避免除零或极大翻页数
-  var perPage = allItems.length > 0 ? allItems.length : PAGE_LIMIT;
-  var totalPages = totalCount > 0 ? Math.ceil(totalCount / perPage) : 1;
-  // 安全兜底：如果首页恰好返回了 limit 数量，count 可能不可靠，至少再翻一页
-  if (totalPages <= 1 && allItems.length >= PAGE_LIMIT) {
-    totalPages = 2;
-  }
+    // 首页
+    var res1 = await apiRequest('item_list', { types: catKey, p: 1 });
+    var allItems = sanitizeItemArray(res1.data, 'list').map(function(item) {
+      item._category = catKey;
+      return item;
+    });
+    var totalCount = res1.count || 0;
+    var perPage = allItems.length > 0 ? allItems.length : 10;
+    var totalPages = totalCount > 0 ? Math.ceil(totalCount / perPage) : 1;
 
-  if (allItems.length >= totalCount || totalPages <= 1) {
-    if (typeof setApiDuration === 'function') setApiDuration(Date.now() - t0);
-    return allItems;
-  }
+    if (allItems.length >= totalCount || totalPages <= 1) {
+      if (typeof setApiDuration === 'function') setApiDuration(Date.now() - t0);
+      return allItems;
+    }
 
-  var remainingPages = [];
-  for (var p = 2; p <= totalPages; p++) { remainingPages.push(p); }
-
-  // 逐页翻取直到返回空或不足一页（替代一次性计算 totalPages，防止 count 不准确）
-  var pageIdx = 0;
-  while (pageIdx < remainingPages.length) {
-    var batchPages = remainingPages.slice(pageIdx, pageIdx + 8);
-    var pageResults = await batchAsync(batchPages.map(function(page) {
+    // 剩余页并行加载
+    var remainingPages = [];
+    for (var p = 2; p <= totalPages; p++) remainingPages.push(p);
+    var pageResults = await batchAsync(remainingPages.map(function(page) {
       return function() {
-        return apiRequest('item_list', { types: catKey, p: page, limit: PAGE_LIMIT })
-          .then(function(r) { return (r.data || []).map(function(item) { return Object.assign({}, item, { _category: catKey }); }); })
+        return apiRequest('item_list', { types: catKey, p: page })
+          .then(function(r) { return sanitizeItemArray(r.data, 'list').map(function(item) { item._category = catKey; return item; }); })
           .catch(function() { return []; });
       };
     }), 8);
-    var gotMore = false;
-    pageResults.forEach(function(items) {
-      if (items.length > 0) {
-        allItems = allItems.concat(items);
-        gotMore = true;
-      }
-    });
-    pageIdx += batchPages.length;
-    // 如果某一整批都没返回数据，说明已到末尾，停止翻页
-    if (!gotMore) break;
-    // 如果最后一批不足一整页，继续翻一页确认是否还有
-    if (batchPages.length < 8 && gotMore && pageIdx < remainingPages.length) {
-      // 扩展 remainingPages，动态追加新页码
-      var nextP = remainingPages[remainingPages.length - 1] + 1;
-      // 最多再翻 20 页（安全上限，防止无限循环）
-      for (var extra = 0; extra < 20 && pageIdx < 200; extra++) {
-        remainingPages.push(nextP + extra);
-      }
-    }
-    // 安全上限：最多翻 200 页
-    if (pageIdx >= 200) break;
+    pageResults.forEach(function(items) { allItems = allItems.concat(items); });
+    if (typeof setApiDuration === 'function') setApiDuration(Date.now() - t0);
+    return allItems;
+  } catch (e) {
+    console.error('[fetchCategoryAll] 请求失败 (' + catKey + '):', e.message);
+    return [];
   }
-  if (typeof setApiDuration === 'function') setApiDuration(Date.now() - t0);
-  return allItems;
 }
 
-// 并发限制：同时最多 N 个请求
-async function batchAsync(tasks, concurrency) {
+// 并发控制工具
+function batchAsync(tasks, concurrency) {
   if (concurrency === undefined || concurrency === null) concurrency = 5;
-  const results = [];
-  const queue = [...tasks];
-  async function worker() {
-    while (queue.length) {
-      const task = queue.shift();
-      if (task) results.push(await task());
+  var results = [];
+  var queue = tasks.slice();
+  return new Promise(function(resolve) {
+    var running = 0;
+    function next() {
+      if (queue.length === 0 && running === 0) { resolve(results); return; }
+      while (running < concurrency && queue.length > 0) {
+        var task = queue.shift();
+        running++;
+        task().then(function(r) { results.push(r); }).catch(function() { results.push(null); }).finally(function() {
+          running--;
+          next();
+        });
+      }
     }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, function() { return worker(); }));
-  return results;
+    next();
+  });
 }
 
-/**
- * ★ 渐进式加载：仅用首页数据（_quick promise）快速返回，不等待全部分页
- * 返回 { allItems, isPartial } — isPartial=true 表示数据还不完整
- * 后台继续拉取剩余页并在完成后自动更新缓存
- */
+// ★ 从预取数据收集全量物品（所有分类 _quick 同源，任意一个 resolve 即全量就绪）
 async function loadAllItemsQuick() {
   var prefetched = window.__prefetch || {};
-  var taskFns = CATEGORIES.map(function(cat) {
-    var p = prefetched[cat.key];
-    // 优先使用 _quick（仅等待首页），其次尝试主 promise，最后 fallback
-    var quickP = (p && p._quick) ? p._quick : p;
-    if (quickP) {
-      return function() {
-        return quickP.then(function(res) {
-          if (res && res.code === 0 && res.data && res.data.length > 0) {
-            return res.data.map(function(item) { return Object.assign({}, item, { _category: cat.key }); });
-          }
-          return fetchCategoryAll(cat.key).catch(function() { return []; });
-        }).catch(function() {
-          return fetchCategoryAll(cat.key).catch(function() { return []; });
-        });
-      };
+  // 取第一个可用的 _quick promise 等待（所有分类共享同一 API 响应）
+  for (var i = 0; i < CATEGORIES.length; i++) {
+    var p = prefetched[CATEGORIES[i].key];
+    if (p && p._quick) {
+      try {
+        await p._quick;
+        break;
+      } catch(e) { /* continue */ }
     }
-    return function() {
-      return fetchCategoryAll(cat.key).catch(function() { return []; });
-    };
+  }
+  // 从所有分类收集已就绪数据
+  var allItems = [];
+  CATEGORIES.forEach(function(cat) {
+    var p = prefetched[cat.key];
+    if (p && p._resolvedData && p._resolvedData.length > 0) {
+      allItems = allItems.concat(p._resolvedData);
+    }
   });
-  var results = await batchAsync(taskFns, 8);
-  var allItems = Array.prototype.concat.apply([], results);
+  if (allItems.length === 0) {
+    // fallback: 直接调 API（所有分类，首页）
+    try {
+      var fallbackAll = [];
+      var catResults = await Promise.all(CATEGORIES.map(function(cat) {
+        return apiRequest('item_list', { types: cat.key, p: 1 }).then(function(r) {
+          return sanitizeItemArray(r.data, 'list').map(function(item) {
+            item._category = cat.key;
+            return item;
+          });
+        }).catch(function() { return []; });
+      }));
+      catResults.forEach(function(items) { fallbackAll = fallbackAll.concat(items); });
+      allItems = fallbackAll;
+    } catch(e) { return []; }
+  }
   return allItems;
 }
 
-/** 检查是否所有分类的预取数据都已完整加载 */
+// ★ 获取首批物品：等所有分类首页到齐 → 按涨跌幅+价格排序 → 取前 N 件
+async function getFirstBatchItems(targetCount) {
+  if (targetCount === undefined || targetCount === null) targetCount = 50;
+  var prefetched = window.__prefetch || {};
+
+  // 优先使用 _allPage1Ready（等所有分类首页到齐，已排序）
+  if (prefetched._allPage1Ready) {
+    try {
+      var sortedItems = await prefetched._allPage1Ready;
+      if (sortedItems && sortedItems.length > 0) {
+        return sortedItems.slice(0, targetCount);
+      }
+    } catch(e) { /* 降级 */ }
+  }
+
+  // 降级：收集已就绪数据，手动排序
+  var all = [];
+  try {
+    all = await loadAllItemsQuick();
+  } catch(e) { all = []; }
+
+  // 按显著性排序：|涨跌幅| × 价格档位
+  function score(item) {
+    var bl = Math.abs(item.bl || item.day_3_bl || item.day_7_bl || 0);
+    var p = item.price || 0;
+    var pf = p >= 1000000 ? 4 : p >= 100000 ? 3 : p >= 10000 ? 2 : 1;
+    return bl * pf;
+  }
+  all.sort(function(a, b) { return score(b) - score(a); });
+  return all.slice(0, targetCount);
+}
+
+// ★ 后台静默加载全部数据（使用 requestIdleCallback 或分段执行）
+function warmAllDataBackground(onProgress) {
+  var prefetched = window.__prefetch || {};
+  var catsLoaded = 0;
+  var totalCats = CATEGORIES.length;
+
+  return Promise.all(CATEGORIES.map(function(cat) {
+    var p = prefetched[cat.key];
+    // 如果预取对象已存在且 _quick 可用，等待它
+    if (p && p._quick) {
+      return p._quick.then(function() {
+        // 等待该分类 _complete
+        return new Promise(function(resolve) {
+          if (p._complete) { catsLoaded++; if (onProgress) onProgress(catsLoaded, totalCats); resolve(true); return; }
+          var checkTimer;
+          var timeout = setTimeout(function() {
+            clearInterval(checkTimer);
+            catsLoaded++;
+            if (onProgress) onProgress(catsLoaded, totalCats);
+            resolve(false);
+          }, 15000);
+          checkTimer = setInterval(function() {
+            if (p._complete) {
+              clearTimeout(timeout);
+              clearInterval(checkTimer);
+              catsLoaded++;
+              if (onProgress) onProgress(catsLoaded, totalCats);
+              resolve(true);
+            }
+          }, 200);
+        });
+      }).catch(function() { catsLoaded++; if (onProgress) onProgress(catsLoaded, totalCats); return false; });
+    }
+    // 无预取对象，直接 fetch
+    return fetchCategoryAll(cat.key).then(function() {
+      catsLoaded++;
+      if (onProgress) onProgress(catsLoaded, totalCats);
+      return true;
+    }).catch(function() {
+      catsLoaded++;
+      if (onProgress) onProgress(catsLoaded, totalCats);
+      return false;
+    });
+  }));
+}
+
+/** 预取数据是否全部就绪 */
 function isPrefetchComplete() {
   var prefetched = window.__prefetch || {};
   for (var i = 0; i < CATEGORIES.length; i++) {
     var p = prefetched[CATEGORIES[i].key];
-    if (p && !p._complete) return false;
+    if (!p || !p._complete) return false;
   }
   return true;
 }
 
-/** ★ 后台继续等待完整数据，完成后自动更新缓存和索引 */
+/** 后台等待预取完成并更新缓存（复用 prefetch 翻页池，不重复请求） */
 function loadAllItemsBackground(currentItems) {
   var prefetched = window.__prefetch || {};
-  var taskFns = CATEGORIES.map(function(cat) {
-    var p = prefetched[cat.key];
-    if (p && p._complete) {
-      // 已完整，直接返回
-      return function() { return Promise.resolve(p._resolvedData || []); };
-    }
-    if (p) {
-      return function() {
-        return p.then(function(res) {
-          if (res && res.code === 0 && res.data && res.data.length > 0) {
-            return res.data.map(function(item) { return Object.assign({}, item, { _category: cat.key }); });
-          }
-          return [];
-        }).catch(function() { return currentItems.filter(function(i) { return i._category === cat.key; }); });
-      };
-    }
-    return function() { return Promise.resolve(currentItems.filter(function(i) { return i._category === cat.key; })); };
-  });
 
-  return batchAsync(taskFns, 8).then(function(results) {
-    var allItems = Array.prototype.concat.apply([], results);
+  // 先等待所有 _quick promise（page1 全部到齐）
+  return Promise.all(CATEGORIES.map(function(cat) {
+    var p = prefetched[cat.key];
+    if (p && p._quick) return p._quick.catch(function() { return null; });
+    return Promise.resolve(null);
+  })).then(function() {
+    var allItems = [];
+    CATEGORIES.forEach(function(cat) {
+      var p = prefetched[cat.key];
+      if (p && p._resolvedData) allItems = allItems.concat(p._resolvedData);
+    });
+
+    if (allItems.length === 0 && currentItems && currentItems.length > 0) {
+      allItems = currentItems;
+    }
+
     if (allItems.length > 0) {
       setCache({ _allItems: allItems });
-      if (typeof buildSearchIndex === 'function') { buildSearchIndex(allItems); }
-      if (typeof updateCategoryIcons === 'function') { updateCategoryIcons(allItems); }
-      if (typeof checkFavoritePriceChanges === 'function') { checkFavoritePriceChanges(); }
-      if (typeof renderHomeTopMover === 'function') { renderHomeTopMover(); }
+      if (typeof buildSearchIndex === 'function') buildSearchIndex(allItems);
+      if (typeof updateCategoryIcons === 'function') updateCategoryIcons(allItems);
+      if (typeof checkFavoritePriceChanges === 'function') checkFavoritePriceChanges();
+      if (typeof renderHomeTopMover === 'function') renderHomeTopMover();
     }
-    return allItems;
-  }).catch(function() { return currentItems; });
+
+    // ★ 不再重复拉取！等待 prefetch 翻页池自然完成
+    return _waitForPagination(prefetched, 20000).then(function() {
+      var fullItems = [];
+      var seen = {};
+      CATEGORIES.forEach(function(cat) {
+        var p = prefetched[cat.key];
+        if (p && p._resolvedData) {
+          p._resolvedData.forEach(function(item) {
+            if (!seen[item.id]) { seen[item.id] = true; fullItems.push(item); }
+          });
+        }
+      });
+      if (fullItems.length > allItems.length) {
+        setCache({ _allItems: fullItems });
+        if (typeof buildSearchIndex === 'function') buildSearchIndex(fullItems);
+        if (typeof updateCategoryIcons === 'function') updateCategoryIcons(fullItems);
+        if (typeof checkFavoritePriceChanges === 'function') checkFavoritePriceChanges();
+        if (typeof renderHomeTopMover === 'function') renderHomeTopMover();
+      }
+      return fullItems.length > 0 ? fullItems : allItems;
+    });
+  }).catch(function() { return currentItems || []; });
+}
+
+// ★ 轮询等待 prefetch 翻页完成
+function _waitForPagination(prefetched, timeout) {
+  return new Promise(function(resolve) {
+    if (typeof prefetched.isPaginationDone === 'function' && prefetched.isPaginationDone()) {
+      resolve(); return;
+    }
+    var start = Date.now();
+    var timer = setInterval(function() {
+      var done = typeof prefetched.isPaginationDone === 'function' && prefetched.isPaginationDone();
+      if (done || (Date.now() - start > timeout)) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, 500);
+  });
 }
 
 async function loadAllItems(forceRefresh) {
@@ -279,19 +354,14 @@ async function loadAllItems(forceRefresh) {
     }
   }
 
-  // 先用首页数据快速返回
   var allItems = await loadAllItemsQuick();
   if (allItems.length > 0) {
     setCache({ _allItems: allItems });
-    if (typeof buildSearchIndex === 'function') { buildSearchIndex(allItems); }
-    if (typeof updateCategoryIcons === 'function') { updateCategoryIcons(allItems); }
+    if (typeof buildSearchIndex === 'function') buildSearchIndex(allItems);
+    if (typeof updateCategoryIcons === 'function') updateCategoryIcons(allItems);
   }
 
-  // 后台加载完整数据
-  if (!isPrefetchComplete()) {
-    loadAllItemsBackground(allItems);
-  }
-
+  // 后台记录当日价格快照 + SW历史合并 + 检查收藏变动
   setTimeout(function() {
     if (typeof mergeSWPriceHistory === 'function') {
       mergeSWPriceHistory().then(function() {
@@ -304,13 +374,11 @@ async function loadAllItems(forceRefresh) {
   return allItems;
 }
 
-/** 从预取数据中获取分类真实总数（用于显示准确分页） */
+/** 从预取数据中获取分类物品总数 */
 function getCategoryTotalCount(catKey) {
   var prefetched = window.__prefetch || {};
   var p = prefetched[catKey];
-  if (p && typeof p._totalCount === 'number' && p._totalCount > 0) {
-    return p._totalCount;
-  }
+  if (p && typeof p._totalCount === 'number' && p._totalCount > 0) return p._totalCount;
   return 0;
 }
 
@@ -318,32 +386,28 @@ function getCategoryTotalCount(catKey) {
 function getGlobalStats() {
   var prefetched = window.__prefetch || {};
   var totalItems = 0;
-  var loadedItems = 0;
-  var catsWithData = 0;
   var catsComplete = 0;
   CATEGORIES.forEach(function(cat) {
     var p = prefetched[cat.key];
     if (p && p._hasPage1) {
-      catsWithData++;
       totalItems += (p._totalCount || 0);
-      loadedItems += (p._resolvedData ? p._resolvedData.length : 0);
       if (p._complete) catsComplete++;
     }
   });
   return {
     totalItems: totalItems,
-    loadedItems: loadedItems,
-    catsWithData: catsWithData,
+    loadedItems: totalItems,
+    catsWithData: catsComplete,
     catsComplete: catsComplete,
     totalCats: CATEGORIES.length,
     allComplete: catsComplete >= CATEGORIES.length
   };
 }
 
-// ===== 后端 历史数据 =====
+// ===== 历史数据 API =====
 
 /**
- * 从 后端 D1 数据库获取物品的云端价格历史快照
+ * 从后端 D1 数据库获取物品的云端价格历史快照
  * @param {number} itemId
  * @returns {Promise<object>} { code, data: { itemId, name, snapshots: [{d, p, b, s}] } }
  */
@@ -364,4 +428,111 @@ async function fetchItemHistory(itemId) {
       }
     }
   }
+}
+
+// ===== 数据净化层（所有原始 API 数据的唯一入口） =====
+// 把字段类型不稳定、id/tid 关系混乱、极端数值、命名不一致等问题在源头一次性解决
+// 下游所有渲染/排序/收藏比对代码只需假设"数据是干净的"，不用逐处防御
+
+/**
+ * 归一化物品 ID：id 优先，为空时用 tid 兜底，最终保证 Number 类型
+ * 统一入口后，所有下游比较只需 i.id === itemId，不再需要 || tid
+ */
+function canonicalId(rawItem) {
+  var id = Number(rawItem.id) || Number(rawItem.tid) || 0;
+  return id || 0;
+}
+
+/** 安全数字转换：NaN / ±Infinity → 0 */
+function safeNum(v) {
+  var n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** 价格钳位：非有限值/负数 → 0，不做上限过滤（游戏内真实高价可达上亿） */
+function clampPrice(v) {
+  var n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+/** id/tid 不一致检测（节流日志，避免刷屏） */
+var _idMismatchWarned = {};
+function _warnIdMismatch(rawItem) {
+  if (rawItem.id && rawItem.tid && String(rawItem.id) !== String(rawItem.tid)) {
+    var key = rawItem.id + '|' + rawItem.tid;
+    if (!_idMismatchWarned[key]) {
+      _idMismatchWarned[key] = true;
+      console.warn('[canonicalId] id/tid 不一致:',
+        { id: rawItem.id, tid: rawItem.tid, name: rawItem.name || '(未知)' },
+        '已使用 id=' + canonicalId(rawItem));
+    }
+  }
+}
+
+/**
+ * 净化 item_price_all 单条（仅价格字段，不含元数据）
+ * 调用场景：refreshAllData / refreshCurrentList / openDetail / refreshFavTab 拿到价格后
+ */
+function sanitizePriceItem(p) {
+  _warnIdMismatch(p);
+  return {
+    id: canonicalId(p),
+    tid: p.tid != null ? Number(p.tid) : null,
+    price: clampPrice(p.price),
+    bl: safeNum(p.bl),
+    day_3_bl: safeNum(p.day_3_bl),
+    day_3_price: clampPrice(p.day_3_price),
+    day_7_bl: safeNum(p.day_7_bl),
+    day_7_price: clampPrice(p.day_7_price),
+    day_30_bl: safeNum(p.day_30_bl),
+    day_30_price: clampPrice(p.day_30_price),
+    price_start: clampPrice(p.price_start || p.priceStart),
+    is_get_time: p.is_get_time
+  };
+}
+
+/**
+ * 净化 item_list 单条（元数据 + 可能附带的价格字段）
+ * 调用场景：fetchCategoryAll / loadAllItemsQuick fallback / prefetch 原始数据
+ */
+function sanitizeListItem(item) {
+  _warnIdMismatch(item);
+  return {
+    id: canonicalId(item),
+    tid: item.tid != null ? Number(item.tid) : null,
+    name: item.name || '',
+    pic: item.pic || '',
+    grade: safeNum(item.grade),
+    ShopSellType: item.ShopSellType || '',
+    desc: item.desc || '',
+    secondClassCN: item.secondClassCN || '',
+    length: safeNum(item.length),
+    width: safeNum(item.width),
+    weight: safeNum(item.weight || item.Weight),   // ★ 统一 Weight → weight
+    objectID: item.objectID || '',
+    price: clampPrice(item.price),
+    bl: safeNum(item.bl),
+    day_3_bl: safeNum(item.day_3_bl),
+    day_3_price: clampPrice(item.day_3_price),
+    day_7_bl: safeNum(item.day_7_bl),
+    day_7_price: clampPrice(item.day_7_price),
+    day_30_bl: safeNum(item.day_30_bl),
+    day_30_price: clampPrice(item.day_30_price),
+    price_start: clampPrice(item.price_start || item.priceStart),
+    is_get_time: item.is_get_time
+  };
+}
+
+/**
+ * 净化数组：非数组返回 []、过滤无核心字段条目、逐条净化
+ * @param {*} data - API 返回的 data 字段（可能是数组/null/{}/undefined）
+ * @param {string} source - 'price' 用 sanitizePriceItem，其他用 sanitizeListItem
+ */
+function sanitizeItemArray(data, source) {
+  if (!Array.isArray(data)) return [];
+  var sanitizer = source === 'price' ? sanitizePriceItem : sanitizeListItem;
+  return data
+    .filter(function(item) { return item && (item.id || item.tid); })
+    .map(sanitizer);
 }

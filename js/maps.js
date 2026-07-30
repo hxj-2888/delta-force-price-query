@@ -1,4 +1,8 @@
-// ===== 地图数据 & 钥匙/收集品归属映射 =====
+// ===== maps.js — 地图归属映射 =====
+// 功能清单: 5张游戏地图定义(零号大坝/长弓溪谷/航天基地/巴克什/监狱) | 钥匙卡pic URL→地图映射(4规则)
+// 收集品关键词→地图映射(40+关键词) | findItemMap(综合查询) | getKeyMapFromPic(pic URL匹配)
+// 依赖: 无(纯静态数据) | 被依赖: render.js(详情页地图归属显示)
+// 改动影响: 修改关键词→影响收集品/钥匙地图归属; 新增地图→需同步更新MAPS和规则
 
 // 地图定义（无 emoji）
 var MAPS = {
@@ -104,24 +108,3 @@ function findItemMap(name, category, picUrl) {
   return null;
 }
 
-
-// ===== 新赛季收集品关键词（基于游戏版本更新）=====
-var NEW_SEASON_KEYWORDS = [
-  "飞秒激光器", "液压破门器", "飞行员眼镜", "高能瓦斯罐",
-  "OLIGHT", "电子脚镣", "装甲车电池", "潮汐监狱",
-  "脑机relink", "阵列服务器", "万金泪冠", "复苏呼吸机",
-  "海盗弯刀", "卫队金扳指", "渡鸦项坠", "优秀雇员奖杯",
-  "心灵感应", "雷斯的乐谱本", "木雕烟斗",
-  "电动车电池", "单反相机", "摄影机", "军用无人机",
-  "聚乙烯纤维", "高出力粉碎钳", "特种钢", "医用酒精",
-  "E型滤毒罐", "镜头", "可编程处理器", "军用电台"
-];
-
-function isNewSeasonItem(name) {
-  if (!name) return false;
-  var kw = name.toLowerCase();
-  for (var i = 0; i < NEW_SEASON_KEYWORDS.length; i++) {
-    if (kw.indexOf(NEW_SEASON_KEYWORDS[i].toLowerCase()) !== -1) return true;
-  }
-  return false;
-}

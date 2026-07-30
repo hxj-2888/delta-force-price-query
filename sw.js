@@ -1,13 +1,14 @@
-// ===== 三角洲行动 - 价格自动记录 Service Worker =====
-// 利用 Periodic Background Sync API，即使页面关闭也能每天后台抓取价格
-// Chrome 80+ / Edge 80+ 支持，需要用户授权
-// 回退方案：页面打开时自动补录当天数据
+// ===== sw.js — Service Worker 后台价格记录 =====
+// 功能清单: Periodic Background Sync每日自动抓取全量价格→IndexedDB | 分批写入(500条/批)
+// 为30天价格折线图提供每日数据锚点,即使页面未打开也能积累历史
+// 依赖: IndexedDB(deltaforce_price_db/daily_prices) 同域/api/proxy
+// 改动影响: 修改记录频率→影响价格图表数据密度; 修改分批大小→影响写入性能
 
 // 使用同域 API 代理，无需硬编码后端地址
 const PROXY_URL = self.location.origin + '/api/proxy';
 
 const DB_NAME = 'deltaforce_price_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // ★ 与 store.js MAIN_DB_VERSION 保持一致
 const STORE_NAME = 'daily_prices';
 
 self.addEventListener('install', () => {

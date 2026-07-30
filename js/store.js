@@ -1,19 +1,44 @@
-// ===== 数据持久化层（LocalStorage, IndexedDB 操作） =====
+// ===== store.js — 数据持久化层 =====
+// 功能清单: 物品缓存(内存+localStorage双级,5分钟TTL) | 搜索历史(最多20条) | 最近浏览(最多15条)
+// 收藏系统(最多50条) | 价格历史本地快照(每物品14天) | SW后台记录合并(mergeSWPriceHistory)
+// 云端快照缓存(5分钟TTL) | 浏览状态恢复 | 分类图标缓存 | 搜索索引(字符级倒排索引) | 刷新冷却控制
+// 依赖: utils.js(无,纯数据层) | 被依赖: api.js(loadAllItems/setCache/getCache) main.js(初始化/用户操作)
+// 改动影响: 修改缓存键或TTL→影响api.js的缓存命中率; 修改用户数据键→影响main.js/search页功能
 
-// ===== 缓存（IndexedDB + 内存 + LocalStorage 三级） =====
+// ===== 缓存（内存 + LocalStorage 双级） =====
 
 var CACHE_KEY = 'deltaforce_cache_v10';
 var CACHE_TIME_KEY = 'deltaforce_cache_time_v10';
-var CACHE_DURATION = 2 * 60 * 60 * 1000;
+var CACHE_DURATION = 5 * 60 * 1000; // 5分钟，确保版本更新后用户能及时获取新数据
 
 var REFRESH_COOLDOWN = 30 * 1000;
 var lastRefreshTime = 0;
 var _lastApiDuration = 3000;
 
 var _memoryCache = null;
+
+// IndexedDB（SW 后台价格记录存储，用于 mergeSWPriceHistory）
 var MAIN_DB_NAME = 'deltaforce_price_db';
 var MAIN_DB_VERSION = 2;
-var MAIN_STORE_NAME = 'main_cache';
+
+function _openMainDB() {
+  if (!('indexedDB' in window)) return Promise.reject(new Error('no indexedDB'));
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open(MAIN_DB_NAME, MAIN_DB_VERSION);
+    req.onupgradeneeded = function(e) {
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains('daily_prices')) {
+        db.createObjectStore('daily_prices', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = function(e) { resolve(e.target.result); };
+    req.onerror = function(e) { reject(e.target.error); };
+  });
+}
+
+function openPriceDB() {
+  return _openMainDB();
+}
 
 function setApiDuration(ms) {
   _lastApiDuration = ms > 0 ? ms : 3000;
@@ -40,10 +65,12 @@ function markRefreshed() {
   lastRefreshTime = Date.now();
 }
 
+// 从内存缓存读取（5分钟TTL内有效）
 function getCache() {
   if (_memoryCache && _memoryCache.data) {
     if (Date.now() - _memoryCache.time < CACHE_DURATION) return _memoryCache.data;
   }
+  // 降级到 localStorage（用于页面刷新后快速恢复，无需等待网络）
   var t = localStorage.getItem(CACHE_TIME_KEY);
   if (t && (Date.now() - parseInt(t) < CACHE_DURATION)) {
     try {
@@ -52,6 +79,7 @@ function getCache() {
       return data;
     } catch(e) {}
   }
+  // 即使过期也返回缓存数据作为初始渲染（避免白屏），后续网络请求会更新
   if (!t) {
     try {
       var raw = localStorage.getItem(CACHE_KEY);
@@ -66,102 +94,37 @@ function getCache() {
   return null;
 }
 
+// 写入缓存（双级：内存 + localStorage）
 function setCache(data) {
   _memoryCache = { data: data, time: Date.now() };
-  _writeCacheToIDB(data);
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
   } catch(e) {
-    console.warn('LocalStorage 缓存写入失败:', e.message);
+    // ★ localStorage 配额满：清除非关键数据后重试一次
+    console.warn('LocalStorage 缓存写入失败（可能配额满），尝试清理...');
     try { localStorage.removeItem(CACHE_KEY); } catch(e2) {}
     try { localStorage.removeItem(CACHE_TIME_KEY); } catch(e2) {}
+    // 清理价格历史（通常是最大的非关键数据）
+    try { localStorage.removeItem('deltaforce_price_hist'); } catch(e2) {}
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+      // ★ 通知用户部分历史数据已被清理
+      if (typeof toast === 'function') toast('存储空间不足，已清理历史价格数据', 3000);
+    } catch(e3) {
+      console.error('LocalStorage 缓存写入彻底失败:', e3.message);
+      if (typeof toast === 'function') toast('存储空间已满，部分功能可能异常', 3000);
+    }
   }
 }
 
 function clearCache() {
   _memoryCache = null;
-  _clearIDBCache();
   localStorage.removeItem(CACHE_KEY);
   localStorage.removeItem(CACHE_TIME_KEY);
   _searchIndex = null;
-  if (typeof _topMoverFirstRetryDone !== 'undefined') _topMoverFirstRetryDone = false;
 }
-
-function _openMainDB() {
-  if (!('indexedDB' in window)) return Promise.reject(new Error('no indexedDB'));
-  return new Promise(function(resolve, reject) {
-    var req = indexedDB.open(MAIN_DB_NAME, MAIN_DB_VERSION);
-    req.onupgradeneeded = function(e) {
-      var db = e.target.result;
-      if (!db.objectStoreNames.contains(MAIN_STORE_NAME)) {
-        db.createObjectStore(MAIN_STORE_NAME, { keyPath: 'key' });
-      }
-      if (!db.objectStoreNames.contains('daily_prices')) {
-        db.createObjectStore('daily_prices', { keyPath: 'key' });
-      }
-    };
-    req.onsuccess = function(e) { resolve(e.target.result); };
-    req.onerror = function(e) { reject(e.target.error); };
-  });
-}
-
-function _writeCacheToIDB(data) {
-  if (!('indexedDB' in window)) return;
-  _openMainDB().then(function(db) {
-    try {
-      var tx = db.transaction(MAIN_STORE_NAME, 'readwrite');
-      tx.objectStore(MAIN_STORE_NAME).put({ key: 'all_items', data: data, time: Date.now() });
-      tx.oncomplete = function() { db.close(); };
-      tx.onerror = function() { db.close(); };
-    } catch(e) { db.close(); }
-  }).catch(function() {});
-}
-
-function _clearIDBCache() {
-  if (!('indexedDB' in window)) return;
-  _openMainDB().then(function(db) {
-    try {
-      var tx = db.transaction(MAIN_STORE_NAME, 'readwrite');
-      tx.objectStore(MAIN_STORE_NAME).delete('all_items');
-      tx.oncomplete = function() { db.close(); };
-    } catch(e) { db.close(); }
-  }).catch(function() {});
-}
-
-async function initMainCache() {
-  if (!('indexedDB' in window)) return null;
-  try {
-    var db = await _openMainDB();
-    return new Promise(function(resolve) {
-      try {
-        var tx = db.transaction(MAIN_STORE_NAME, 'readonly');
-        var req = tx.objectStore(MAIN_STORE_NAME).get('all_items');
-        req.onsuccess = function() {
-          db.close();
-          if (req.result && req.result.data) {
-            if (Date.now() - req.result.time < CACHE_DURATION) {
-              _memoryCache = { data: req.result.data, time: req.result.time };
-              resolve(req.result.data);
-              return;
-            }
-          }
-          resolve(null);
-        };
-        req.onerror = function() { db.close(); resolve(null); };
-      } catch(e) { db.close(); resolve(null); }
-    });
-  } catch(e) { return null; }
-}
-
-// 清除旧版缓存（v0-v9）
-setTimeout(function migrateCache() {
-  for (var i = 0; i <= 9; i++) {
-    var k = i === 0 ? 'deltaforce_cache' : 'deltaforce_cache_v' + i;
-    var tk = i === 0 ? 'deltaforce_cache_time' : 'deltaforce_cache_time_v' + i;
-    if (localStorage.getItem(k)) { localStorage.removeItem(k); localStorage.removeItem(tk); }
-  }
-}, 0);
 
 // ===== 搜索历史 =====
 var QUERY_HISTORY_KEY = 'deltaforce_search_history';
@@ -283,7 +246,7 @@ function clearFavorites() {
 
 // ===== 价格历史（本地快照） =====
 var PRICE_HISTORY_KEY = 'deltaforce_price_hist';
-var MAX_HIST_PER_ITEM = 14; // 保留近14天，减少存储配额压力
+var MAX_HIST_PER_ITEM = 14; // 保留近14天
 
 // 线上快照内存缓存（避免重复请求后端）
 var _cloudSnapCache = {};  // itemId -> { snapshots, fetchedAt }
@@ -293,30 +256,76 @@ function getPriceHistory() {
   catch(e) { return {}; }
 }
 
-// 从 localStorage 快照数据计算指定天数前的涨跌幅
-function getLocalPriceChange(itemId, daysAgo) {
+function savePriceSnapshot(itemId, item) {
+  if (!itemId || !item.price) return;
   var hist = getPriceHistory();
-  var snaps = hist[String(itemId)] || [];
-  if (snaps.length < 2) return null;
-  var latest = snaps[0];
-  if (!latest) return null;
-  var now = Math.floor(Date.now() / 1000);
-  var targetTs = now - daysAgo * 86400;
-  var closest = null;
-  var closestDiff = Infinity;
-  for (var i = 0; i < snaps.length; i++) {
-    var diff = Math.abs(snaps[i].ts - targetTs);
-    if (diff < closestDiff) { closestDiff = diff; closest = snaps[i]; }
+  var k = String(itemId);
+  if (!hist[k]) hist[k] = [];
+  var today = new Date(); today.setHours(0,0,0,0);
+  var todayTs = Math.floor(today.getTime()/1000);
+  hist[k] = hist[k].filter(function(s) {
+    var sd = new Date(s.ts*1000); sd.setHours(0,0,0,0);
+    return Math.floor(sd.getTime()/1000) !== todayTs;
+  });
+  hist[k].push({ ts: Math.floor(Date.now() / 1000), price: item.price });
+  hist[k].sort(function(a,b) { return b.ts - a.ts; });
+  if (hist[k].length > MAX_HIST_PER_ITEM) hist[k] = hist[k].slice(0, MAX_HIST_PER_ITEM);
+  try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
+}
+
+// 记录所有物品当日价格（页面打开时调用，用于价格历史图表）
+function recordAllItemsPrices(allItems) {
+  if (!allItems || allItems.length === 0) return 0;
+  var hist = getPriceHistory();
+  var today = new Date(); today.setHours(0,0,0,0);
+  var todayTs = Math.floor(today.getTime()/1000);
+  var now = Math.floor(Date.now()/1000);
+  var added = 0;
+  allItems.forEach(function(item) {
+    if (!item.id || !item.price || item.price <= 0) return;
+    var k = String(item.id);
+    if (!hist[k]) hist[k] = [];
+    var hasToday = false;
+    for (var i = 0; i < hist[k].length; i++) {
+      var sd = new Date(hist[k][i].ts * 1000); sd.setHours(0,0,0,0);
+      if (Math.floor(sd.getTime()/1000) === todayTs) { hasToday = true; break; }
+    }
+    if (hasToday) return;
+    hist[k].push({ ts: now, price: item.price });
+    added++;
+    if (hist[k].length > 1) {
+      hist[k].sort(function(a,b) { return b.ts - a.ts; });
+    }
+    if (hist[k].length > MAX_HIST_PER_ITEM) hist[k] = hist[k].slice(0, MAX_HIST_PER_ITEM);
+  });
+  // 清理 35 天前的过期数据
+  var staleCutoff = Math.floor(Date.now() / 1000) - 35 * 86400;
+  var hadStale = false;
+  Object.keys(hist).forEach(function(k) {
+    var before = hist[k].length;
+    hist[k] = hist[k].filter(function(s) { return s.ts >= staleCutoff; });
+    if (hist[k].length === 0) { delete hist[k]; hadStale = true; }
+    else if (hist[k].length < before) { hadStale = true; }
+  });
+  if (added > 0 || hadStale) {
+    try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {
+      // ★ 配额满：清理超过 7 天的旧记录后重试
+      console.warn('价格历史写入失败（可能配额满），裁剪旧数据...');
+      var weekCutoff = Math.floor(Date.now() / 1000) - 7 * 86400;
+      Object.keys(hist).forEach(function(k) {
+        hist[k] = hist[k].filter(function(s) { return s.ts >= weekCutoff; });
+        if (hist[k].length === 0) delete hist[k];
+      });
+      try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e2) {
+        // 仍失败则放弃本次写入
+        console.error('价格历史写入彻底失败:', e2.message);
+      }
+    }
   }
-  if (!closest || closest.ts === latest.ts || !closest.price || closest.price <= 0) return null;
-  var change = (latest.price - closest.price) / closest.price * 100;
-  return Math.abs(change) > 0.001 ? change : 0;
+  return added;
 }
 
-function openPriceDB() {
-  return _openMainDB();
-}
-
+// 合并 SW 后台记录的每日价格到本地快照
 async function mergeSWPriceHistory() {
   if (!('indexedDB' in window)) return 0;
   try {
@@ -373,62 +382,6 @@ async function mergeSWPriceHistory() {
   }
 }
 
-function savePriceSnapshot(itemId, item) {
-  if (!itemId || !item.price) return;
-  var hist = getPriceHistory();
-  var k = String(itemId);
-  if (!hist[k]) hist[k] = [];
-  var today = new Date(); today.setHours(0,0,0,0);
-  var todayTs = Math.floor(today.getTime()/1000);
-  hist[k] = hist[k].filter(function(s) {
-    var sd = new Date(s.ts*1000); sd.setHours(0,0,0,0);
-    return Math.floor(sd.getTime()/1000) !== todayTs;
-  });
-  hist[k].push({ ts: Math.floor(Date.now() / 1000), price: item.price });
-  hist[k].sort(function(a,b) { return b.ts - a.ts; });
-  if (hist[k].length > MAX_HIST_PER_ITEM) hist[k] = hist[k].slice(0, MAX_HIST_PER_ITEM);
-  try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
-}
-
-function recordAllItemsPrices(allItems) {
-  if (!allItems || allItems.length === 0) return 0;
-  var hist = getPriceHistory();
-  var today = new Date(); today.setHours(0,0,0,0);
-  var todayTs = Math.floor(today.getTime()/1000);
-  var now = Math.floor(Date.now()/1000);
-  var added = 0;
-  allItems.forEach(function(item) {
-    if (!item.id || !item.price || item.price <= 0) return;
-    var k = String(item.id);
-    if (!hist[k]) hist[k] = [];
-    var hasToday = false;
-    for (var i = 0; i < hist[k].length; i++) {
-      var sd = new Date(hist[k][i].ts * 1000); sd.setHours(0,0,0,0);
-      if (Math.floor(sd.getTime()/1000) === todayTs) { hasToday = true; break; }
-    }
-    if (hasToday) return;
-    hist[k].push({ ts: now, price: item.price });
-    added++;
-    if (hist[k].length > 1) {
-      hist[k].sort(function(a,b) { return b.ts - a.ts; });
-    }
-    if (hist[k].length > MAX_HIST_PER_ITEM) hist[k] = hist[k].slice(0, MAX_HIST_PER_ITEM);
-  });
-  // 清理 35 天前的过期数据（无论是否新增都执行，防止过期数据长期堆积）
-  var staleCutoff = Math.floor(Date.now() / 1000) - 35 * 86400;
-  var hadStale = false;
-  Object.keys(hist).forEach(function(k) {
-    var before = hist[k].length;
-    hist[k] = hist[k].filter(function(s) { return s.ts >= staleCutoff; });
-    if (hist[k].length === 0) { delete hist[k]; hadStale = true; }
-    else if (hist[k].length < before) { hadStale = true; }
-  });
-  if (added > 0 || hadStale) {
-    try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
-  }
-  return added;
-}
-
 /**
  * 合并获取价格数据点（API锚点 + 线上快照 + 本地快照）
  * @param {object} item - 物品对象
@@ -446,7 +399,7 @@ function getMergedPriceData(item, cloudSnapshots) {
   if (item.day_3_price > 0)  { pts.push({ day: 3,  price: item.day_3_price });  usedDays[3] = true; }
   if (item.price > 0)        { pts.push({ day: 0,  price: item.price });         usedDays[0] = true; }
 
-  // 优先级2: 云端快照（D1 数据库每日记录，标记 cloud 以在图表中区分）
+  // 优先级2: 云端快照（D1 数据库每日记录）
   if (cloudSnapshots && cloudSnapshots.length > 0) {
     cloudSnapshots.forEach(function(s) {
       var snapDate = new Date(s.d + 'T00:00:00+08:00');
@@ -508,7 +461,6 @@ function restoreBrowseState() {
   try {
     var saved = JSON.parse(localStorage.getItem(BROWSE_STATE_KEY));
     if (!saved) return;
-    // 恢复浏览状态由 main.js 在加载完成后调用
     return saved;
   } catch(e) { return null; }
 }
