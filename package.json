@@ -6,7 +6,7 @@
   "bin": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "node scripts/build.js",
+    "build": "node -e \"if(require('fs').existsSync('scripts/build.js'))require('child_process').execSync('node scripts/build.js',{stdio:'inherit'})\"",
     "generate-metadata": "node scripts/generate-metadata.js",
     "predeploy": "node scripts/build.js"
   },
