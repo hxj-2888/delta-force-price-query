@@ -2,20 +2,18 @@
 // 功能清单: API代理请求(带重试+超时) | 请求去重(同端点并发合并) | 分类全量拉取(fetchCategoryAll)
 // 预取数据收集(loadAllItemsQuick) | 首批物品获取(getFirstBatchItems) | 后台静默加载(warmAllDataBackground)
 // 预取完成等待(loadAllItemsBackground) | 全局统计(getGlobalStats) | 价格历史API(fetchItemHistory)
-// 依赖: store.js(setCache/getCache) render.js(CATEGORIES) utils.js(batchAsync) | 被依赖: main.js(初始化/刷新)
-// 改动影响: 修改PROXY_URL→影响所有API调用; 修改重试策略→影响弱网环境; 修改去重逻辑→影响并发请求
+// 数据净化(sanitizeItemArray/canonicalId/clampPrice) | 并发控制(batchAsync)
+// 依赖: config.js(CATEGORIES) store/cache.js(setCache/getCache/setApiDuration) store/search.js(buildSearchIndex)
+// 被依赖: render/ app/
 
-// 后端 URL（优先读取 index.html 中定义的全局常量）
 var WORKER_BASE = (typeof window !== 'undefined' && window.__WORKER_BASE) || '';
 var PROXY_URL = WORKER_BASE + '/api/proxy';
 
-// ★ 检测微信内置浏览器（缓存策略激进，需特殊处理）
 var _isWeChat = false;
 if (typeof navigator !== 'undefined' && navigator.userAgent) {
   _isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 }
 
-// ★ 请求去重：同一端点并发请求合并为一个网络请求（不缓存响应，确保数据新鲜）
 var _apiPending = {};
 
 function getApiCacheKey(endpoint, params) {
@@ -25,12 +23,10 @@ function getApiCacheKey(endpoint, params) {
 async function apiRequest(endpoint, params, retries, noCache) {
   if (retries === undefined || retries === null) retries = 3;
   params = params || {};
-  // ★ 微信浏览器：注入分钟级时间戳破缓存（绕过微信内置缓存和 CDN 残留）
   if (_isWeChat) { params._wc = Math.floor(Date.now() / 60000); }
   var cacheKey = getApiCacheKey(endpoint, params);
   var lastErr;
 
-  // ★ 请求去重：如果已有相同请求在进行中，等待它完成
   var canDedup = endpoint === 'item_price_all' || endpoint === 'item_list';
   if (!noCache && canDedup && _apiPending[cacheKey]) {
     try { return await _apiPending[cacheKey]; } catch(e) { /* fall through to fresh request */ }
@@ -89,11 +85,9 @@ async function apiRequest(endpoint, params, retries, noCache) {
   throw lastErr;
 }
 
-// ★ 使用 item_list（含名称+图标）获取单分类全量数据，支持翻页
 async function fetchCategoryAll(catKey) {
   var t0 = Date.now();
   try {
-    // 首页
     var res1 = await apiRequest('item_list', { types: catKey, p: 1 });
     var allItems = sanitizeItemArray(res1.data, 'list').map(function(item) {
       item._category = catKey;
@@ -108,7 +102,6 @@ async function fetchCategoryAll(catKey) {
       return allItems;
     }
 
-    // 剩余页并行加载
     var remainingPages = [];
     for (var p = 2; p <= totalPages; p++) remainingPages.push(p);
     var pageResults = await batchAsync(remainingPages.map(function(page) {
@@ -127,7 +120,6 @@ async function fetchCategoryAll(catKey) {
   }
 }
 
-// 并发控制工具
 function batchAsync(tasks, concurrency) {
   if (concurrency === undefined || concurrency === null) concurrency = 5;
   var results = [];
@@ -149,10 +141,8 @@ function batchAsync(tasks, concurrency) {
   });
 }
 
-// ★ 从预取数据收集全量物品（所有分类 _quick 同源，任意一个 resolve 即全量就绪）
 async function loadAllItemsQuick() {
   var prefetched = window.__prefetch || {};
-  // 取第一个可用的 _quick promise 等待（所有分类共享同一 API 响应）
   for (var i = 0; i < CATEGORIES.length; i++) {
     var p = prefetched[CATEGORIES[i].key];
     if (p && p._quick) {
@@ -162,7 +152,6 @@ async function loadAllItemsQuick() {
       } catch(e) { /* continue */ }
     }
   }
-  // 从所有分类收集已就绪数据
   var allItems = [];
   CATEGORIES.forEach(function(cat) {
     var p = prefetched[cat.key];
@@ -171,7 +160,6 @@ async function loadAllItemsQuick() {
     }
   });
   if (allItems.length === 0) {
-    // fallback: 直接调 API（所有分类，首页）
     try {
       var fallbackAll = [];
       var catResults = await Promise.all(CATEGORIES.map(function(cat) {
@@ -189,12 +177,10 @@ async function loadAllItemsQuick() {
   return allItems;
 }
 
-// ★ 获取首批物品：等所有分类首页到齐 → 按涨跌幅+价格排序 → 取前 N 件
 async function getFirstBatchItems(targetCount) {
   if (targetCount === undefined || targetCount === null) targetCount = 50;
   var prefetched = window.__prefetch || {};
 
-  // 优先使用 _allPage1Ready（等所有分类首页到齐，已排序）
   if (prefetched._allPage1Ready) {
     try {
       var sortedItems = await prefetched._allPage1Ready;
@@ -204,13 +190,11 @@ async function getFirstBatchItems(targetCount) {
     } catch(e) { /* 降级 */ }
   }
 
-  // 降级：收集已就绪数据，手动排序
   var all = [];
   try {
     all = await loadAllItemsQuick();
   } catch(e) { all = []; }
 
-  // 按显著性排序：|涨跌幅| × 价格档位
   function score(item) {
     var bl = Math.abs(item.bl || item.day_3_bl || item.day_7_bl || 0);
     var p = item.price || 0;
@@ -221,7 +205,6 @@ async function getFirstBatchItems(targetCount) {
   return all.slice(0, targetCount);
 }
 
-// ★ 后台静默加载全部数据（使用 requestIdleCallback 或分段执行）
 function warmAllDataBackground(onProgress) {
   var prefetched = window.__prefetch || {};
   var catsLoaded = 0;
@@ -229,10 +212,8 @@ function warmAllDataBackground(onProgress) {
 
   return Promise.all(CATEGORIES.map(function(cat) {
     var p = prefetched[cat.key];
-    // 如果预取对象已存在且 _quick 可用，等待它
     if (p && p._quick) {
       return p._quick.then(function() {
-        // 等待该分类 _complete
         return new Promise(function(resolve) {
           if (p._complete) { catsLoaded++; if (onProgress) onProgress(catsLoaded, totalCats); resolve(true); return; }
           var checkTimer;
@@ -254,7 +235,6 @@ function warmAllDataBackground(onProgress) {
         });
       }).catch(function() { catsLoaded++; if (onProgress) onProgress(catsLoaded, totalCats); return false; });
     }
-    // 无预取对象，直接 fetch
     return fetchCategoryAll(cat.key).then(function() {
       catsLoaded++;
       if (onProgress) onProgress(catsLoaded, totalCats);
@@ -267,7 +247,6 @@ function warmAllDataBackground(onProgress) {
   }));
 }
 
-/** 预取数据是否全部就绪 */
 function isPrefetchComplete() {
   var prefetched = window.__prefetch || {};
   for (var i = 0; i < CATEGORIES.length; i++) {
@@ -277,11 +256,9 @@ function isPrefetchComplete() {
   return true;
 }
 
-/** 后台等待预取完成并更新缓存（复用 prefetch 翻页池，不重复请求） */
 function loadAllItemsBackground(currentItems) {
   var prefetched = window.__prefetch || {};
 
-  // 先等待所有 _quick promise（page1 全部到齐）
   return Promise.all(CATEGORIES.map(function(cat) {
     var p = prefetched[cat.key];
     if (p && p._quick) return p._quick.catch(function() { return null; });
@@ -305,7 +282,6 @@ function loadAllItemsBackground(currentItems) {
       if (typeof renderHomeTopMover === 'function') renderHomeTopMover();
     }
 
-    // ★ 不再重复拉取！等待 prefetch 翻页池自然完成
     return _waitForPagination(prefetched, 20000).then(function() {
       var fullItems = [];
       var seen = {};
@@ -329,7 +305,6 @@ function loadAllItemsBackground(currentItems) {
   }).catch(function() { return currentItems || []; });
 }
 
-// ★ 轮询等待 prefetch 翻页完成
 function _waitForPagination(prefetched, timeout) {
   return new Promise(function(resolve) {
     if (typeof prefetched.isPaginationDone === 'function' && prefetched.isPaginationDone()) {
@@ -361,7 +336,6 @@ async function loadAllItems(forceRefresh) {
     if (typeof updateCategoryIcons === 'function') updateCategoryIcons(allItems);
   }
 
-  // 后台记录当日价格快照 + SW历史合并 + 检查收藏变动
   setTimeout(function() {
     if (typeof mergeSWPriceHistory === 'function') {
       mergeSWPriceHistory().then(function() {
@@ -374,7 +348,6 @@ async function loadAllItems(forceRefresh) {
   return allItems;
 }
 
-/** 从预取数据中获取分类物品总数 */
 function getCategoryTotalCount(catKey) {
   var prefetched = window.__prefetch || {};
   var p = prefetched[catKey];
@@ -382,7 +355,6 @@ function getCategoryTotalCount(catKey) {
   return 0;
 }
 
-/** 获取所有分类的总体统计 */
 function getGlobalStats() {
   var prefetched = window.__prefetch || {};
   var totalItems = 0;
@@ -405,12 +377,6 @@ function getGlobalStats() {
 }
 
 // ===== 历史数据 API =====
-
-/**
- * 从后端 D1 数据库获取物品的云端价格历史快照
- * @param {number} itemId
- * @returns {Promise<object>} { code, data: { itemId, name, snapshots: [{d, p, b, s}] } }
- */
 async function fetchItemHistory(itemId) {
   var MAX_RETRIES = 2;
   for (var attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -430,33 +396,7 @@ async function fetchItemHistory(itemId) {
   }
 }
 
-// ===== 数据净化层（所有原始 API 数据的唯一入口） =====
-// 把字段类型不稳定、id/tid 关系混乱、极端数值、命名不一致等问题在源头一次性解决
-// 下游所有渲染/排序/收藏比对代码只需假设"数据是干净的"，不用逐处防御
-
-/**
- * 归一化物品 ID：id 优先，为空时用 tid 兜底，最终保证 Number 类型
- * 统一入口后，所有下游比较只需 i.id === itemId，不再需要 || tid
- */
-function canonicalId(rawItem) {
-  var id = Number(rawItem.id) || Number(rawItem.tid) || 0;
-  return id || 0;
-}
-
-/** 安全数字转换：NaN / ±Infinity → 0 */
-function safeNum(v) {
-  var n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/** 价格钳位：非有限值/负数 → 0，不做上限过滤（游戏内真实高价可达上亿） */
-function clampPrice(v) {
-  var n = Number(v);
-  if (!Number.isFinite(n) || n < 0) return 0;
-  return n;
-}
-
-/** id/tid 不一致检测（节流日志，避免刷屏） */
+// ===== 数据净化层 =====
 var _idMismatchWarned = {};
 function _warnIdMismatch(rawItem) {
   if (rawItem.id && rawItem.tid && String(rawItem.id) !== String(rawItem.tid)) {
@@ -470,10 +410,22 @@ function _warnIdMismatch(rawItem) {
   }
 }
 
-/**
- * 净化 item_price_all 单条（仅价格字段，不含元数据）
- * 调用场景：refreshAllData / refreshCurrentList / openDetail / refreshFavTab 拿到价格后
- */
+function canonicalId(rawItem) {
+  var id = Number(rawItem.id) || Number(rawItem.tid) || 0;
+  return id || 0;
+}
+
+function safeNum(v) {
+  var n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function clampPrice(v) {
+  var n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
 function sanitizePriceItem(p) {
   _warnIdMismatch(p);
   return {
@@ -492,10 +444,6 @@ function sanitizePriceItem(p) {
   };
 }
 
-/**
- * 净化 item_list 单条（元数据 + 可能附带的价格字段）
- * 调用场景：fetchCategoryAll / loadAllItemsQuick fallback / prefetch 原始数据
- */
 function sanitizeListItem(item) {
   _warnIdMismatch(item);
   return {
@@ -509,7 +457,7 @@ function sanitizeListItem(item) {
     secondClassCN: item.secondClassCN || '',
     length: safeNum(item.length),
     width: safeNum(item.width),
-    weight: safeNum(item.weight || item.Weight),   // ★ 统一 Weight → weight
+    weight: safeNum(item.weight || item.Weight),
     objectID: item.objectID || '',
     price: clampPrice(item.price),
     bl: safeNum(item.bl),
@@ -524,11 +472,6 @@ function sanitizeListItem(item) {
   };
 }
 
-/**
- * 净化数组：非数组返回 []、过滤无核心字段条目、逐条净化
- * @param {*} data - API 返回的 data 字段（可能是数组/null/{}/undefined）
- * @param {string} source - 'price' 用 sanitizePriceItem，其他用 sanitizeListItem
- */
 function sanitizeItemArray(data, source) {
   if (!Array.isArray(data)) return [];
   var sanitizer = source === 'price' ? sanitizePriceItem : sanitizeListItem;

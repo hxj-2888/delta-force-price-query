@@ -20,12 +20,13 @@ server.js
 package-lock.json
 
 # 源 JS 文件（线上仅使用 js/bundle.js，避免上传未压缩源码）
+js/config.js
 js/utils.js
 js/maps.js
-js/store.js
 js/api.js
-js/render.js
-js/main.js
+js/store/
+js/render/
+js/app/
 
 # 版本控制
 .git/
