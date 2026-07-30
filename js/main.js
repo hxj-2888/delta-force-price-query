@@ -38,7 +38,20 @@ function goBack() {
     pageStack.pop();
     const prev = pageStack[pageStack.length - 1];
     showPage(prev);
-    if (prev === 'list') {
+    if (prev === 'home') {
+      // ★ 从详情/搜索/列表返回首页：恢复筛选/排序/分页 + 滚动位置
+      var saved = restoreBrowseState();
+      if (saved && typeof applyHomeBrowseState === 'function') {
+        applyHomeBrowseState(saved);
+      }
+      // 用最新缓存数据重渲染（保留当前页码 + 筛选条件）
+      checkFavoritePriceChanges();
+      renderHomeTopMover();
+      renderHomeMovers(false);
+      if (saved && saved.homeScrollTop) {
+        setTimeout(function() { window.scrollTo(0, saved.homeScrollTop); }, 100);
+      }
+    } else if (prev === 'list') {
       // 修复：从 search→detail 返回时，listItems 可能被单元素污染，从缓存恢复
       const cached = getCache();
       if (cached && cached._allItems && cached._allItems.length > 0) {
@@ -57,9 +70,10 @@ function goBack() {
 }
 
 function pushPage(name) {
+  // ★ 必须在 showPage 之前保存，否则 scrollTop 已被 showPage 置 0
+  saveBrowseState();
   pageStack.push(name);
   showPage(name);
-  saveBrowseState();
 }
 
 function goToPage(page) {
@@ -116,6 +130,12 @@ function preWarmFavTab() {
 }
 
 function switchTab(tabName) {
+  // ★ 仅在离开需要保留状态的页面时才保存（防止 detail/favtab 覆盖 home 的保存）
+  var leavingPage = pageStack[pageStack.length - 1];
+  if (leavingPage === 'home' || leavingPage === 'list') {
+    saveBrowseState();
+  }
+
   document.querySelectorAll('.bottom-nav .tab').forEach(function(t) { t.classList.remove('active'); });
   var tab = document.querySelector('.bottom-nav .tab[data-tab="' + tabName + '"]');
   if (tab) tab.classList.add('active');
@@ -125,11 +145,21 @@ function switchTab(tabName) {
     target.classList.add('active');
     pageStack = [tabName];
     if (tabName === 'home') {
+      // ★ 恢复首页筛选/排序/分页状态
+      var saved = restoreBrowseState();
+      if (saved && typeof applyHomeBrowseState === 'function') {
+        applyHomeBrowseState(saved);
+      }
       checkFavoritePriceChanges();
       renderHomeTopMover();
       renderHomeMovers(false);   // ★ 保留当前页码，不重置到第一页
+      // ★ 恢复滚动位置（renderHomeMovers 已重建 DOM，延迟滚动）
+      if (saved && saved.homeScrollTop) {
+        setTimeout(function() { window.scrollTo(0, saved.homeScrollTop); }, 100);
+      }
       // ★ 后台预暖收藏页数据
       setTimeout(function() { preWarmFavTab(); }, 300);
+      return; // ★ 跳过末尾的 scrollTo(0,0)
     }
     if (tabName === 'favtab') {
       // ★ 如果缓存未就绪，异步加载后渲染

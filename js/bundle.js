@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260730m — 自动生成于 2026-07-30 02:47:09
+// v20260730l — 自动生成于 2026-07-30 03:57:22
 
 // ===== utils.js =====
 // ===== utils.js — 工具函数集 =====
@@ -607,13 +607,6 @@ function getMergedPriceData(item, cloudSnapshots) {
   var SPD = 86400;
   var usedDays = {};
 
-  // ★ 计算日历日期偏移（以午夜为界），避免因快照时间导致同一天的数据点被合并或丢失
-  function calendarDayAgo(ts) {
-    var sd = new Date(ts * 1000); sd.setHours(0,0,0,0);
-    var todayDate = new Date(); todayDate.setHours(0,0,0,0);
-    return Math.round((todayDate.getTime() / 1000 - sd.getTime() / 1000) / SPD);
-  }
-
   // 优先级1: API 锚点（30天/7天/3天/当前）
   if (item.day_30_price > 0) { pts.push({ day: 30, price: item.day_30_price }); usedDays[30] = true; }
   if (item.day_7_price > 0)  { pts.push({ day: 7,  price: item.day_7_price });  usedDays[7] = true; }
@@ -632,11 +625,11 @@ function getMergedPriceData(item, cloudSnapshots) {
     });
   }
 
-  // 优先级3: 本地快照（兜底）— 使用日历日期对齐，确保同一天内的多次记录映射到同一 day 值
+  // 优先级3: 本地快照（兜底）
   var hist = getPriceHistory();
   var snaps = hist[String(item.id)] || [];
   snaps.forEach(function(s) {
-    var d = calendarDayAgo(s.ts);
+    var d = Math.round((now - s.ts) / SPD);
     if (d >= 1 && d <= 30 && !usedDays[d]) {
       pts.push({ day: d, price: s.price, hist: true });
       usedDays[d] = true;
@@ -673,7 +666,17 @@ function saveBrowseState() {
   var state = {
     page: pageStack[pageStack.length - 1] || 'home',
     category: typeof currentCategory !== 'undefined' ? currentCategory : null,
-    isAllMode: typeof isAllMode !== 'undefined' ? isAllMode : false
+    isAllMode: typeof isAllMode !== 'undefined' ? isAllMode : false,
+    // ★ 首页状态完整保存：筛选/排序/分页/滚动位置
+    homeCategoryFilter: typeof homeCategoryFilter !== 'undefined' ? homeCategoryFilter : 'all',
+    homePeriod: typeof homePeriod !== 'undefined' ? homePeriod : 'bl',
+    homePriceRange: typeof homePriceRange !== 'undefined' ? homePriceRange : 'all',
+    homeSortBy: typeof homeSortBy !== 'undefined' ? homeSortBy : 'default',
+    homeSortDir: typeof homeSortDir !== 'undefined' ? homeSortDir : 'desc',
+    homeCurrentPage: typeof homeCurrentPage !== 'undefined' ? homeCurrentPage : 1,
+    homeScrollTop: (function() {
+      try { return window.pageYOffset || document.documentElement.scrollTop || 0; } catch(e) { return 0; }
+    })()
   };
   localStorage.setItem(BROWSE_STATE_KEY, JSON.stringify(state));
 }
@@ -1536,6 +1539,50 @@ function resetAllFilters() {
 
   closeAllDropdowns();
   renderHomeMovers();
+}
+
+// ★ 恢复首页浏览状态（筛选/排序/分页 + UI 标签同步）
+function applyHomeBrowseState(state) {
+  if (!state) return;
+  if (state.homeCategoryFilter !== undefined) homeCategoryFilter = state.homeCategoryFilter;
+  if (state.homePeriod !== undefined) homePeriod = state.homePeriod;
+  if (state.homePriceRange !== undefined) homePriceRange = state.homePriceRange;
+  if (state.homeSortBy !== undefined) homeSortBy = state.homeSortBy;
+  if (state.homeSortDir !== undefined) homeSortDir = state.homeSortDir;
+  if (state.homeCurrentPage !== undefined) homeCurrentPage = state.homeCurrentPage;
+
+  // 同步所有下拉标签文字
+  var timeLabels = { bl: '近1天', day_3_bl: '近3天', day_7_bl: '近7天' };
+  var timeEl = document.getElementById('timeLabel');
+  if (timeEl) timeEl.textContent = timeLabels[homePeriod] || '近1天';
+
+  var priceLabels = { all: '全部价格', lt1w: '< 1万', '1-10w': '1万~10万', '10-100w': '10万~100万', gt100w: '> 100万' };
+  var priceEl = document.getElementById('priceLabel');
+  if (priceEl) priceEl.textContent = priceLabels[homePriceRange] || '全部价格';
+
+  var filterEl = document.getElementById('filterLabel');
+  if (filterEl) filterEl.textContent = homeCategoryFilter === 'all' ? '筛选' : (CATEGORY_MAP[homeCategoryFilter] || homeCategoryFilter);
+
+  var sortLabelText;
+  if (homeSortBy === 'default') sortLabelText = '综合↓';
+  else if (homeSortBy === 'change') sortLabelText = '涨跌幅' + (homeSortDir === 'desc' ? '↓' : '↑');
+  else sortLabelText = '价格' + (homeSortDir === 'desc' ? '↓' : '↑');
+  var sortEl = document.getElementById('sortLabel');
+  if (sortEl) sortEl.textContent = sortLabelText;
+
+  // 同步下拉面板选中态
+  document.querySelectorAll('#timeDropdown .dropdown-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.period === homePeriod);
+  });
+  document.querySelectorAll('#priceDropdown .dropdown-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.range === homePriceRange);
+  });
+  document.querySelectorAll('.filter-cat-chip').forEach(function(chip) {
+    chip.classList.toggle('active', chip.dataset.cat === homeCategoryFilter);
+  });
+  document.querySelectorAll('#sortDropdown .dropdown-item').forEach(function(item) {
+    item.classList.toggle('active', item.dataset.sort === homeSortBy && (homeSortBy === 'default' || item.dataset.dir === homeSortDir));
+  });
 }
 
 // ★ 首页物品列表（分页：每页 HOME_PAGE_SIZE 件，底部分页栏）
@@ -2478,7 +2525,20 @@ function goBack() {
     pageStack.pop();
     const prev = pageStack[pageStack.length - 1];
     showPage(prev);
-    if (prev === 'list') {
+    if (prev === 'home') {
+      // ★ 从详情/搜索/列表返回首页：恢复筛选/排序/分页 + 滚动位置
+      var saved = restoreBrowseState();
+      if (saved && typeof applyHomeBrowseState === 'function') {
+        applyHomeBrowseState(saved);
+      }
+      // 用最新缓存数据重渲染（保留当前页码 + 筛选条件）
+      checkFavoritePriceChanges();
+      renderHomeTopMover();
+      renderHomeMovers(false);
+      if (saved && saved.homeScrollTop) {
+        setTimeout(function() { window.scrollTo(0, saved.homeScrollTop); }, 100);
+      }
+    } else if (prev === 'list') {
       // 修复：从 search→detail 返回时，listItems 可能被单元素污染，从缓存恢复
       const cached = getCache();
       if (cached && cached._allItems && cached._allItems.length > 0) {
@@ -2497,9 +2557,10 @@ function goBack() {
 }
 
 function pushPage(name) {
+  // ★ 必须在 showPage 之前保存，否则 scrollTop 已被 showPage 置 0
+  saveBrowseState();
   pageStack.push(name);
   showPage(name);
-  saveBrowseState();
 }
 
 function goToPage(page) {
@@ -2556,6 +2617,12 @@ function preWarmFavTab() {
 }
 
 function switchTab(tabName) {
+  // ★ 仅在离开需要保留状态的页面时才保存（防止 detail/favtab 覆盖 home 的保存）
+  var leavingPage = pageStack[pageStack.length - 1];
+  if (leavingPage === 'home' || leavingPage === 'list') {
+    saveBrowseState();
+  }
+
   document.querySelectorAll('.bottom-nav .tab').forEach(function(t) { t.classList.remove('active'); });
   var tab = document.querySelector('.bottom-nav .tab[data-tab="' + tabName + '"]');
   if (tab) tab.classList.add('active');
@@ -2565,15 +2632,24 @@ function switchTab(tabName) {
     target.classList.add('active');
     pageStack = [tabName];
     if (tabName === 'home') {
-      // ★ 切回首页：不重新渲染列表（保持滚动+分页），仅更新轻量的提醒和涨幅卡片
-      // 因为在收藏页期间数据不会变（auto-refresh 只在首页active时运行，且已移除 loadAllItems）
+      // ★ 恢复首页筛选/排序/分页状态
+      var saved = restoreBrowseState();
+      if (saved && typeof applyHomeBrowseState === 'function') {
+        applyHomeBrowseState(saved);
+      }
       checkFavoritePriceChanges();
       renderHomeTopMover();
+      renderHomeMovers(false);   // ★ 保留当前页码，不重置到第一页
+      // ★ 恢复滚动位置（renderHomeMovers 已重建 DOM，延迟滚动）
+      if (saved && saved.homeScrollTop) {
+        setTimeout(function() { window.scrollTo(0, saved.homeScrollTop); }, 100);
+      }
       // ★ 后台预暖收藏页数据
       setTimeout(function() { preWarmFavTab(); }, 300);
+      return; // ★ 跳过末尾的 scrollTo(0,0)
     }
     if (tabName === 'favtab') {
-      // ★ 渲染收藏页（直接从缓存读取，不触发 loadAllItems 避免影响首页缓存）
+      // ★ 如果缓存未就绪，异步加载后渲染
       if (!_favTabDataReady) {
         var cached = getCache();
         if (cached && cached._allItems && cached._allItems.length > 0) {
@@ -2581,8 +2657,16 @@ function switchTab(tabName) {
         }
       }
       renderFavTab();
+      // 后台确保数据最新
+      if (!_favTabDataReady) {
+        loadAllItems(false).then(function() {
+          _favTabDataReady = true;
+          if (pageStack[pageStack.length - 1] === 'favtab') renderFavTab();
+        });
+      }
     }
   }
+  window.scrollTo(0, 0);
 }
 
 // ===== 分类导航 =====
