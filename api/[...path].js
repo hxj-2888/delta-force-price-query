@@ -11,6 +11,7 @@ const API_PATH = '/workApi/v1/sjz_api';
 
 // ========== 简单内存限流 ==========
 // 说明: Serverless 实例级计数, 防止代理被脚本/爬虫刷爆上游配额; 全局限流可改用 Vercel WAF。
+//       规范实现见 scripts/rate-limit.cjs, 改动时请同步三处副本。
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_MAX_PER_IP = 120;   // 每 IP 每分钟
 const RATE_MAX_GLOBAL = 600;   // 每实例每分钟

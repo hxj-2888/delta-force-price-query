@@ -23,6 +23,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -32,9 +33,9 @@ permissions:
   contents: read
 
 jobs:
-  # ===== 构建一致性校验: bundle.js 必须与 js/ 源码同步 =====
-  verify-bundle:
-    name: Verify bundle in sync
+  # ===== 质量门禁: 语法检查 + 单元/冒烟测试 + bundle 一致性 =====
+  check:
+    name: Lint, test & bundle check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -45,13 +46,19 @@ jobs:
         with:
           node-version: 20
 
+      - name: Lint (syntax check all JS)
+        run: npm run lint
+
+      - name: Unit & smoke tests
+        run: npm test
+
       - name: Check bundle & version consistency
-        run: node scripts/build.js --check
+        run: npm run check
 
   # ===== Cloudflare Pages 正式版（delta-force-v5, 生产分支 main）=====
   deploy-cloudflare:
     name: Cloudflare Pages (production)
-    needs: verify-bundle
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -67,7 +74,7 @@ jobs:
   # ===== Vercel 生产环境（delta-force-price-query）=====
   deploy-vercel:
     name: Vercel (production)
-    needs: verify-bundle
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -81,3 +88,21 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-project-name: delta-force-price-query
           vercel-args: '--prod'
+
+  # ===== 部署后冒烟验证: 双平台首页与 API 可达 =====
+  smoke-test:
+    name: Post-deploy smoke test
+    needs: [deploy-cloudflare, deploy-vercel]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cloudflare Pages 首页
+        run: curl -fsSL -o /dev/null --max-time 30 "https://delta-force-v5.pages.dev/"
+
+      - name: Cloudflare Pages 元数据 API
+        run: curl -fsSL --max-time 30 "https://delta-force-v5.pages.dev/api/metadata" | head -c 200
+
+      - name: Vercel 首页
+        run: curl -fsSL -o /dev/null --max-time 30 "https://delta-force-price-query.vercel.app/"
+
+      - name: Vercel 元数据 API
+        run: curl -fsSL --max-time 30 "https://delta-force-price-query.vercel.app/api/metadata" | head -c 200

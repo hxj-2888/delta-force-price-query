@@ -12,6 +12,7 @@ const API_PATH = '/workApi/v1/sjz_api';
 // ========== 简单内存限流 ==========
 // 说明: 模块级计数器按 isolate 生效, 各边缘节点独立统计; 对个人工具足够,
 //       如需跨节点全局限流, 可改用 CF Rate Limiting 或 KV 计数。
+//       规范实现见 scripts/rate-limit.cjs, 改动时请同步三处副本。
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_MAX_PER_IP = 120;   // 每 IP 每分钟
 const RATE_MAX_GLOBAL = 600;   // 每 isolate 每分钟
