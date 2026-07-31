@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260731o — 自动生成于 2026-07-31 06:42:28
+// v20260731p — 自动生成于 2026-07-31 07:58:32
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -369,6 +369,7 @@ function setCache(data) {
     try { localStorage.removeItem(CACHE_KEY); } catch(e2) {}
     try { localStorage.removeItem(CACHE_TIME_KEY); } catch(e2) {}
     try { localStorage.removeItem('deltaforce_price_hist'); } catch(e2) {}
+    _histCache = null;
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(data));
       localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
@@ -388,9 +389,16 @@ function clearCache() {
 }
 
 // ===== 价格历史（本地快照） =====
+var _histCache = null;      // 内存缓存：避免列表/首页每张卡片渲染都 JSON.parse 大对象
+var _histCacheTime = 0;
+
 function getPriceHistory() {
-  try { return JSON.parse(localStorage.getItem(PRICE_HISTORY_KEY)) || {}; }
-  catch(e) { return {}; }
+  var now = Date.now();
+  if (_histCache && now - _histCacheTime < 2000) return _histCache;
+  try { _histCache = JSON.parse(localStorage.getItem(PRICE_HISTORY_KEY)) || {}; }
+  catch(e) { _histCache = {}; }
+  _histCacheTime = now;
+  return _histCache;
 }
 
 function savePriceSnapshot(itemId, item) {
@@ -407,6 +415,7 @@ function savePriceSnapshot(itemId, item) {
   hist[k].push({ ts: Math.floor(Date.now() / 1000), price: item.price });
   hist[k].sort(function(a,b) { return b.ts - a.ts; });
   if (hist[k].length > MAX_HIST_PER_ITEM) hist[k] = hist[k].slice(0, MAX_HIST_PER_ITEM);
+  _histCache = null;
   try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
 }
 
@@ -443,6 +452,7 @@ function recordAllItemsPrices(allItems) {
     else if (hist[k].length < before) { hadStale = true; }
   });
   if (added > 0 || hadStale) {
+    _histCache = null;
     try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {
       console.warn('价格历史写入失败（可能配额满），裁剪旧数据...');
       var weekCutoff = Math.floor(Date.now() / 1000) - 7 * 86400;
@@ -450,6 +460,7 @@ function recordAllItemsPrices(allItems) {
         hist[k] = hist[k].filter(function(s) { return s.ts >= weekCutoff; });
         if (hist[k].length === 0) delete hist[k];
       });
+      _histCache = null;
       try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e2) {
         console.error('价格历史写入彻底失败:', e2.message);
       }
@@ -497,6 +508,7 @@ async function mergeSWPriceHistory() {
       }
     });
     if (added > 0) {
+      _histCache = null;
       try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
     }
     if (staleKeys.length > 0) {

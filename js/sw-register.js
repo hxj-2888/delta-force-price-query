@@ -7,7 +7,7 @@
 async function registerPeriodicSync() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    var reg = await navigator.serviceWorker.register('/sw.js?v=v20260731o');
+    var reg = await navigator.serviceWorker.register('/sw.js?v=v20260731p');
     console.log('[SW] 注册成功', reg.scope);
 
     if ('periodicSync' in reg) {
