@@ -31,7 +31,7 @@ Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 [Files]
 Source: ".\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; 排除安装器自身目录
-Excludes: "installer\*,.git\*,node_modules\*,miniprogram\*,miniprogram.zip,functions\*,api\*,workers\*,migrations\*,.env*,.gitignore,.vercelignore,_headers,vercel.json,wrangler.toml,DEPLOY.md,README.md,project.config.json,project.private.config.json,.vercel\*,.wrangler\*"
+Excludes: "installer\*,.git\*,node_modules\*,miniprogram\*,miniprogram.zip,functions\*,api\*,workers\*,migrations\*,test\*,.env*,.gitignore,.vercelignore,_headers,vercel.json,wrangler.toml,DEPLOY.md,README.md,project.config.json,project.private.config.json,.vercel\*,.wrangler\*"
 
 [Dirs]
 Name: "{app}"; Permissions: users-full
