@@ -52,7 +52,7 @@ module.exports = async function handler(req, res) {
         .status(200)
         .setHeader('Content-Type', 'application/json; charset=utf-8')
         .setHeader('Access-Control-Allow-Origin', '*')
-        .setHeader('Cache-Control', 'public, max-age=1800, s-maxage=3600')
+        .setHeader('Cache-Control', 'public, max-age=1800, s-maxage=1800')
         .send(raw);
       return;
     } catch (err) {
@@ -146,7 +146,7 @@ module.exports = async function handler(req, res) {
       .status(200)
       .setHeader('Content-Type', 'application/json; charset=utf-8')
       .setHeader('Access-Control-Allow-Origin', '*')
-      .setHeader('Cache-Control', 'no-cache, s-maxage=600')
+      .setHeader('Cache-Control', 'public, max-age=60, s-maxage=60')
       .send(data);
   } catch (err) {
     console.error('[API代理错误]', err.message);
