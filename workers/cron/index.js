@@ -74,8 +74,10 @@ async function backfillMissingDays(env, priceData) {
       }
 
       console.log(`[Backfill] ${dateStr} 仅 ${row ? row.cnt : 0} 条，补录中...`);
+      // ★ INSERT OR IGNORE: 只补缺失行, 不覆盖当天已有的真实历史数据
+      //   补录的数据用当前价格近似, 仅作缺口占位（避免 30 天曲线断点）
       const stmts = items.map(item =>
-        env.DB.prepare(`INSERT OR REPLACE INTO price_history (item_id, price, name, recorded_date) VALUES (?, ?, ?, ?)`)
+        env.DB.prepare(`INSERT OR IGNORE INTO price_history (item_id, price, name, recorded_date) VALUES (?, ?, ?, ?)`)
           .bind(item.id, item.price, item.name || '', dateStr)
       );
 
@@ -135,7 +137,7 @@ async function collectDailyPrices(env, priceData) {
   }
 }
 
-// ===== 每周元数据刷新 =====
+// ===== 每日增量元数据刷新（全量翻页，直到找到全部新物品）=====
 async function refreshMetadata(env, priceData, token) {
   if (!env.METADATA_KV) { console.error('[Cron-meta] METADATA_KV 未绑定'); return; }
 
@@ -143,7 +145,6 @@ async function refreshMetadata(env, priceData, token) {
     // Step 1: 提取全量物品 ID（复用已拉取的 priceData）
     const priceItemIds = new Set();
     priceData.data.forEach(item => { if (item.id) priceItemIds.add(Number(item.id)); if (item.tid) priceItemIds.add(Number(item.tid)); });
-    console.log(`[Cron-meta] item_price_all 有 ${priceItemIds.size} 个唯一物品 ID`);
 
     // Step 2: 读取现有 KV 元数据
     let existingMeta = {};
@@ -157,64 +158,68 @@ async function refreshMetadata(env, priceData, token) {
     console.log(`[Cron-meta] KV 现有 ${existingIds.size} 个物品元数据`);
 
     // Step 3: 找出新 ID
-    const newIds = [];
-    priceItemIds.forEach(id => {
-      if (!existingIds.has(id) && id > 0) newIds.push(id);
-    });
-    console.log(`[Cron-meta] 发现 ${newIds.length} 个新物品 ID`);
+    const newIdSet = new Set();
+    priceItemIds.forEach(id => { if (!existingIds.has(id) && id > 0) newIdSet.add(id); });
+    console.log(`[Cron-meta] 发现 ${newIdSet.size} 个新物品 ID`);
 
-    if (newIds.length === 0) {
-      console.log('[Cron-meta] 无需更新，退出');
-      return;
-    }
+    if (newIdSet.size === 0) { console.log('[Cron-meta] 无需更新，退出'); return; }
 
-    // Step 4: 并行拉取 10 个分类的 page 1
-    console.log('[Cron-meta] 并行拉取 10 个分类的 item_list page 1...');
-    const newIdSet = new Set(newIds);
-
-    const itemListPromises = CATS.map(cat => {
-      const url = `https://${API_HOST}${API_PATH}/item_list?types=${cat}&p=1&token=${encodeURIComponent(token)}`;
-      return fetch(url, {
-        headers: { 'User-Agent': 'DeltaForceMetaRefresh/1.0', 'Accept': 'application/json' },
-      }).then(r => r.ok ? r.json() : null)
-        .catch(() => null)
-        .then(data => ({ cat, data }));
-    });
-
-    const itemListResults = await Promise.all(itemListPromises);
-
-    // Step 5: 从 page 1 提取新物品的元数据
+    // Step 4: 逐分类翻页扫描，直到所有新物品都被找到（或翻完全部分类）
     let newCount = 0;
-    for (const { cat, data } of itemListResults) {
-      if (!data || data.code !== 0 || !Array.isArray(data.data)) {
-        console.warn(`[Cron-meta] ${cat} 返回异常，跳过`);
-        continue;
-      }
-      for (const item of data.data) {
-        if (!item.id) continue;
-        const id = Number(item.id);
-        const tid = item.tid ? Number(item.tid) : 0;
-        if (!newIdSet.has(id) && !(tid && newIdSet.has(tid))) continue;
+    for (const cat of CATS) {
+      if (newIdSet.size === 0) break;
+      let page = 1;
+      let totalPages = 1;
+      while (page <= totalPages && newIdSet.size > 0) {
+        const url = `https://${API_HOST}${API_PATH}/item_list?types=${cat}&p=${page}&token=${encodeURIComponent(token)}`;
+        let data = null;
+        try {
+          const resp = await fetch(url, {
+            headers: { 'User-Agent': 'DeltaForceMetaRefresh/1.0', 'Accept': 'application/json' },
+          });
+          if (resp.ok) data = await resp.json();
+        } catch (e) {
+          console.warn(`[Cron-meta] ${cat} p${page} 请求失败:`, e.message);
+          break;
+        }
+        if (!data || data.code !== 0 || !Array.isArray(data.data)) {
+          console.warn(`[Cron-meta] ${cat} p${page} 返回异常，跳过该分类`);
+          break;
+        }
 
-        const meta = { _category: cat };
-        META_FIELDS.forEach(f => {
-          if (item[f] !== undefined && item[f] !== null && item[f] !== '') {
-            meta[f] = item[f];
-          }
-        });
-        existingMeta[String(id)] = meta;
-        newIdSet.delete(id);
-        if (tid) newIdSet.delete(tid);
-        newCount++;
+        if (page === 1) {
+          const perPage = data.data.length || 10;
+          totalPages = Math.ceil((data.count || data.data.length) / perPage) || 1;
+        }
+
+        for (const item of data.data) {
+          if (!item.id) continue;
+          const id = Number(item.id);
+          const tid = item.tid ? Number(item.tid) : 0;
+          if (!newIdSet.has(id) && !(tid && newIdSet.has(tid))) continue;
+
+          const meta = { _category: cat };
+          META_FIELDS.forEach(f => {
+            if (item[f] !== undefined && item[f] !== null && item[f] !== '') {
+              meta[f] = item[f];
+            }
+          });
+          existingMeta[String(id)] = meta;
+          newIdSet.delete(id);
+          if (tid) newIdSet.delete(tid);
+          newCount++;
+        }
+        page++;
       }
     }
 
-    // Step 6: 写回 KV
+    // Step 5: 写回 KV
     if (newCount > 0) {
       await env.METADATA_KV.put('metadata', JSON.stringify(existingMeta));
-      console.log(`[Cron-meta] 完成: ${newCount} 个新物品元数据已写入 KV, 总计 ${Object.keys(existingMeta).length} 件`);
+      console.log(`[Cron-meta] 完成: ${newCount} 个新物品元数据已写入 KV, 总计 ${Object.keys(existingMeta).length} 件` +
+        (newIdSet.size > 0 ? `，仍有 ${newIdSet.size} 个未找到（可能在深分页或已下架，下次重试）` : ''));
     } else {
-      console.log('[Cron-meta] 未能在 page 1 中找到新物品的元数据（可能在更后面的页，下周重试）');
+      console.log('[Cron-meta] 未找到新物品的元数据（可能在深分页或已下架，下次重试）');
     }
   } catch (err) {
     console.error('[Cron-meta] 执行失败:', err.message);
