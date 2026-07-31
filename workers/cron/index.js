@@ -47,6 +47,24 @@ async function runScheduled(env, ctx) {
 
   // 任务 2: 增量刷新元数据到 KV（仅检查是否有新物品）
   await refreshMetadata(env, priceData, token);
+
+  // 任务 3: 每月 1 日清理 180 天前的历史数据（控制 D1 体积）
+  await monthlyCleanup(env);
+}
+
+// ===== 每月数据清理（每月 1 日删除 180 天前的历史记录）=====
+async function monthlyCleanup(env) {
+  if (!env.DB) return;
+  try {
+    const beijingNow = new Date(new Date().getTime() + 8 * 3600 * 1000);
+    if (beijingNow.getUTCDate() !== 1) return; // 仅北京时间每月 1 日执行
+    const result = await env.DB.prepare(
+      `DELETE FROM price_history WHERE recorded_date < date('now', '+8 hours', '-180 days')`
+    ).run();
+    console.log(`[Cron-cleanup] 已清理 180 天前的历史数据, ${result.meta.changes} 行`);
+  } catch (e) {
+    console.error('[Cron-cleanup] 清理失败:', e.message);
+  }
 }
 
 // ===== 补录缺失天（最多回溯 3 天，防止 API 超时/D1 故障造成永久缺口） =====
