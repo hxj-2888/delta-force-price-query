@@ -97,3 +97,22 @@ npm i -g wrangler && wrangler pages deploy .
 ├── .env                # API Token 配置（本地，不入库）
 └── delta-force-logo.png
 ```
+
+---
+
+## 开发与自动化
+
+```bash
+npm run build              # 重建 js/bundle.js 并同步版本号（修改 js/ 后必须执行）
+npm run check              # 校验 bundle 与源码/版本号一致（不写文件）
+npm test                   # 单元 + 冒烟测试（限流/静态服务/元数据/bundle）
+npm run lint               # 全项目 JS 语法检查
+npm run generate-metadata  # 重新生成 data/metadata.json
+```
+
+CI 流程（push 到 main 自动执行）：
+
+1. `check`：语法检查 → 单元/冒烟测试 → bundle 一致性校验，任一失败即阻止部署；
+2. 双平台部署：Cloudflare Pages（delta-force-v5）+ Vercel（delta-force-price-query）；
+3. `smoke-test`：部署后自动验证两个平台的首页和 `/api/metadata` 均可访问；
+4. 每周一 11:00（北京时间）自动重新生成元数据，有变化则提交并重新部署。

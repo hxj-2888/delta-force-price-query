@@ -1,0 +1,55 @@
+# ===== 每周自动刷新物品元数据 =====
+# 重新生成 data/metadata.json（走已部署的 /api/proxy，无需本地 Token），
+# 有变化则提交到 main，并显式调用 deploy.yml 立即重新部署。
+# 依赖: GITHUB_TOKEN 的 contents: write 权限（仓库默认自带，无需额外配置）
+
+name: metadata-refresh
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # 每周一 03:00 UTC = 北京时间 11:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    name: Regenerate metadata.json
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate metadata
+        run: node scripts/generate-metadata.js
+
+      - name: Commit if changed
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/metadata.json
+          if git diff --cached --quiet; then
+            echo "元数据无变化，无需提交"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: 每周自动刷新物品元数据"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # GITHUB_TOKEN 推送不会自动触发 deploy.yml（GitHub 防递归机制），
+  # 因此有变化时显式调用部署流程，保证元数据立即上线
+  deploy:
+    name: Redeploy after metadata change
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml

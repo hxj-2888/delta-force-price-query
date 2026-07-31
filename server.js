@@ -10,8 +10,9 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { createRateLimiter, DEFAULTS } = require('./scripts/rate-limit.cjs');
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 const API_HOST = 'orzice.com';
 const API_PATH = '/workApi/v1/sjz_api';
 
@@ -92,39 +93,16 @@ function isAuthorizedOrigin(req) {
 }
 
 // ===== 简单内存限流（单机使用, 防止本机页面/脚本刷上游配额） =====
-var rateWindows = {};
-var rateGlobal = [];
-var RATE_WINDOW_MS = 60 * 1000;
-var RATE_MAX_PER_IP = 120;   // 每 IP 每分钟
-var RATE_MAX_GLOBAL = 600;   // 全局每分钟
+// 逻辑见 scripts/rate-limit.cjs（规范实现），可通过环境变量覆盖阈值（测试用）
+var checkRateLimit = createRateLimiter({
+  windowMs: Number(process.env.RATE_WINDOW_MS || DEFAULTS.windowMs),
+  maxPerIp: Number(process.env.RATE_MAX_PER_IP || DEFAULTS.maxPerIp),
+  maxGlobal: Number(process.env.RATE_MAX_GLOBAL || DEFAULTS.maxGlobal)
+});
 
 function getClientIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
          req.socket.remoteAddress || 'unknown';
-}
-
-function checkRateLimit(req) {
-  var now = Date.now();
-  var ip = getClientIp(req);
-
-  // 清理过期窗口
-  Object.keys(rateWindows).forEach(function(k) {
-    if (now - rateWindows[k].ts > RATE_WINDOW_MS) delete rateWindows[k];
-  });
-  rateGlobal = rateGlobal.filter(function(t) { return now - t < RATE_WINDOW_MS; });
-
-  var entry = rateWindows[ip];
-  if (!entry || now - entry.ts > RATE_WINDOW_MS) {
-    entry = { ts: now, count: 0 };
-    rateWindows[ip] = entry;
-  }
-  entry.count++;
-
-  if (entry.count > RATE_MAX_PER_IP || rateGlobal.length >= RATE_MAX_GLOBAL) {
-    return false;
-  }
-  rateGlobal.push(now);
-  return true;
 }
 
 function proxyApi(req, res) {
@@ -133,7 +111,7 @@ function proxyApi(req, res) {
     res.end(JSON.stringify({ code: -1, msg: '未授权的来源' }));
     return;
   }
-  if (!checkRateLimit(req)) {
+  if (!checkRateLimit(getClientIp(req))) {
     res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' });
     res.end(JSON.stringify({ code: -1, msg: '请求过于频繁, 请稍后再试' }));
     return;
