@@ -19,6 +19,11 @@ setup.bat
 start.bat
 server.js
 package-lock.json
+installer/
+dist/
+
+# 仓库元数据
+.github/
 
 # 源 JS 文件（线上仅使用 js/bundle.js，源文件暴露无压缩源码）
 js/config.js
@@ -28,12 +33,6 @@ js/api.js
 js/store/
 js/render/
 js/app/
-
-# 版本控制
-.git/
-.gitignore
-.gitattributes
-.vercelignore
 
 # 小程序（独立部署，不走网页端）
 miniprogram/

@@ -1,0 +1,68 @@
+<!-- 价格异动页 -->
+<view class="nav-bar">
+  <view class="nav-title">价格异动</view>
+  <view class="nav-actions">
+    <button class="sort-btn {{direction === 'up' ? 'active' : ''}}" bindtap="setDirection" data-dir="up">涨幅榜</button>
+    <button class="sort-btn {{direction === 'down' ? 'active' : ''}}" bindtap="setDirection" data-dir="down">跌幅榜</button>
+    <text class="nav-action" bindtap="refreshMovers">刷新</text>
+  </view>
+</view>
+
+<!-- 时段选择 -->
+<view class="filter-bar">
+  <button class="sort-btn {{period === 'bl' ? 'active' : ''}}" bindtap="setPeriod" data-period="bl">今日</button>
+  <button class="sort-btn {{period === 'day_3_bl' ? 'active' : ''}}" bindtap="setPeriod" data-period="day_3_bl">近3天</button>
+  <button class="sort-btn {{period === 'day_7_bl' ? 'active' : ''}}" bindtap="setPeriod" data-period="day_7_bl">近7天</button>
+  <button class="sort-btn {{period === 'local_1d' ? 'active' : ''}}" bindtap="setPeriod" data-period="local_1d">本地1天</button>
+  <button class="sort-btn {{period === 'local_3d' ? 'active' : ''}}" bindtap="setPeriod" data-period="local_3d">本地3天</button>
+  <button class="sort-btn {{period === 'local_7d' ? 'active' : ''}}" bindtap="setPeriod" data-period="local_7d">本地7天</button>
+</view>
+
+<!-- 价格范围 -->
+<view class="filter-bar">
+  <button class="sort-btn {{range === 'all' ? 'active' : ''}}" bindtap="setRange" data-range="all">全部</button>
+  <button class="sort-btn {{range === '1-10w' ? 'active' : ''}}" bindtap="setRange" data-range="1-10w">1-10万</button>
+  <button class="sort-btn {{range === '10-100w' ? 'active' : ''}}" bindtap="setRange" data-range="10-100w">10-100万</button>
+  <button class="sort-btn {{range === '100w+' ? 'active' : ''}}" bindtap="setRange" data-range="100w+">100万以上</button>
+</view>
+
+<!-- 统计 -->
+<view class="list-stats" wx:if="{{items.length > 0}}">
+  <text>{{periodLabel}} {{directionLabel}} 前 {{items.length}} · 按涨跌幅排序</text>
+  <text>点击物品查看详情</text>
+</view>
+
+<!-- 加载中 -->
+<view class="loading-container" wx:if="{{loading}}">
+  <view class="loading-spinner"></view>
+  <view class="loading-text">加载中...</view>
+</view>
+
+<!-- 空状态 -->
+<view class="empty-container" wx:elif="{{items.length === 0 && !loading}}">
+  <view class="empty-icon">-</view>
+  <view class="empty-text">{{emptyText}}</view>
+</view>
+
+<!-- 列表 -->
+<view wx:for="{{items}}" wx:key="id" class="item-card" data-id="{{item.id}}" bindtap="openDetail">
+  <view class="grade-diamond" wx:if="{{item.gradeDiamond}}" style="background:{{item.gradeColor}}"></view>
+  <view class="item-pic">
+    <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}"></image>
+    <text wx:else>-</text>
+  </view>
+  <view class="item-info">
+    <view class="item-name-row">
+      <text class="item-name">{{item.name}}</text>
+      <text class="item-grade" wx:if="{{item.gradeText}}" style="color:{{item.gradeColor}}">{{item.gradeText}}</text>
+    </view>
+    <view class="item-price-row">
+      <text class="item-price">¥{{item.priceFormatted}}</text>
+      <text class="item-change {{item.changeClass}}">{{item.changeFormatted}}</text>
+    </view>
+    <view class="progress-bar">
+      <view class="progress-fill" style="width:{{item.barWidth}}%;background:{{item.barColor}}"></view>
+    </view>
+  </view>
+  <text class="item-arrow">›</text>
+</view>

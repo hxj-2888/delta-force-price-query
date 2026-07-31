@@ -7,23 +7,9 @@
   "scripts": {
     "start": "node server.js",
     "build": "node -e \"if(require('fs').existsSync('scripts/build.js'))require('child_process').execSync('node scripts/build.js',{stdio:'inherit'})\"",
+    "check": "node scripts/build.js --check",
     "generate-metadata": "node scripts/generate-metadata.js",
     "predeploy": "node scripts/build.js"
-  },
-  "pkg": {
-    "assets": [
-      "index.html",
-      "manifest.json",
-      "sw.js",
-      "css/**/*",
-      "js/**/*",
-      "delta-force-logo.png",
-      ".env.example"
-    ],
-    "targets": [
-      "node18-win-x64"
-    ],
-    "outputPath": "dist"
   },
   "keywords": ["三角洲行动", "价格查询", "变卖物"],
   "author": "",

@@ -9,12 +9,42 @@ const API_PATH = '/workApi/v1/sjz_api';
 
 // ★ 上游 API Token — 必须在 Cloudflare Dashboard 中设置 API_TOKEN 环境变量
 
+// ========== 简单内存限流 ==========
+// 说明: 模块级计数器按 isolate 生效, 各边缘节点独立统计; 对个人工具足够,
+//       如需跨节点全局限流, 可改用 CF Rate Limiting 或 KV 计数。
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_MAX_PER_IP = 120;   // 每 IP 每分钟
+const RATE_MAX_GLOBAL = 600;   // 每 isolate 每分钟
+const rateWindows = new Map();
+let rateGlobal = [];
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+
+  // 清理过期窗口
+  for (const [key, entry] of rateWindows) {
+    if (now - entry.ts > RATE_WINDOW_MS) rateWindows.delete(key);
+  }
+  rateGlobal = rateGlobal.filter(t => now - t < RATE_WINDOW_MS);
+
+  const entry = rateWindows.get(ip) || { ts: now, count: 0 };
+  entry.count++;
+  rateWindows.set(ip, entry);
+
+  if (entry.count > RATE_MAX_PER_IP || rateGlobal.length >= RATE_MAX_GLOBAL) {
+    return false;
+  }
+  rateGlobal.push(now);
+  return true;
+}
+
 // ========== HTTP 请求处理 ==========
 
 function isAuthorizedOrigin(request) {
   const siteOrigin = new URL(request.url).origin;
   const origin = request.headers.get('origin');
   const fetchSite = request.headers.get('sec-fetch-site');
+  // 浏览器跨站请求直接拒绝（Fetch Metadata 头 JS 不可伪造）
   if (fetchSite === 'cross-site') return false;
   if (!origin) return true;
   if (origin === siteOrigin) return true;
@@ -36,6 +66,15 @@ export async function onRequest(context) {
         'Access-Control-Allow-Headers': '*',
         'Access-Control-Max-Age': '86400',
       },
+    });
+  }
+
+  // 限流（保护上游配额, 防止代理被爬虫/脚本滥用）
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return new Response(JSON.stringify({ code: -1, msg: '请求过于频繁, 请稍后再试' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' },
     });
   }
 

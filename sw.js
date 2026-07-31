@@ -10,6 +10,7 @@ const PROXY_URL = self.location.origin + '/api/proxy';
 const DB_NAME = 'deltaforce_price_db';
 const DB_VERSION = 2;  // ★ 与 store.js MAIN_DB_VERSION 保持一致
 const STORE_NAME = 'daily_prices';
+const STATIC_CACHE = 'deltaforce-static-v1';
 
 self.addEventListener('install', () => {
   console.log('[SW] install');
@@ -19,6 +20,44 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (e) => {
   console.log('[SW] activate');
   e.waitUntil(clients.claim());
+});
+
+// ★ fetch handler：满足 Chrome/Edge 的 PWA 可安装条件（要求 SW 注册 fetch 事件），
+//   同时提供轻量运行时缓存：HTML 网络优先，静态资源缓存优先（版本号 ?v= 保证更新）
+self.addEventListener('fetch', (e) => {
+  const url = new URL(e.request.url);
+
+  // 仅处理同源 GET，API 请求一律走网络（保证价格实时）
+  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
+
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    // HTML 网络优先：离线时回退缓存，保证已安装应用可打开
+    e.respondWith(
+      fetch(e.request)
+        .then((resp) => {
+          const copy = resp.clone();
+          caches.open(STATIC_CACHE).then((cache) => cache.put(url.pathname, copy));
+          return resp;
+        })
+        .catch(() => caches.match(url.pathname))
+    );
+    return;
+  }
+
+  // 静态资源（css/js/img/manifest 等）：缓存优先 + 后台更新
+  e.respondWith(
+    caches.open(STATIC_CACHE).then(async (cache) => {
+      const cached = await cache.match(e.request);
+      const network = fetch(e.request)
+        .then((resp) => {
+          if (resp.ok) cache.put(e.request, resp.clone());
+          return resp;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })
+  );
 });
 
 // Periodic Background Sync 主入口

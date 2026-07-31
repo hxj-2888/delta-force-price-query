@@ -1,0 +1,134 @@
+/* ========== 搜索页头部 ========== */
+.search-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: #1a1a2e;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.search-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.08);
+  border-radius: 22px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.search-input-wrap input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 14px;
+}
+.search-clear {
+  color: #666;
+  font-size: 16px;
+  padding: 0 6px;
+  display: none;
+}
+.search-clear.visible {
+  display: block;
+}
+.search-cancel {
+  color: #667eea;
+  font-size: 14px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+
+/* ========== 搜索提示 ========== */
+.search-hint {
+  text-align: center;
+  padding: 40px 30px 20px;
+}
+.hint-title {
+  font-size: 16px;
+  color: #aaa;
+  margin-bottom: 10px;
+}
+.hint-text {
+  font-size: 13px;
+  color: #666;
+}
+
+/* ========== 历史/收藏 ========== */
+.history-section {
+  padding: 0 16px;
+}
+.history-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #888;
+  padding: 12px 0 8px;
+  font-weight: 500;
+}
+.history-clear {
+  color: #f44336;
+  font-size: 12px;
+}
+.history-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.history-tag {
+  padding: 6px 14px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 16px;
+  font-size: 12px;
+  color: #aaa;
+}
+.history-tag:active {
+  background: rgba(102,126,234,0.2);
+  color: #aab8ff;
+}
+
+/* ========== 搜索结果 ========== */
+.search-result-header {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: #888;
+}
+.result-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  margin: 2px 12px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.result-item:active {
+  background: rgba(102,126,234,0.15);
+  border-color: rgba(102,126,234,0.3);
+}
+.item-pic-sm {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.3);
+  margin-right: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.item-pic-sm image {
+  width: 100%;
+  height: 100%;
+}
+.item-cat-tag {
+  font-size: 10px;
+  color: #667eea;
+  margin-left: 6px;
+  background: rgba(102,126,234,0.15);
+  padding: 2px 8px;
+  border-radius: 8px;
+}

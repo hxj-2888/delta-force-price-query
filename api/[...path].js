@@ -9,6 +9,33 @@ const https = require('https');
 const API_HOST = 'orzice.com';
 const API_PATH = '/workApi/v1/sjz_api';
 
+// ========== 简单内存限流 ==========
+// 说明: Serverless 实例级计数, 防止代理被脚本/爬虫刷爆上游配额; 全局限流可改用 Vercel WAF。
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_MAX_PER_IP = 120;   // 每 IP 每分钟
+const RATE_MAX_GLOBAL = 600;   // 每实例每分钟
+const rateWindows = new Map();
+let rateGlobal = [];
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+
+  for (const [key, entry] of rateWindows) {
+    if (now - entry.ts > RATE_WINDOW_MS) rateWindows.delete(key);
+  }
+  rateGlobal = rateGlobal.filter(t => now - t < RATE_WINDOW_MS);
+
+  const entry = rateWindows.get(ip) || { ts: now, count: 0 };
+  entry.count++;
+  rateWindows.set(ip, entry);
+
+  if (entry.count > RATE_MAX_PER_IP || rateGlobal.length >= RATE_MAX_GLOBAL) {
+    return false;
+  }
+  rateGlobal.push(now);
+  return true;
+}
+
 /** ★ 同源校验：阻止第三方站点通过浏览器 fetch 盗用 API_TOKEN */
 function isAuthorizedOrigin(req) {
   const origin = req.headers['origin'] || '';
@@ -38,6 +65,19 @@ module.exports = async function handler(req, res) {
       .setHeader('Access-Control-Allow-Headers', '*')
       .setHeader('Access-Control-Max-Age', '86400')
       .send('');
+    return;
+  }
+
+  // 限流（保护上游配额, 防止代理被爬虫/脚本滥用）
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+             (req.socket && req.socket.remoteAddress) || 'unknown';
+  if (!checkRateLimit(ip)) {
+    res
+      .status(429)
+      .setHeader('Content-Type', 'application/json; charset=utf-8')
+      .setHeader('Retry-After', '60')
+      .setHeader('Access-Control-Allow-Origin', '*')
+      .json({ code: -1, msg: '请求过于频繁, 请稍后再试' });
     return;
   }
 

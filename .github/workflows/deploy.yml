@@ -32,9 +32,26 @@ permissions:
   contents: read
 
 jobs:
+  # ===== 构建一致性校验: bundle.js 必须与 js/ 源码同步 =====
+  verify-bundle:
+    name: Verify bundle in sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check bundle & version consistency
+        run: node scripts/build.js --check
+
   # ===== Cloudflare Pages 正式版（delta-force-v5, 生产分支 main）=====
   deploy-cloudflare:
     name: Cloudflare Pages (production)
+    needs: verify-bundle
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -50,6 +67,7 @@ jobs:
   # ===== Vercel 生产环境（delta-force-price-query）=====
   deploy-vercel:
     name: Vercel (production)
+    needs: verify-bundle
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
