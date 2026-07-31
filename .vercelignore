@@ -45,6 +45,9 @@ DEPLOY.md
 # 构建工具
 scripts/
 
+# 测试代码（仅本地/git 使用）
+test/
+
 # 数据库迁移（仅开发用）
 migrations/
 
