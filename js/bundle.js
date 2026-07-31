@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260730m — 自动生成于 2026-07-30 04:46:00
+// v20260731o — 自动生成于 2026-07-31 06:42:28
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -3040,7 +3040,7 @@ async function refreshCurrentList() {
     if (document.getElementById('page-home').classList.contains('active')) {
       checkFavoritePriceChanges();
       renderHomeTopMover();
-      renderHomeMovers();
+      renderHomeMovers(false);
     }
   } catch (err) {
     console.error('刷新失败:', err);
@@ -3145,7 +3145,7 @@ async function refreshAllData() {
     markRefreshed();
 
     if (prevPage === 'home') {
-      renderHomeMovers();
+      renderHomeMovers(false);
       checkFavoritePriceChanges();
       renderHomeTopMover();
       toast('全部数据已刷新！（' + merged.length + ' 件）');
@@ -3326,7 +3326,7 @@ document.addEventListener('visibilitychange', function() {
         if (pageStack[pageStack.length - 1] === 'home') {
           checkFavoritePriceChanges();
           renderHomeTopMover();
-          renderHomeMovers();
+          renderHomeMovers(false);
         }
         preWarmFavTab();
       }).catch(function(){});
