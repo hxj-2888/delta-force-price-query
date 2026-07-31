@@ -19,14 +19,8 @@ start.bat
 server.js
 package-lock.json
 
-# 源 JS 文件（线上仅使用 js/bundle.js，避免上传未压缩源码）
-js/config.js
-js/utils.js
-js/maps.js
-js/api.js
-js/store/
-js/render/
-js/app/
+# js/ 模块源码已纳入版本控制（展示工程结构）；线上仍只用 js/bundle.js 单文件
+# 铁律：修改任何 js/ 源文件后必须运行 node scripts/build.js 重建 bundle 再部署
 
 # 版本控制
 .git/
