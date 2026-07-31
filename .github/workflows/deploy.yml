@@ -1,0 +1,56 @@
+# ===== GitHub Actions — 双平台自动部署 =====
+# 触发: push 到 main（或手动 workflow_dispatch）
+# 效果: 自动部署 Cloudflare Pages 正式版 + Vercel 生产环境
+# 依赖 GitHub Secrets（Settings → Secrets and variables → Actions）:
+#   CF_API_TOKEN     Cloudflare API Token（权限见 README/下方注释）
+#   VERCEL_TOKEN     Vercel Access Token（vercel.com/account/tokens）
+#   VERCEL_ORG_ID    team_Bdsai4tRCQlodMkUQOHj4pu0
+#   VERCEL_PROJECT_ID prj_CJEWLKoQnKm1YcikNZuUIBEzCpxY
+# 注意: 仓库根 wrangler.toml 的 D1/KV 绑定在 CI 中直接生效，
+#       CF API Token 需含 Pages/Workers Scripts/D1/KV 的 Edit 权限。
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ===== Cloudflare Pages 正式版（delta-force-v5, 生产分支 main）=====
+  deploy-cloudflare:
+    name: Cloudflare Pages (production)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: 63ebb412ea5aaa7b38f49b2eb93c534e
+          command: pages deploy . --project-name=delta-force-v5 --branch=main --commit-hash=${{ github.sha }}
+
+  # ===== Vercel 生产环境（delta-force-price-query）=====
+  deploy-vercel:
+    name: Vercel (production)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
