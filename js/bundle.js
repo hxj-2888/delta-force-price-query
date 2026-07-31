@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260731p — 自动生成于 2026-07-31 07:58:32
+// v20260731q — 自动生成于 2026-07-31 08:05:37
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -1600,31 +1600,54 @@ function generatePriceCurveSVG(pricePoints) {
     };
   });
 
-  function catmullRom(p0, p1, p2, p3, t) {
-    var t2 = t * t, t3 = t2 * t;
-    return 0.5 * (
-      (2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-    );
+  // 保单调三次 Hermite 插值(Fritsch–Carlson), 替代 Catmull-Rom。
+  // Catmull-Rom 在相邻两日价格落差大时会产生过冲: 曲线在两个数据点之间越过下界再折返,
+  // 造成图线"往回折"以及自交叠。保单调插值保证每段曲线单调、且取值不越出两端点范围。
+  function monotoneSmooth(dataPoints) {
+    var n = dataPoints.length;
+    var h = [], d = [], m = [];
+    var i;
+    for (i = 0; i < n - 1; i++) {
+      h[i] = (dataPoints[i + 1].x - dataPoints[i].x) || 1e-6;
+      d[i] = (dataPoints[i + 1].y - dataPoints[i].y) / h[i];
+    }
+    m[0] = d[0];
+    m[n - 1] = d[n - 2];
+    for (i = 1; i < n - 1; i++) {
+      m[i] = (d[i - 1] * d[i] <= 0) ? 0 : (d[i - 1] + d[i]) / 2;
+    }
+    for (i = 0; i < n - 1; i++) {
+      if (d[i] !== 0) {
+        var alpha = m[i] / d[i], beta = m[i + 1] / d[i];
+        var ab2 = alpha * alpha + beta * beta;
+        if (ab2 > 9) {
+          var tau = 3 / Math.sqrt(ab2);
+          m[i] = tau * alpha * d[i];
+          m[i + 1] = tau * beta * d[i];
+        }
+      }
+    }
+    function h00(t) { return 2 * t * t * t - 3 * t * t + 1; }
+    function h10(t) { return t * t * t - 2 * t * t + t; }
+    function h01(t) { return -2 * t * t * t + 3 * t * t; }
+    function h11(t) { return t * t * t - t * t; }
+    var out = [];
+    for (i = 0; i < n - 1; i++) {
+      var x0 = dataPoints[i].x, y0 = dataPoints[i].y;
+      var x1 = dataPoints[i + 1].x, y1 = dataPoints[i + 1].y;
+      var dx = x1 - x0;
+      var steps = Math.max(8, Math.round(dx / 0.8));
+      for (var s = 0; s < steps; s++) {
+        var t = s / steps;
+        var y = h00(t) * y0 + h10(t) * dx * m[i] + h01(t) * y1 + h11(t) * dx * m[i + 1];
+        out.push({ x: x0 + dx * t, y: y });
+      }
+    }
+    out.push({ x: dataPoints[n - 1].x, y: dataPoints[n - 1].y });
+    return out;
   }
 
-  var smoothPts = [];
-  for (var i = 0; i < dataPoints.length; i++) {
-    if (i === 0) {
-      smoothPts.push({ x: dataPoints[0].x, y: dataPoints[0].y });
-      continue;
-    }
-    var p0 = dataPoints[Math.max(0, i - 2)];
-    var p1 = dataPoints[i - 1];
-    var p2 = dataPoints[i];
-    var p3 = dataPoints[Math.min(dataPoints.length - 1, i + 1)];
-    var steps = Math.max(8, Math.round((p2.x - p1.x) / 0.8));
-    for (var s = 1; s <= steps; s++) {
-      var t = s / steps;
-      var cx = catmullRom(p0.x, p1.x, p2.x, p3.x, t);
-      var cy = catmullRom(p0.y, p1.y, p2.y, p3.y, t);
-      smoothPts.push({ x: cx, y: cy });
-    }
-  }
+  var smoothPts = monotoneSmooth(dataPoints);
 
   var pathD = '';
   smoothPts.forEach(function(p, idx) {
