@@ -1,16 +1,17 @@
-# 依赖
-node_modules/
-
 # 敏感文件 — 绝不上传
 .env
+.env.example
 .env.local
 .env.production
 
 # Cloudflare Workers 本地缓存
 .wrangler/
 
-# Vercel 本地配置
-.vercel/
+# Cloudflare 专属文件（Vercel 无需部署）
+functions/
+workers/
+_headers
+wrangler.toml
 
 # 本地开发/打包工具
 installer.iss
@@ -19,7 +20,7 @@ start.bat
 server.js
 package-lock.json
 
-# 源 JS 文件（线上仅使用 js/bundle.js，避免上传未压缩源码）
+# 源 JS 文件（线上仅使用 js/bundle.js，源文件暴露无压缩源码）
 js/config.js
 js/utils.js
 js/maps.js
@@ -30,7 +31,9 @@ js/app/
 
 # 版本控制
 .git/
+.gitignore
 .gitattributes
+.vercelignore
 
 # 小程序（独立部署，不走网页端）
 miniprogram/
