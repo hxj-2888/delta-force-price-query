@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // ===== server.js — Node.js 本地服务器 =====
 // 功能清单: 静态文件服务(MIME映射+路径消毒+黑名单) | API代理(/api/*→orzice.com) | CORS处理
 // .env文件读取(API_TOKEN) | 超时控制(15s) | 安全防护(目录遍历/敏感文件访问/来源校验/限流)

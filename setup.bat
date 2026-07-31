@@ -38,7 +38,7 @@ set "VBS=%TEMP%\shortcut.vbs"
 >> "%VBS%" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\三角洲行动-变卖物价格查询.lnk")
 >> "%VBS%" echo shortcut.TargetPath = "%INSTALL_DIR%\start.bat"
 >> "%VBS%" echo shortcut.WorkingDirectory = "%INSTALL_DIR%"
->> "%VBS%" echo shortcut.IconLocation = "%INSTALL_DIR%\delta-force-logo.png,0"
+>> "%VBS%" echo shortcut.IconLocation = "%INSTALL_DIR%\icon.ico,0"
 >> "%VBS%" echo shortcut.Description = "三角洲行动 - 变卖物实时价格查询"
 >> "%VBS%" echo shortcut.WindowStyle = 1
 >> "%VBS%" echo shortcut.Save
