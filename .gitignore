@@ -1,10 +1,12 @@
 # 依赖
 node_modules/
+package-lock.json
 
 # 敏感文件 — 绝不上传
 .env
 .env.local
 .env.production
+project.private.config.json
 
 # Cloudflare Workers 本地缓存
 .wrangler/
@@ -12,33 +14,10 @@ node_modules/
 # Vercel 本地配置
 .vercel/
 
-# 本地开发/打包工具
-installer.iss
-setup.bat
-start.bat
-server.js
-package-lock.json
-
-# js/ 模块源码已纳入版本控制（展示工程结构）；线上仍只用 js/bundle.js 单文件
-# 铁律：修改任何 js/ 源文件后必须运行 node scripts/build.js 重建 bundle 再部署
-
-# 版本控制
-.git/
-.gitattributes
-
-# 小程序（独立部署，不走网页端）
-miniprogram/
+# 构建产物/生成目录（源文件全部纳入版本控制）
+installer/
+dist/
 miniprogram.zip
-
-# 文档
-README.md
-DEPLOY.md
-
-# 构建工具
-scripts/
-
-# 数据库迁移（仅开发用）
-migrations/
 
 # 系统垃圾
 .DS_Store

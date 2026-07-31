@@ -1,0 +1,65 @@
+<!-- 列表页 -->
+<view class="nav-bar">
+  <view class="nav-back" bindtap="goBack">‹ 返回</view>
+  <view class="nav-title">{{title}}</view>
+  <view class="nav-actions">
+    <text class="nav-action" bindtap="refreshList">刷新</text>
+    <text class="nav-action" bindtap="goToSearch">搜索</text>
+  </view>
+</view>
+
+<view class="list-stats" wx:if="{{items.length > 0}}">
+  <text>共 {{totalCount}} 件 · 第 {{currentPage}}/{{totalPages}} 页</text>
+  <text wx:if="{{lastUpdateTime}}">更新于 {{lastUpdateTime}}</text>
+</view>
+
+<view class="sort-bar">
+  <button class="sort-btn {{sortBy === 'price' ? 'active' : ''}}" bindtap="setSort" data-field="price">
+    价格<text class="sort-dir">{{sortDirPrice}}</text>
+  </button>
+  <button class="sort-btn {{sortBy === 'change' ? 'active' : ''}}" bindtap="setSort" data-field="change">
+    涨跌幅<text class="sort-dir">{{sortDirChange}}</text>
+  </button>
+</view>
+
+<!-- 加载中 -->
+<view class="loading-container" wx:if="{{loading}}">
+  <view class="loading-spinner"></view>
+  <view class="loading-text">加载中...</view>
+</view>
+
+<!-- 空状态 -->
+<view class="empty-container" wx:elif="{{items.length === 0 && !loading}}">
+  <view class="empty-icon">-</view>
+  <view class="empty-text">暂无物品数据</view>
+</view>
+
+<!-- 列表 -->
+<view wx:for="{{pageItems}}" wx:key="id" class="item-card" data-id="{{item.id}}" bindtap="openDetail">
+  <view class="grade-diamond" wx:if="{{item.gradeDiamond}}" style="background:{{item.gradeColor}}"></view>
+  <view class="item-pic">
+    <image src="{{item.pic}}" mode="aspectFit" wx:if="{{item.pic}}"></image>
+    <text class="pic-placeholder" wx:else>-</text>
+  </view>
+  <view class="item-info">
+    <view class="item-name-row">
+      <text class="item-name">{{item.name}}</text>
+      <text class="item-grade" wx:if="{{item.gradeText}}" style="color:{{item.gradeColor}}">{{item.gradeText}}</text>
+    </view>
+    <view class="item-price-row">
+      <text class="item-price">¥{{item.priceFormatted}}</text>
+      <text class="item-change {{item.changeClass}}">{{item.changeFormatted}}</text>
+    </view>
+    <view class="item-attrs" wx:if="{{item.attrText}}">
+      <text class="item-attrs-text">{{item.attrText}}</text>
+    </view>
+  </view>
+  <text class="item-arrow">›</text>
+</view>
+
+<!-- 分页 -->
+<view class="pagination" wx:if="{{totalPages > 1}}">
+  <button class="page-btn {{currentPage <= 1 ? 'disabled' : ''}}" bindtap="goToPage" data-page="{{currentPage - 1}}">◀</button>
+  <button class="page-btn {{page === currentPage ? 'active' : ''}}" wx:for="{{pageButtons}}" wx:key="*this" bindtap="goToPage" data-page="{{item}}">{{item}}</button>
+  <button class="page-btn {{currentPage >= totalPages ? 'disabled' : ''}}" bindtap="goToPage" data-page="{{currentPage + 1}}">▶</button>
+</view>
