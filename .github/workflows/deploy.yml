@@ -9,12 +9,13 @@
 # 注意: 仓库根 wrangler.toml 的 D1/KV 绑定在 CI 中直接生效，
 #       CF API Token 需含 Pages/Workers Scripts/D1/KV 的 Edit 权限。
 #
-# Vercel 部署历史:
-#   amondnet/vercel-action@v20 — 部署成功但 post-deploy `vercel inspect` 报 "User not found"，job 红 X
-#   官方 CLI 方案（pull/build/--prebuilt）— `vercel pull` 报 "Could not retrieve Project Settings"
-#     （根因: VERCEL_TOKEN 作用域不足以解析 team/user，详见 https://vercel.link/cannot-load-project-settings）
-#   现用 amondnet/vercel-action@v42（最新大版本，Node 24），若仍红 X 则需换 VERCEL_TOKEN（
-#     到 vercel.com/account/tokens 用本人账号重新生成，并确保对 team 有部署+读取权限）
+# Vercel 部署历史（踩坑记录）:
+#   amondnet/vercel-action@v20 — 部署成功(vercel@58) 但 post-deploy `vercel inspect` 报 "User not found"
+#   amondnet/vercel-action@v42 — 用 vercel@50 部署，"Could not retrieve Project Settings"（token 与 50.x 不兼容）
+#   官方 CLI 方案 pull/build/--prebuilt — `vercel pull` 同样报 "Could not retrieve Project Settings"
+#   ★ 最终方案 = @v20 + `vercel-project-name`：提供项目名后 action 不再调 `vercel inspect`
+#     （源码: deploymentName = vercelProjectName || await vercelInspect(...)），假失败消除。
+#     若 VERCEL_TOKEN 到期或换人维护，在 vercel.com/account/tokens 重新生成即可。
 
 name: deploy
 
@@ -55,9 +56,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v42
+        uses: amondnet/vercel-action@v20
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-project-name: delta-force-price-query
           vercel-args: '--prod'
