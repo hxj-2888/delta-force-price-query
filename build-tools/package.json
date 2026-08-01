@@ -1,0 +1,11 @@
+{
+  "name": "delta-force-build-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "本地构建工具：terser + clean-css，用于生成受保护的部署副本",
+  "license": "MIT",
+  "dependencies": {
+    "clean-css": "^5.3.3",
+    "terser": "^5.49.0"
+  }
+}

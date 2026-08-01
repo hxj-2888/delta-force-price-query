@@ -1,6 +1,7 @@
 # 依赖
 node_modules/
 package-lock.json
+!build-tools/package-lock.json
 
 # 敏感文件 — 绝不上传
 .env
@@ -17,6 +18,7 @@ project.private.config.json
 # 构建产物/生成目录（源文件全部纳入版本控制）
 installer/
 dist/
+_dist/
 miniprogram.zip
 
 # 系统垃圾
