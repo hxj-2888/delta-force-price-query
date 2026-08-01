@@ -64,19 +64,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install build tools
-        run: npm ci --prefix build-tools --no-audit --no-fund
-
-      - name: Protect build (obfuscate JS/CSS, strip comments, security headers)
-        run: node protect-build.js
-
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: 63ebb412ea5aaa7b38f49b2eb93c534e
-          workingDirectory: _dist
-          command: pages deploy --project-name=delta-force-v5 --branch=main --commit-hash=${{ github.sha }}
+          command: pages deploy . --project-name=delta-force-v5 --branch=main --commit-hash=${{ github.sha }}
 
   # ===== Vercel 生产环境（delta-force-price-query）=====
   deploy-vercel:
