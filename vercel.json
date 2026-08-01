@@ -1,7 +1,8 @@
 {
   "version": 2,
   "framework": null,
-  "outputDirectory": ".",
+  "buildCommand": "npm ci --prefix build-tools --no-audit --no-fund && node protect-build.js",
+  "outputDirectory": "_dist",
   "headers": [
     {
       "source": "/",
