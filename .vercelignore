@@ -19,7 +19,6 @@ setup.bat
 start.bat
 server.js
 package-lock.json
-!build-tools/package-lock.json
 installer/
 dist/
 
