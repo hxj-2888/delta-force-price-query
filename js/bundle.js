@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260731q — 自动生成于 2026-07-31 08:05:37
+// v20260803n — 自动生成于 2026-08-03 05:58:05
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -1459,7 +1459,7 @@ function setHomeSort(sortBy, sortDir) {
   if (sortBy === 'default') {
     labelText = '综合↓';
   } else if (sortBy === 'change') {
-    labelText = '涨跌幅' + (sortDir === 'desc' ? '↓' : '↑');
+    labelText = '涨跌幅';
   } else {
     labelText = '价格' + (sortDir === 'desc' ? '↓' : '↑');
   }
@@ -1513,7 +1513,7 @@ function applyHomeBrowseState(state) {
 
   var sortLabelText;
   if (homeSortBy === 'default') sortLabelText = '综合↓';
-  else if (homeSortBy === 'change') sortLabelText = '涨跌幅' + (homeSortDir === 'desc' ? '↓' : '↑');
+  else if (homeSortBy === 'change') sortLabelText = '涨跌幅';
   else sortLabelText = '价格' + (homeSortDir === 'desc' ? '↓' : '↑');
   var sortEl = document.getElementById('sortLabel');
   if (sortEl) sortEl.textContent = sortLabelText;
@@ -2584,10 +2584,6 @@ function updateSortBar() {
   document.querySelectorAll('.sort-btn').forEach(function(btn) {
     var field = btn.dataset.sort;
     btn.classList.toggle('active', field === sortBy);
-  });
-  ['price', 'change'].forEach(function(f) {
-    var el = document.getElementById('dir-' + f);
-    if (el) el.textContent = (f === sortBy) ? (sortDir === 'desc' ? '↓' : '↑') : '';
   });
 }
 

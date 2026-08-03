@@ -170,7 +170,7 @@ function setHomeSort(sortBy, sortDir) {
   if (sortBy === 'default') {
     labelText = '综合↓';
   } else if (sortBy === 'change') {
-    labelText = '涨跌幅' + (sortDir === 'desc' ? '↓' : '↑');
+    labelText = '涨跌幅';
   } else {
     labelText = '价格' + (sortDir === 'desc' ? '↓' : '↑');
   }
@@ -224,7 +224,7 @@ function applyHomeBrowseState(state) {
 
   var sortLabelText;
   if (homeSortBy === 'default') sortLabelText = '综合↓';
-  else if (homeSortBy === 'change') sortLabelText = '涨跌幅' + (homeSortDir === 'desc' ? '↓' : '↑');
+  else if (homeSortBy === 'change') sortLabelText = '涨跌幅';
   else sortLabelText = '价格' + (homeSortDir === 'desc' ? '↓' : '↑');
   var sortEl = document.getElementById('sortLabel');
   if (sortEl) sortEl.textContent = sortLabelText;
