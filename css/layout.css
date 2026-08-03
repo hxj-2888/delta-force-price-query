@@ -1,20 +1,20 @@
-﻿/* ========== 椤甸潰鍒囨崲 ========== */
+﻿/* ========== 页面切换 ========== */
 .page { display: none; }
 .page.active { display: block; animation: fadeIn 0.3s ease; }
 .slide-in { animation: slideIn 0.3s ease; }
 
-/* ========== 棣栭〉澶撮儴 ========== */
+/* ========== 首页头部 ========== */
 .header { padding: 32px 12px 16px; text-align: center; background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2)); border-bottom: 1px solid rgba(255,255,255,0.05); }
 .header-logo { width: 84px; height: 84px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
 .header-title { font-size: 24px; font-weight: bold; color: #fff; letter-spacing: 2px; margin-bottom: 4px; }
 .header-subtitle { font-size: 13px; color: #8890b0; margin-bottom: 6px; }
 .header-info { font-size: 11px; color: #555; margin-top: 4px; }
 
-/* ========== 鎼滅储鏍?========== */
+/* ========== 搜索栏 ========== */
 .search-bar { display: flex; align-items: center; margin: 16px 12px; padding: 12px 18px; background: rgba(255,255,255,0.08); border-radius: 0; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
 .search-placeholder { color: #666; font-size: 14px; }
 
-/* ========== 鍒嗙被缃戞牸 ========== */
+/* ========== 分类网格 ========== */
 .category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 14px; }
 .category-card { display: flex; align-items: center; padding: 18px 16px; background: rgba(255,255,255,0.05); border-radius: 0; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: all 0.2s; }
 .category-card:active { background: rgba(102,126,234,0.2); border-color: rgba(102,126,234,0.4); transform: scale(0.97); }
@@ -26,7 +26,7 @@
 .category-card.all-items .cat-icon { font-size: 28px; }
 .category-card.all-items:active { background: linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,165,0,0.12)); }
 
-/* ========== 搴曢儴瀵艰埅 ========== */
+/* ========== 底部导航 ========== */
 .bottom-nav {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 500px; display: flex;
@@ -38,7 +38,7 @@
 .bottom-nav .tab .tab-label { font-size: 11px; }
 .bottom-nav .tab:active { opacity: 0.5; }
 
-/* ========== 瀵艰埅鏍?========== */
+/* ========== 导航栏 ========== */
 .nav-bar { display: flex; align-items: center; padding: 12px 16px; background: #1a1a2e; border-bottom: 1px solid rgba(255,255,255,0.05); position: sticky; top: 0; z-index: 10; }
 .nav-back { color: #667eea; font-size: 16px; cursor: pointer; width: 60px; }
 .nav-title { flex: 1; text-align: center; font-size: 17px; font-weight: bold; color: #fff; }
@@ -49,15 +49,14 @@
 .refresh-all { color: #667eea; font-size: 11px; cursor: pointer; margin-left: 8px; opacity: 0.7; transition: opacity 0.2s; }
 .refresh-all:hover { opacity: 1; }
 
-/* ========== 鍒楄〃缁熻 / 鎺掑簭 ========== */
+/* ========== 列表统计 / 排序 ========== */
 .list-stats { display: flex; justify-content: space-between; padding: 12px 20px; font-size: 12px; color: #888; background: rgba(255,255,255,0.02); }
 .sort-bar { display: flex; gap: 8px; padding: 8px 16px; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.04); }
 .sort-btn { font-size: 11px; padding: 6px 14px; border-radius: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #888; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
 .sort-btn:active { transform: scale(0.95); }
 .sort-btn.active { background: rgba(102,126,234,0.2); border-color: rgba(102,126,234,0.4); color: #aab8ff; }
-.sort-dir { margin-left: 2px; font-size: 10px; }
 
-/* ========== 鍒嗛〉 ========== */
+/* ========== 分页 ========== */
 .pagination { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 16px 12px; flex-wrap: wrap; }
 .page-btn { width: 34px; height: 34px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #aaa; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; user-select: none; }
 .page-btn:active { background: rgba(102,126,234,0.25); border-color: rgba(102,126,234,0.4); color: #fff; }
@@ -66,7 +65,7 @@
 .page-btn.arrow { font-size: 16px; }
 .page-info { font-size: 11px; color: #666; text-align: center; padding: 4px 12px; }
 
-/* ========== 鎼滅储椤靛ご閮?========== */
+/* ========== 搜索页头部 ========== */
 .search-header { display: flex; align-items: center; padding: 10px 14px; background: #1a1a2e; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .search-input-wrap { flex: 1; display: flex; align-items: center; background: rgba(255,255,255,0.08); border-radius: 0; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.1); }
 .search-input-wrap input { flex: 1; background: none; border: none; outline: none; color: #fff; font-size: 14px; }
@@ -131,4 +130,4 @@
 /* ========== 首页物品列表 ========== */
 .home-movers-section { margin: 0 12px 12px; }
 
-/* ========== 浜壊涓婚瑕嗙洊 ========== */
+/* ========== 亮点主题覆盖 ========== */

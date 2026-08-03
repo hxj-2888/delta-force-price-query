@@ -95,10 +95,6 @@ function updateSortBar() {
     var field = btn.dataset.sort;
     btn.classList.toggle('active', field === sortBy);
   });
-  ['price', 'change'].forEach(function(f) {
-    var el = document.getElementById('dir-' + f);
-    if (el) el.textContent = (f === sortBy) ? (sortDir === 'desc' ? '↓' : '↑') : '';
-  });
 }
 
 function resetSort() {
