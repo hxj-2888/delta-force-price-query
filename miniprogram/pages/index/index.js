@@ -87,10 +87,10 @@ Page({
         store.recordAllItemsPrices(cached._allItems);
         this.renderTopMover(cached._allItems);
         this.checkFavChanges();
-        // 后台刷新
-        api.loadAllItems(true).catch(() => {});
+        // 后台刷新（v2: 仅 1 次价格请求 + 元数据, 不再全量翻页）
+        api.loadAllItemsFast(true).catch(() => {});
       } else {
-        const items = await api.loadAllItems();
+        const items = await api.loadAllItemsFast();
         if (items && items.length > 0) {
           await this.updateCategoryIcons(items);
           store.recordAllItemsPrices(items);
@@ -252,7 +252,7 @@ Page({
     wx.showLoading({ title: '正在刷新全部数据...' });
     try {
       store.clearCache();
-      const items = await api.loadAllItems(true);
+      const items = await api.loadAllItemsFast(true);
       if (items && items.length > 0) {
         await this.updateCategoryIcons(items);
         store.recordAllItemsPrices(items);

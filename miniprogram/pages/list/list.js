@@ -53,17 +53,14 @@ Page({
           : cached._allItems.filter(i => i._category === this.data.categoryKey);
       }
       if (items.length === 0) {
-        if (this.data.isAllMode) {
-          items = await api.loadAllItems();
-        } else {
+        // v2: 用 2 请求全量（价格+元数据）本地过滤, 替代单分类全量翻页
+        items = await api.loadAllItemsFast();
+        if (!this.data.isAllMode) {
+          items = items.filter(i => i._category === this.data.categoryKey);
+        }
+        if (items.length === 0) {
+          // 兜底: 全量失败时退回单分类翻页
           items = await api.fetchCategoryAll(this.data.categoryKey);
-          // 合并回缓存
-          const c2 = store.getCache();
-          if (c2 && c2._allItems) {
-            const other = c2._allItems.filter(i => i._category !== this.data.categoryKey);
-            c2._allItems = other.concat(items);
-            store.setCache(c2);
-          }
         }
       }
       this.processItems(items);
@@ -205,18 +202,10 @@ Page({
   async refreshList() {
     wx.showLoading({ title: '刷新中...' });
     try {
-      store.clearCache();
-      let items;
-      if (this.data.isAllMode) {
-        items = await api.loadAllItems(true);
-      } else {
-        items = await api.fetchCategoryAll(this.data.categoryKey, true);
-        const c2 = store.getCache();
-        if (c2 && c2._allItems) {
-          const other = c2._allItems.filter(i => i._category !== this.data.categoryKey);
-          c2._allItems = other.concat(items);
-          store.setCache(c2);
-        }
+      // v2: 刷新 = 1 次价格请求 + 元数据, 本地过滤
+      let items = await api.loadAllItemsFast(true);
+      if (!this.data.isAllMode) {
+        items = items.filter(i => i._category === this.data.categoryKey);
       }
       this.processItems(items);
       wx.hideLoading();

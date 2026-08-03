@@ -72,7 +72,7 @@ Page({
     if (!cached || !cached._allItems) {
       const api = require('../../utils/api');
       try {
-        await api.loadAllItems();
+        await api.loadAllItemsFast();
       } catch (e) { }
     }
     this.loadFavorites();

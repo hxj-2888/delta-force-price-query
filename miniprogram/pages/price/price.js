@@ -39,7 +39,7 @@ Page({
     try {
       const cached = store.getCache();
       if (!cached || !cached._allItems || cached._allItems.length === 0) {
-        await api.loadAllItems();
+        await api.loadAllItemsFast();
       }
       this.computeMovers();
     } catch (e) {
