@@ -10,7 +10,7 @@ const PROXY_URL = self.location.origin + '/api/proxy';
 const DB_NAME = 'deltaforce_price_db';
 const DB_VERSION = 2;  // ★ 与 store.js MAIN_DB_VERSION 保持一致
 const STORE_NAME = 'daily_prices';
-const STATIC_CACHE = 'deltaforce-static-v1';
+const STATIC_CACHE = 'deltaforce-static-v2';  // ★ v2: 强制旧缓存失效, 让定时器降频/滚动条适配尽快生效
 
 self.addEventListener('install', () => {
   console.log('[SW] install');
@@ -19,7 +19,17 @@ self.addEventListener('install', () => {
 
 self.addEventListener('activate', (e) => {
   console.log('[SW] activate');
-  e.waitUntil(clients.claim());
+  e.waitUntil(
+    Promise.all([
+      clients.claim(),
+      // 清理旧版本静态缓存, 避免只增不减
+      caches.keys().then((keys) => Promise.all(
+        keys
+          .filter((k) => k.startsWith('deltaforce-static-') && k !== STATIC_CACHE)
+          .map((k) => caches.delete(k))
+      ))
+    ])
+  );
 });
 
 // ★ fetch handler：满足 Chrome/Edge 的 PWA 可安装条件（要求 SW 注册 fetch 事件），

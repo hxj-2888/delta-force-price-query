@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260805v — 自动生成于 2026-08-05 13:57:00
+// v20260805w — 自动生成于 2026-08-05 14:12:53
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -3282,7 +3282,8 @@ function startHomeAutoRefresh() {
     }
   }
   doAutoRefresh();
-  homeRefreshTimer = setInterval(doAutoRefresh, 300000);
+  // 自动刷新降频: 5 分钟 → 1 小时（减少后台活动与本地写入）
+  homeRefreshTimer = setInterval(doAutoRefresh, 3600000);
 }
 
 function stopHomeAutoRefresh() {
@@ -3305,7 +3306,8 @@ function doRecordDaily() {
 function startGlobalDailyRecord() {
   stopGlobalDailyRecord();
   doRecordDaily();
-  globalDailyRecordTimer = setInterval(doRecordDaily, 1800000);
+  // 价格记录降频: 30 分钟 → 1 小时
+  globalDailyRecordTimer = setInterval(doRecordDaily, 3600000);
 }
 
 function stopGlobalDailyRecord() {
@@ -3591,7 +3593,9 @@ renderHome();
 
 // ===== 自定义滚动条（桌面端） =====
 (function initCustomScrollbar() {
-  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+  // PC 滚动条适配: 只要主指针是鼠标就显示（触屏笔记本接鼠标也能看到滑钮），
+  // 纯触屏设备（手机/平板/触屏模式）交给系统滚动条
+  if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) {
     return;
   }
   var body = document.body;
