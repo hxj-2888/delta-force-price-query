@@ -144,6 +144,15 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
       // ★ 暴露重试入口
       running.retry = function() { location.reload(); };
 
+      // ★ 元数据补全补丁（v3 修复）: 上次补全学到的 name/分类 持久化到 localStorage,
+      //   避免元数据不完整时每次页面加载都重复拉 10 个分类第 1 页（10 次上游请求）。
+      var _metaPatchKey = 'deltaforce_meta_patch_v1';
+      var _metaPatch = {};
+      try {
+        var _patchRaw = localStorage.getItem(_metaPatchKey);
+        if (_patchRaw) _metaPatch = JSON.parse(_patchRaw) || {};
+      } catch (e) {}
+
       Promise.all([
         _fetchPriceAllWithRetry().then(function(r) { return r.json(); }),
         metadataPromise
@@ -172,6 +181,19 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
             }
           }
           return result;
+        });
+
+        // ★ 应用上次补全的补丁（减少未知物品, 避免重复触发 10 分类补全请求）
+        merged.forEach(function(item) {
+          var patch = _metaPatch[String(item.id)] || _metaPatch[String(item.tid)];
+          if (patch) {
+            item._category = patch._category || item._category;
+            item.name = patch.name || item.name;
+            item.pic = patch.pic || item.pic;
+            if (patch.grade !== undefined && patch.grade !== null) item.grade = patch.grade;
+            if (patch.secondClassCN) item.secondClassCN = patch.secondClassCN;
+            if (patch.objectID) item.objectID = patch.objectID;
+          }
         });
 
         // ★ 补充 metadata 中有但 item_price_all 中没有的物品（已下架/过期物品）
@@ -242,6 +264,15 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
                         if (apiItem.tid !== undefined && apiItem.tid !== null) uItem.tid = apiItem.tid;
                         if (apiItem.secondClassCN) uItem.secondClassCN = apiItem.secondClassCN;
                         if (apiItem.ShopSellType) uItem.ShopSellType = apiItem.ShopSellType;
+                        // 记录补丁, 下次加载直接使用, 不再重复请求
+                        _metaPatch[String(apiId)] = {
+                          _category: cat,
+                          name: apiItem.name || uItem.name,
+                          pic: apiItem.pic || uItem.pic || '',
+                          grade: apiItem.grade,
+                          secondClassCN: apiItem.secondClassCN,
+                          objectID: apiItem.objectID
+                        };
                         _patched++;
                       }
                     }
@@ -250,6 +281,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
               }
 
               if (_patched > 0) {
+                try { localStorage.setItem(_metaPatchKey, JSON.stringify(_metaPatch)); } catch (e) {}
                 console.log('[prefetch] 补全完成: ' + _patched + ' 个物品获得元数据');
               } else {
                 console.warn('[prefetch] item_list page1 未找到剩余未知物品的元数据');
@@ -584,8 +616,8 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   </div>
 
   <!-- Service Worker 注册（必须在 bundle 之前加载） -->
-  <script src="js/sw-register.js?v=v20260803n" defer></script>
+  <script src="js/sw-register.js?v=v20260805v" defer></script>
   <!-- ★ 单文件 bundle：减少 HTTP 请求 6→1，defer 不阻塞解析 -->
-  <script src="js/bundle.js?v=v20260803n" defer></script>
+  <script src="js/bundle.js?v=v20260805v" defer></script>
 </body>
 </html>

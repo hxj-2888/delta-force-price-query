@@ -15,6 +15,8 @@ if (typeof navigator !== 'undefined' && navigator.userAgent) {
 }
 
 var _apiPending = {};
+var _apiTtlCache = {};   // item_price_all 5 分钟内存缓存（v3 修复: 详情页/收藏刷新不再每次都打上游）
+var API_TTL_MS = 5 * 60 * 1000;
 
 function getApiCacheKey(endpoint, params) {
   return endpoint + '?' + JSON.stringify(params);
@@ -26,6 +28,12 @@ async function apiRequest(endpoint, params, retries, noCache) {
   if (_isWeChat) { params._wc = Math.floor(Date.now() / 60000); }
   var cacheKey = getApiCacheKey(endpoint, params);
   var lastErr;
+
+  // ★ v3: item_price_all 5 分钟 TTL 缓存（刷新类操作传 noCache=true 绕过）
+  if (!noCache && endpoint === 'item_price_all') {
+    var ttlHit = _apiTtlCache[endpoint];
+    if (ttlHit && Date.now() - ttlHit.ts < API_TTL_MS) return ttlHit.data;
+  }
 
   var canDedup = endpoint === 'item_price_all' || endpoint === 'item_list';
   if (!noCache && canDedup && _apiPending[cacheKey]) {
@@ -52,6 +60,9 @@ async function apiRequest(endpoint, params, retries, noCache) {
           .then(function(data) {
             if (data.code !== 0) throw new Error(data.msg || 'API返回错误');
             delete _apiPending[cacheKey];
+            if (!noCache && endpoint === 'item_price_all') {
+              _apiTtlCache[endpoint] = { ts: Date.now(), data: data };
+            }
             resolve(data);
           })
           .catch(function(err) {
