@@ -220,22 +220,9 @@ async function openCategory(key, name) {
     if (currentCategory && currentCategory.key !== key) return;
     listItems = items;
     renderList(items, false);
-
-    if (fromCache) {
-      fetchCategoryAll(key).then(function(freshItems) {
-        if (currentCategory && currentCategory.key !== key) return;
-        if (freshItems && freshItems.length > 0 && freshItems.length !== listItems.length) {
-          listItems = freshItems;
-          renderList(freshItems, false);
-          var c3 = getCache();
-          if (c3 && c3._allItems) {
-            var others = c3._allItems.filter(function(i) { return i._category !== key; });
-            c3._allItems = others.concat(freshItems);
-            setCache(c3);
-          }
-        }
-      }).catch(function() {});
-    }
+    // ★ v3 修复: 移除"缓存命中后仍自动全量翻页刷新"的请求。
+    //   预取 v3 已用 item_price_all + metadata 拿到全量最新数据,
+    //   此处再翻页只会重复消耗上游(acc 类一次约 56 次), 数据会在下次页面加载时自动更新。
   } catch (err) {
     if (currentCategory && currentCategory.key !== key) return;
     console.error('加载失败:', err);

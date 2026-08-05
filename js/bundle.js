@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260803n — 自动生成于 2026-08-03 05:58:05
+// v20260805v — 自动生成于 2026-08-05 13:57:00
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -821,6 +821,8 @@ if (typeof navigator !== 'undefined' && navigator.userAgent) {
 }
 
 var _apiPending = {};
+var _apiTtlCache = {};   // item_price_all 5 分钟内存缓存（v3 修复: 详情页/收藏刷新不再每次都打上游）
+var API_TTL_MS = 5 * 60 * 1000;
 
 function getApiCacheKey(endpoint, params) {
   return endpoint + '?' + JSON.stringify(params);
@@ -832,6 +834,12 @@ async function apiRequest(endpoint, params, retries, noCache) {
   if (_isWeChat) { params._wc = Math.floor(Date.now() / 60000); }
   var cacheKey = getApiCacheKey(endpoint, params);
   var lastErr;
+
+  // ★ v3: item_price_all 5 分钟 TTL 缓存（刷新类操作传 noCache=true 绕过）
+  if (!noCache && endpoint === 'item_price_all') {
+    var ttlHit = _apiTtlCache[endpoint];
+    if (ttlHit && Date.now() - ttlHit.ts < API_TTL_MS) return ttlHit.data;
+  }
 
   var canDedup = endpoint === 'item_price_all' || endpoint === 'item_list';
   if (!noCache && canDedup && _apiPending[cacheKey]) {
@@ -858,6 +866,9 @@ async function apiRequest(endpoint, params, retries, noCache) {
           .then(function(data) {
             if (data.code !== 0) throw new Error(data.msg || 'API返回错误');
             delete _apiPending[cacheKey];
+            if (!noCache && endpoint === 'item_price_all') {
+              _apiTtlCache[endpoint] = { ts: Date.now(), data: data };
+            }
             resolve(data);
           })
           .catch(function(err) {
@@ -2710,22 +2721,9 @@ async function openCategory(key, name) {
     if (currentCategory && currentCategory.key !== key) return;
     listItems = items;
     renderList(items, false);
-
-    if (fromCache) {
-      fetchCategoryAll(key).then(function(freshItems) {
-        if (currentCategory && currentCategory.key !== key) return;
-        if (freshItems && freshItems.length > 0 && freshItems.length !== listItems.length) {
-          listItems = freshItems;
-          renderList(freshItems, false);
-          var c3 = getCache();
-          if (c3 && c3._allItems) {
-            var others = c3._allItems.filter(function(i) { return i._category !== key; });
-            c3._allItems = others.concat(freshItems);
-            setCache(c3);
-          }
-        }
-      }).catch(function() {});
-    }
+    // ★ v3 修复: 移除"缓存命中后仍自动全量翻页刷新"的请求。
+    //   预取 v3 已用 item_price_all + metadata 拿到全量最新数据,
+    //   此处再翻页只会重复消耗上游(acc 类一次约 56 次), 数据会在下次页面加载时自动更新。
   } catch (err) {
     if (currentCategory && currentCategory.key !== key) return;
     console.error('加载失败:', err);
