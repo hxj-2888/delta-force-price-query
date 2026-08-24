@@ -53,3 +53,5 @@ jobs:
     needs: refresh
     if: needs.refresh.outputs.changed == 'true'
     uses: ./.github/workflows/deploy.yml
+    # 可复用工作流默认不继承调用方密钥，必须显式传递，否则部署 job 拿不到 CF/VERCEL token
+    secrets: inherit
