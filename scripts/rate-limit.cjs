@@ -1,8 +1,8 @@
 'use strict';
 // ===== 限流器（规范实现, server.js 引用） =====
-// Cloudflare / Vercel 函数因平台打包限制各自保留内联副本
-// （functions/api/[[path]].js、api/[...path].js），
-// 改动本文件后请同步三处副本；test/rate-limit.test.mjs 会校验副本常量一致。
+// Cloudflare Pages 函数因平台打包限制保留内联副本
+// （functions/api/[[path]].js），改动本文件后请同步该副本；
+// test/rate-limit.test.mjs 会校验副本常量一致（server.js 直接引用本文件）。
 
 const DEFAULTS = {
   windowMs: 60 * 1000,   // 统计窗口

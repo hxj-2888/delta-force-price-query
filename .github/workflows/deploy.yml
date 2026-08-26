@@ -1,21 +1,9 @@
-# ===== GitHub Actions — 双平台自动部署 =====
+# ===== GitHub Actions — Cloudflare Pages 自动部署 =====
 # 触发: push 到 main（或手动 workflow_dispatch）
-# 效果: 自动部署 Cloudflare Pages 正式版 + Vercel 生产环境
+# 效果: 自动部署 Cloudflare Pages 正式版（delta-force-v5）
 # 依赖 GitHub Secrets（Settings → Secrets and variables → Actions）:
-#   CF_API_TOKEN     Cloudflare API Token（权限见 README/下方注释）
-#   VERCEL_TOKEN     Vercel Access Token（vercel.com/account/tokens）
-#   VERCEL_ORG_ID    team_Bdsai4tRCQlodMkUQOHj4pu0
-#   VERCEL_PROJECT_ID prj_CJEWLKoQnKm1YcikNZuUIBEzCpxY
-# 注意: 仓库根 wrangler.toml 的 D1/KV 绑定在 CI 中直接生效，
-#       CF API Token 需含 Pages/Workers Scripts/D1/KV 的 Edit 权限。
-#
-# Vercel 部署历史（踩坑记录）:
-#   amondnet/vercel-action@v20 — 部署成功(vercel@58) 但 post-deploy `vercel inspect` 报 "User not found"
-#   amondnet/vercel-action@v42 — 用 vercel@50 部署，"Could not retrieve Project Settings"（token 与 50.x 不兼容）
-#   官方 CLI 方案 pull/build/--prebuilt — `vercel pull` 同样报 "Could not retrieve Project Settings"
-#   ★ 最终方案 = @v20 + `vercel-project-name`：提供项目名后 action 不再调 `vercel inspect`
-#     （源码: deploymentName = vercelProjectName || await vercelInspect(...)），假失败消除。
-#     若 VERCEL_TOKEN 到期或换人维护，在 vercel.com/account/tokens 重新生成即可。
+#   CF_API_TOKEN     Cloudflare API Token（需含 Pages/Workers Scripts/D1/KV 的 Edit 权限）
+# 注意: 仓库根 wrangler.toml 的 D1/KV 绑定在 CI 中直接生效。
 
 name: deploy
 
@@ -71,28 +59,10 @@ jobs:
           accountId: 63ebb412ea5aaa7b38f49b2eb93c534e
           command: pages deploy . --project-name=delta-force-v5 --branch=main --commit-hash=${{ github.sha }}
 
-  # ===== Vercel 生产环境（delta-force-price-query）=====
-  deploy-vercel:
-    name: Vercel (production)
-    needs: check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v20
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-project-name: delta-force-price-query
-          vercel-args: '--prod'
-
-  # ===== 部署后冒烟验证: 双平台首页与 API 可达 =====
+  # ===== 部署后冒烟验证: Cloudflare 首页与 API 可达 =====
   smoke-test:
     name: Post-deploy smoke test
-    needs: [deploy-cloudflare, deploy-vercel]
+    needs: deploy-cloudflare
     runs-on: ubuntu-latest
     steps:
       - name: Cloudflare Pages 首页
@@ -100,9 +70,3 @@ jobs:
 
       - name: Cloudflare Pages 元数据 API
         run: curl -fsSL --max-time 30 "https://delta-force-v5.pages.dev/api/metadata" | head -c 200
-
-      - name: Vercel 首页
-        run: curl -fsSL -o /dev/null --max-time 30 "https://delta-force-price-query.vercel.app/"
-
-      - name: Vercel 元数据 API
-        run: curl -fsSL --max-time 30 "https://delta-force-price-query.vercel.app/api/metadata" | head -c 200

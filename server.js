@@ -105,6 +105,14 @@ function getClientIp(req) {
          req.socket.remoteAddress || 'unknown';
 }
 
+// 收集请求体（前端把 { endpoint, params } 放在 POST body，见 js/api.js）
+function collectBody(req, cb) {
+  var chunks = [];
+  req.on('data', function (c) { chunks.push(c); });
+  req.on('end', function () { cb(Buffer.concat(chunks).toString('utf8')); });
+  req.on('error', function () { cb(''); });
+}
+
 function proxyApi(req, res) {
   if (!isAuthorizedOrigin(req)) {
     res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -117,72 +125,102 @@ function proxyApi(req, res) {
     return;
   }
 
-  // 路径校验：防止路径遍历（/api/../admin）
-  var pathPart = req.url.split('?')[0].replace(/^\/api/, '').replace(/\/{2,}/g, '/');
-  if (!/^\/[a-zA-Z0-9_\-\/]*$/.test(pathPart)) {
-    res.writeHead(400);
-    res.end(JSON.stringify({ code: -1, msg: '非法路径' }));
-    return;
-  }
+  // 必须解析 POST body 才能拿到真实 endpoint，否则只会转发到字面 /sjz_api/proxy（上游 404）。
+  // 解析顺序对齐 Cloudflare functions/api/[[path]].js：POST body → GET 查询参数 → URL path 兜底。
+  function forward(body) {
+    var endpoint = '';
+    var queryParams = {};
 
-  // 使用 URLSearchParams 正确处理查询参数编码
-  // 转发原始请求的查询参数并附加 token
-  var searchIndex = req.url.indexOf('?');
-  var rawSearch = searchIndex >= 0 ? req.url.substring(searchIndex) : '';
-  var params = new URLSearchParams(rawSearch);
-  params.set('token', API_TOKEN);
-  var baseUrl = API_PATH + pathPart + '?' + params.toString();
-
-  const options = {
-    hostname: API_HOST,
-    port: 443,
-    path: baseUrl,
-    method: req.method,
-    headers: {
-      'User-Agent': 'DeltaForcePriceQuery/1.0',
-      'Accept': 'application/json'
+    if (req.method === 'POST' && body) {
+      var parsed = null;
+      try { parsed = JSON.parse(body); } catch (e) { parsed = null; }
+      endpoint = (parsed && parsed.endpoint) || '';
+      queryParams = (parsed && parsed.params) || {};
+    } else {
+      var searchIndex = req.url.indexOf('?');
+      var rawSearch = searchIndex >= 0 ? req.url.substring(searchIndex + 1) : '';
+      var qs = new URLSearchParams(rawSearch);
+      endpoint = qs.get('endpoint') || '';
+      qs.forEach(function (v, k) { if (k !== 'endpoint') queryParams[k] = v; });
     }
-  };
 
-  // 掩码 token，防止泄露到日志
-  var logUrl = baseUrl.replace(API_TOKEN, '***');
-  console.log(`[API代理] ${req.url} → https://${API_HOST}${logUrl}`);
+    // 兜底：从 URL path 推导（如 GET /api/item_price_all）
+    if (!endpoint) {
+      endpoint = req.url.split('?')[0].replace(/^\/api/, '').replace(/^\/+/, '').replace(/\/{2,}/g, '/');
+    }
 
-  let responded = false;
+    // 路径校验：防止路径遍历（/api/../admin）
+    if (!/^[a-zA-Z0-9_\-\/]*$/.test(endpoint)) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ code: -1, msg: '非法路径' }));
+      return;
+    }
 
-  const proxyReq = https.request(options, (proxyRes) => {
-    let body = '';
-    proxyRes.on('data', chunk => body += chunk);
-    proxyRes.on('end', () => {
+    // 使用 URLSearchParams 正确处理查询参数编码，附加 token
+    var params = new URLSearchParams();
+    Object.keys(queryParams).forEach(function (k) {
+      if (queryParams[k] != null) params.set(k, String(queryParams[k]));
+    });
+    params.set('token', API_TOKEN);
+    var baseUrl = API_PATH + '/' + endpoint + '?' + params.toString();
+
+    var options = {
+      hostname: API_HOST,
+      port: 443,
+      path: baseUrl,
+      method: 'GET',   // 上游接口均为 GET
+      headers: {
+        'User-Agent': 'DeltaForcePriceQuery/1.0',
+        'Accept': 'application/json'
+      }
+    };
+
+    // 掩码 token，防止泄露到日志
+    var logUrl = baseUrl.replace(API_TOKEN, '***');
+    console.log(`[API代理] ${req.url} → https://${API_HOST}${logUrl}`);
+
+    let responded = false;
+
+    const proxyReq = https.request(options, (proxyRes) => {
+      let body = '';
+      proxyRes.on('data', chunk => body += chunk);
+      proxyRes.on('end', () => {
+        if (responded) return;
+        responded = true;
+        res.writeHead(proxyRes.statusCode, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=60'
+        });
+        res.end(body);
+        console.log(`[API代理] 响应 ${proxyRes.statusCode}, ${body.length} 字节`);
+      });
+    });
+
+    proxyReq.on('error', (err) => {
       if (responded) return;
       responded = true;
-      res.writeHead(proxyRes.statusCode, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=60'
-      });
-      res.end(body);
-      console.log(`[API代理] 响应 ${proxyRes.statusCode}, ${body.length} 字节`);
+      console.error(`[API代理] 错误: ${err.message}`);
+      res.writeHead(502);
+      res.end(JSON.stringify({ code: -1, msg: '代理请求失败: ' + err.message }));
     });
-  });
 
-  proxyReq.on('error', (err) => {
-    if (responded) return;
-    responded = true;
-    console.error(`[API代理] 错误: ${err.message}`);
-    res.writeHead(502);
-    res.end(JSON.stringify({ code: -1, msg: '代理请求失败: ' + err.message }));
-  });
+    proxyReq.setTimeout(15000, () => {
+      if (responded) return;
+      responded = true;
+      proxyReq.destroy();
+      res.writeHead(504);
+      res.end(JSON.stringify({ code: -1, msg: '代理请求超时' }));
+    });
 
-  proxyReq.setTimeout(15000, () => {
-    if (responded) return;
-    responded = true;
-    proxyReq.destroy();
-    res.writeHead(504);
-    res.end(JSON.stringify({ code: -1, msg: '代理请求超时' }));
-  });
+    proxyReq.end();
+  }
 
-  proxyReq.end();
+  if (req.method === 'POST') {
+    collectBody(req, forward);
+  } else {
+    forward('');
+  }
 }
 
 const server = http.createServer((req, res) => {
@@ -222,12 +260,12 @@ const server = http.createServer((req, res) => {
   }
   // 文件名黑名单：禁止访问敏感文件
   var basename = path.basename(resolvedPath).toLowerCase();
-  var BLACKLIST = ['.env', '.git', '.gitignore', '.gitattributes', '.vercelignore',
+  var BLACKLIST = ['.env', '.git', '.gitignore', '.gitattributes',
                     'server.js', 'package.json', 'package-lock.json',
-                    'wrangler.toml', 'vercel.json', '_headers',
+                    'wrangler.toml', '_headers',
                     'installer.iss', 'setup.bat', 'start.bat',
                     'miniprogram.zip', 'DEPLOY.md', 'README.md'];
-  var PATH_PREFIX_BLACKLIST = ['migrations/', 'functions/', 'api/', 'workers/', 'miniprogram/', '.wrangler/', '.vercel/'];
+  var PATH_PREFIX_BLACKLIST = ['migrations/', 'functions/', 'workers/', 'miniprogram/', '.wrangler/', '.vercel/'];
   if (BLACKLIST.indexOf(basename) >= 0 || basename.startsWith('.env')) {
     res.writeHead(403);
     res.end('Forbidden');
