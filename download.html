@@ -22,6 +22,7 @@
   .step .t b{color:#e6e6ef}
   .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:700;text-decoration:none;margin-top:6px}
   .btn:active{transform:translateY(1px)}
+  .btn.ghost{background:#1a1a2e;border:1px solid #33335a;color:#a5b4fc}
   .note{font-size:12px;color:#8a8aa0;line-height:1.6;margin-top:14px}
   .note b{color:#a5b4fc}
   a.zip{display:flex;align-items:center;gap:10px;color:#a5b4fc;text-decoration:none;font-size:14px;font-weight:600}
@@ -36,21 +37,23 @@
   <p class="sub">安装到手机或电脑，随时查实时价格</p>
 
   <div class="card">
-    <h2>📲 方式一：安装为应用（推荐）<span class="tag">PWA · 免下载安装包</span></h2>
-    <div class="step"><div class="n">1</div><div class="t"><b>手机（iPhone / Android）</b>：用浏览器打开后，点浏览器菜单 → <b>「添加到主屏幕」/「安装应用」</b>，桌面即出现应用图标。</div></div>
-    <div class="step"><div class="n">2</div><div class="t"><b>电脑（Windows / Mac）</b>：用 <b>Edge / Chrome</b> 打开，地址栏右侧出现安装图标 → 点击安装。</div></div>
-    <a class="btn" href="/?v=v20260805w">🟢 立即打开在线应用</a>
+    <h2>📲 方式一：安卓 APK 安装版<span class="tag">推荐 · 扫码即装</span></h2>
+    <div class="step"><div class="n">1</div><div class="t">点击下载 <b>delta-force.apk</b>（约 28KB 轻量安装包）。</div></div>
+    <div class="step"><div class="n">2</div><div class="t">下载后打开，按提示允许「安装未知来源应用」，安装完成即出现「三角洲价格查询」图标。</div></div>
+    <a class="btn" href="delta-force.apk" download="delta-force.apk">⬇️ 下载安卓 APK 安装版</a>
+    <a class="btn ghost" href="/?v=v20260805w">🌐 或先在线体验</a>
   </div>
 
   <div class="card">
-    <h2>💻 方式二：便携版 ZIP</h2>
-    <a class="zip" href="delta-force-portable.zip" download="delta-force-portable.zip">⬇️ 下载便携版（Win 解压即用，需安装 Node.js）</a>
-    <p class="note">解压后双击 <b>start.bat</b> 启动本地服务器，浏览器访问 <b>localhost:3000</b>。首次运行按提示配置上游 API Token。</p>
+    <h2>🖥️ 方式二：电脑 / 苹果（PWA）<span class="tag">添加到主屏幕</span></h2>
+    <div class="step"><div class="n">1</div><div class="t"><b>电脑（Win/Mac）</b>：用 <b>Edge / Chrome</b> 打开应用页 → 地址栏右侧安装图标 → 点击安装。</div></div>
+    <div class="step"><div class="n">2</div><div class="t"><b>苹果（iPhone/iPad）</b>：<b>Safari</b> → 分享 → 「添加到主屏幕」。</div></div>
   </div>
 
   <div class="card">
-    <h2>📦 更多版本</h2>
-    <p class="note" style="margin-top:0">• <b>Windows 安装包（.exe）</b>：桌面一键安装版，可在作者处获取。<br/>• <b>微信小程序版</b>：搜「三角洲变卖物价格」或在作者主页获取。</p>
+    <h2>📦 方式三：便携版 ZIP / 其它</h2>
+    <a class="zip" href="delta-force-portable.zip" download="delta-force-portable.zip">⬇️ 下载便携版 ZIP（Win 解压即用，需 Node.js）</a>
+    <p class="note">• <b>Windows 安装包（.exe）</b>：可在作者处获取。<br/>• <b>微信小程序版</b>：搜「三角洲变卖物价格」或在作者主页获取。</p>
   </div>
 
   <p class="small">在线版：<a href="/">delta-force-v5.pages.dev</a></p>

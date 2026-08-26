@@ -23,3 +23,6 @@ miniprogram.zip
 .DS_Store
 Thumbs.db
 *.log
+# Android signing key / build output (not committed)
+android/release.keystore
+android/DeltaForce.apk
