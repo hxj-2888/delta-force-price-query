@@ -19,11 +19,6 @@ DEPLOY.md
 # 测试代码（仅本地/git 使用）
 test/
 
-# Vercel 专属 / 其他平台文件
-api/
-vercel.json
-.vercelignore
-
 # 小程序（独立部署，不走网页端）
 miniprogram/
 miniprogram.zip

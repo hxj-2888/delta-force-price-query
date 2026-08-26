@@ -24,12 +24,7 @@
 
 ### 部署到云端
 
-部署到 Vercel（免费）：
-```
-npm i -g vercel && vercel
-```
-
-或部署到 Cloudflare Pages（免费）：
+部署到 Cloudflare Pages（免费）：
 ```
 npm i -g wrangler && wrangler pages deploy .
 ```
@@ -83,7 +78,6 @@ npm i -g wrangler && wrangler pages deploy .
 ├── sw.js               # Service Worker（后台价格记录 + PWA 安装）
 ├── js/                 # 前端模块源码（bundle.js 为构建产物）
 ├── css/                # 样式文件
-├── api/                # Vercel Serverless API 代理
 ├── functions/          # Cloudflare Pages Functions（API 代理 + 缓存破除）
 ├── workers/cron/       # Cloudflare Cron Worker（每日价格采集）
 ├── data/               # 静态元数据（metadata.json）
@@ -113,6 +107,6 @@ npm run generate-metadata  # 重新生成 data/metadata.json
 CI 流程（push 到 main 自动执行）：
 
 1. `check`：语法检查 → 单元/冒烟测试 → bundle 一致性校验，任一失败即阻止部署；
-2. 双平台部署：Cloudflare Pages（delta-force-v5）+ Vercel（delta-force-price-query）；
-3. `smoke-test`：部署后自动验证两个平台的首页和 `/api/metadata` 均可访问；
+2. 部署到 Cloudflare Pages（delta-force-v5）；
+3. `smoke-test`：部署后自动验证平台的首页和 `/api/metadata` 均可访问；
 4. 每周一 11:00（北京时间）自动重新生成元数据，有变化则提交并重新部署。

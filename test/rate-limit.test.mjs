@@ -40,16 +40,13 @@ test('限流器: 全局预算生效', () => {
   assert.equal(check('c'), false);
 });
 
-test('一致性: CF/Vercel 副本限流常量与规范实现一致（防漂移）', () => {
+test('一致性: CF 副本限流常量与规范实现一致（防漂移）', () => {
   const cf = readFileSync(path.join(root, 'functions', 'api', '[[path]].js'), 'utf8');
-  const vercel = readFileSync(path.join(root, 'api', '[...path].js'), 'utf8');
   const server = readFileSync(path.join(root, 'server.js'), 'utf8');
 
-  for (const [name, src] of [['CF', cf], ['Vercel', vercel]]) {
-    const windowExpr = 'RATE_WINDOW_MS = ' + DEFAULTS.windowMs / 1000 + ' * 1000';
-    assert.ok(src.includes(windowExpr), name + ' windowMs 不一致');
-    assert.match(src, new RegExp('RATE_MAX_PER_IP = ' + DEFAULTS.maxPerIp), name + ' maxPerIp 不一致');
-    assert.match(src, new RegExp('RATE_MAX_GLOBAL = ' + DEFAULTS.maxGlobal), name + ' maxGlobal 不一致');
-  }
+  const windowExpr = 'RATE_WINDOW_MS = ' + DEFAULTS.windowMs / 1000 + ' * 1000';
+  assert.ok(cf.includes(windowExpr), 'CF windowMs 不一致');
+  assert.match(cf, new RegExp('RATE_MAX_PER_IP = ' + DEFAULTS.maxPerIp), 'CF maxPerIp 不一致');
+  assert.match(cf, new RegExp('RATE_MAX_GLOBAL = ' + DEFAULTS.maxGlobal), 'CF maxGlobal 不一致');
   assert.match(server, /require\('\.\/scripts\/rate-limit\.cjs'\)/, 'server.js 应引用规范限流器');
 });
