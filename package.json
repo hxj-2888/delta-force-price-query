@@ -2,6 +2,7 @@
   "name": "delta-force-price-query",
   "version": "1.0.0",
   "description": "三角洲行动 - 变卖物实时价格查询工具",
+  "private": true,
   "main": "server.js",
   "bin": "server.js",
   "scripts": {

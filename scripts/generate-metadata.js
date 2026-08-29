@@ -22,7 +22,9 @@ const META_FIELDS = [
 ];
 
 // ===== HTTP 请求（走代理） =====
-function fetchViaProxy(cat, page) {
+
+// 单次请求（不重试）。reject 的 Error 在 HTTP 错误时带 status 字段，供重试层判断是否可重试。
+function fetchOnce(cat, page) {
   return new Promise((resolve, reject) => {
     const params = `endpoint=item_list&types=${cat}&p=${page}`;
     const url = `https://${PROXY_HOST}${PROXY_PATH}?${params}`;
@@ -37,9 +39,11 @@ function fetchViaProxy(cat, page) {
       let body = '';
       res.on('data', chunk => body += chunk);
       res.on('end', () => {
-        // 代理可能返回 502 等错误
+        // 代理可能返回 429（限流）/ 502 等错误
         if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode}: ${body.substring(0, 100)}`));
+          const err = new Error(`HTTP ${res.statusCode}: ${body.substring(0, 100)}`);
+          err.status = res.statusCode;
+          reject(err);
           return;
         }
         try {
@@ -54,6 +58,40 @@ function fetchViaProxy(cat, page) {
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
   });
+}
+
+// ★ 带指数退避的重试包装
+// 必须重试的原因：Pages 端 /api/proxy 限流为 120 次/分钟/IP，而 GitHub Actions 是单一出口 IP。
+// 1350 件物品按每页 10 条需 ~135 页，必然撞上 429；若不重试，整页数据会被静默丢弃，
+// 最终写出一份残缺的 metadata.json，并被 metadata-refresh.yml 自动提交 + 全量发布。
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const MAX_RETRY = 4;
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+async function fetchViaProxy(cat, page) {
+  let lastErr = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
+    if (attempt > 0) {
+      // 指数退避 2s → 4s → 8s → 16s；429 再额外等 20s，让 60s 限流窗口滑过
+      const extra = (lastErr && lastErr.status === 429) ? 20000 : 0;
+      await sleep(Math.pow(2, attempt) * 1000 + extra);
+    }
+    try {
+      return await fetchOnce(cat, page);
+    } catch (e) {
+      lastErr = e;
+      const retryable = e.status
+        ? RETRYABLE_STATUS.has(e.status)
+        : /timeout|ECONN|ETIMEDOUT|socket|network/i.test(e.message);
+      if (!retryable) throw e;   // 4xx（除 429）与 JSON 解析错误重试无意义
+    }
+  }
+
+  throw lastErr;
 }
 
 // ===== 并发控制 =====
@@ -87,6 +125,7 @@ async function main() {
   const metadata = {};    // { itemId: { name, pic, _category, ... } }
   let totalItems = 0;
   let totalPages = 0;
+  let failedPages = 0;    // 失败页数（写入前校验用）
 
   for (const cat of CATS) {
     process.stdout.write(`[${cat}] 获取 page1...`);
@@ -96,11 +135,13 @@ async function main() {
       page1 = await fetchViaProxy(cat, 1);
     } catch (e) {
       console.log(` 失败: ${e.message}`);
+      failedPages++;
       continue;
     }
 
     if (!page1 || page1.code !== 0 || !Array.isArray(page1.data)) {
       console.log(` 返回异常 (code=${page1 && page1.code})`);
+      failedPages++;
       continue;
     }
 
@@ -131,16 +172,19 @@ async function main() {
         remainingTasks.push(() => fetchViaProxy(cat, p));
       }
 
-      const pageResults = await batchAsync(remainingTasks, 6);
+      // 并发压到 3：CI 出口 IP 是单点，并发越高越容易在 60s 窗口内撞满 120 次限流
+      const pageResults = await batchAsync(remainingTasks, 3);
       let catPagesLoaded = 1;
       pageResults.forEach((res, idx) => {
         const p = idx + 2;
         if (res.error) {
           process.stdout.write(`  [${cat}] p${p} 失败: ${res.error}\r`);
+          failedPages++;
           return;
         }
         if (!res || res.code !== 0 || !Array.isArray(res.data)) {
           process.stdout.write(`  [${cat}] p${p} 数据异常\r`);
+          failedPages++;
           return;
         }
         res.data.forEach(item => {
@@ -163,9 +207,11 @@ async function main() {
     }
   }
 
+  const newCount = Object.keys(metadata).length;
+
   console.log('');
   console.log('========================');
-  console.log(`完成! ${totalPages} 页, ${Object.keys(metadata).length} 件物品元数据`);
+  console.log(`完成! ${totalPages} 页成功, ${failedPages} 页失败, ${newCount} 件物品元数据`);
 
   // 写入文件
   const outputDir = path.join(__dirname, '..', 'data');
@@ -174,8 +220,32 @@ async function main() {
   }
 
   const outputFile = path.join(outputDir, 'metadata.json');
+
+  // ★ 写入前校验（最后一道闸）
+  // 本脚本由 .github/workflows/metadata-refresh.yml 自动执行，产物一旦提交就会触发全量部署。
+  // 若因限流/网络丢页导致条目大幅缺失，线上所有物品会立刻退化为「物品#ID」且无人确认。
+  // 因此宁可本次不更新，也绝不能写出残缺文件。
+  const MIN_ITEMS = 1000;          // 当前全量约 1350 件
+  const DROP_RATIO_LIMIT = 0.9;    // 相对旧文件最多允许下降 10%
+  let oldCount = 0;
+  if (fs.existsSync(outputFile)) {
+    try {
+      oldCount = Object.keys(JSON.parse(fs.readFileSync(outputFile, 'utf8'))).length;
+    } catch (e) {
+      console.warn(`警告: 旧 metadata.json 解析失败 (${e.message})，跳过条数对比`);
+    }
+  }
+
+  if (newCount < MIN_ITEMS || (oldCount > 0 && newCount < oldCount * DROP_RATIO_LIMIT)) {
+    console.error('');
+    console.error(`✗ 拒绝写入: 本次采集到 ${newCount} 件，旧文件 ${oldCount} 件，失败 ${failedPages} 页`);
+    console.error(`  要求: 绝对数 ≥ ${MIN_ITEMS} 且不低于旧文件的 ${DROP_RATIO_LIMIT * 100}%`);
+    console.error('  常见原因: 代理限流(429)或网络抖动导致整页丢失。已保留旧文件，本次不会提交。');
+    process.exit(1);
+  }
+
   fs.writeFileSync(outputFile, JSON.stringify(metadata), 'utf8');
-  console.log(`已写入: ${outputFile}`);
+  console.log(`已写入: ${outputFile}（旧 ${oldCount} 件 → 新 ${newCount} 件）`);
 
   // 统计
   const catCounts = {};

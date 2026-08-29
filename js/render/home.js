@@ -58,9 +58,9 @@ function _renderTopMoverFromData(all) {
       var periodText = t.isDay7 ? '近7天' : '今日';
       var freshness = _topMoverApiDone ? ' <span style="font-size:9px;color:#4fc3f7;font-weight:normal">●实时</span>' : '';
       var picHtml = item.pic
-        ? '<img src="' + sanitizeUrl(item.pic) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:36px;height:36px;border-radius:6px;object-fit:contain;margin-right:10px" onerror="this.style.display=\'none\'">'
+        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:36px;height:36px;border-radius:6px;object-fit:contain;margin-right:10px" onerror="this.style.display=\'none\'">'
         : '';
-      return '<div class="tm-row" onclick="openTopMover(' + JSON.stringify(item.id) + ')" style="display:flex;align-items:center;padding:6px 16px;cursor:pointer;transition:all 0.15s">' +
+      return '<div class="tm-row" onclick="openTopMover(' + Number(item.id) + ')" style="display:flex;align-items:center;padding:6px 16px;cursor:pointer;transition:all 0.15s">' +
         picHtml +
         '<div style="flex:1;min-width:0">' +
           '<div style="font-size:10px;color:#8890b0;line-height:1.3">' + periodText + ' ' + label + freshness + '</div>' +
@@ -108,10 +108,10 @@ function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
   var gradeBg = (item._category !== 'gun' && item.grade) ? 'background:' + getGradeColor(item.grade) + '15;border-color:' + getGradeColor(item.grade) + '30;' : '';
   var gradeDiamond = (item._category !== 'gun' && item.grade) ? '<div class="grade-diamond" style="background:' + getGradeColor(item.grade) + '"></div>' : '';
   var loadingAttr = isEager ? 'loading="eager" decoding="sync"' : 'loading="lazy" decoding="async"';
-  var picHtml = item.pic ? '<img src="' + sanitizeUrl(item.pic) + '" alt="" ' + loadingAttr + ' onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">' : '<span class="pic-placeholder">-</span>';
+  var picHtml = item.pic ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" ' + loadingAttr + ' onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">' : '<span class="pic-placeholder">-</span>';
   var gradeTag = (item._category !== 'gun' && item.grade) ? '<span class="item-grade" style="color:' + getGradeColor(item.grade) + '">' + getGradeText(item.grade) + '</span>' : '';
   var sparkHtml = _renderMiniSparkline(item);
-  return '<div class="item-card fade-in" data-item-id="' + item.id + '" onclick="openPriceMover(' + JSON.stringify(item.id) + ')" style="position:relative;' + gradeBg + '">' +
+  return '<div class="item-card fade-in" data-item-id="' + Number(item.id) + '" onclick="openPriceMover(' + Number(item.id) + ')" style="position:relative;' + gradeBg + '">' +
     gradeDiamond +
     '<div class="item-pic">' + picHtml + '</div>' +
     '<div class="item-info">' +
@@ -127,6 +127,21 @@ function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
     '</div>' +
     '<span class="item-arrow">›</span>' +
   '</div>';
+}
+
+// ★ 首页默认视图（分类=全部）专属排序：把「已加载的数据 + 有图」的物品优先放进首屏。
+// 规则（严格限定首页默认视图；分类 / 涨跌幅 / 价格排序逻辑一概不动）：
+//   1) 有实时价格(price>0) 优先于 价格缺失(0/缺) 的
+//   2) 有图片(pic 存在) 优先于 无图（占位符）的
+//   3) 同分时再按原综合热度 getItemSignificance 降序，保证原有默认体验不被破坏
+function _homeDefaultAllSort(a, b) {
+  var na = (a.price || 0) > 0 ? 0 : 1;
+  var nb = (b.price || 0) > 0 ? 0 : 1;
+  if (na !== nb) return na - nb;
+  var pa = a.pic ? 0 : 1;
+  var pb = b.pic ? 0 : 1;
+  if (pa !== pb) return pa - pb;
+  return getItemSignificance(b) - getItemSignificance(a);
 }
 
 // ===== 首页物品列表（分页） =====
@@ -191,7 +206,11 @@ function renderHomeMovers(resetPage) {
   var dirMul = homeSortDir === 'desc' ? -1 : 1;
   if (homeSortBy === 'default') {
     if (homeCategoryFilter !== 'all') {
+      // 分类视图：保持原有分类排序逻辑，绝不动
       filtered.sort(function(a, b) { return (getItemSignificance(b) - getItemSignificance(a)); });
+    } else {
+      // 全部视图：已加载的数据与图片优先进首屏（见 _homeDefaultAllSort）
+      filtered.sort(_homeDefaultAllSort);
     }
   } else if (homeSortBy === 'change') {
     filtered.sort(function(a, b) {
@@ -249,6 +268,7 @@ function renderHomeMoversWithData(items) {
   filtered = filtered.filter(function(item) { var v = getFieldByPeriod(item, field); return v != null && !isNaN(v); });
   if (homeSortBy === 'default') {
     if (homeCategoryFilter !== 'all') filtered.sort(function(a,b) { return getItemSignificance(b) - getItemSignificance(a); });
+    else filtered.sort(_homeDefaultAllSort);
   } else if (homeSortBy === 'change') {
     var dm = homeSortDir === 'desc' ? -1 : 1;
     filtered.sort(function(a,b) { return ((getFieldByPeriod(a,field)||0) - (getFieldByPeriod(b,field)||0)) * dm; });

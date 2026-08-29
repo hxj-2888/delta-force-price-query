@@ -10,7 +10,13 @@ const PROXY_URL = self.location.origin + '/api/proxy';
 const DB_NAME = 'deltaforce_price_db';
 const DB_VERSION = 2;  // ★ 与 store.js MAIN_DB_VERSION 保持一致
 const STORE_NAME = 'daily_prices';
-const STATIC_CACHE = 'deltaforce-static-v2';  // ★ v2: 强制旧缓存失效, 让定时器降频/滚动条适配尽快生效
+
+// ★ 缓存名跟随构建版本
+// 注册方式是 /sw.js?v=<VERSION>（见 js/sw-register.js），这里从自身 URL 取出版本号作为缓存名。
+// 每次发版都会生成新的缓存桶，activate 时自动清掉上一个版本的桶；
+// 旧实现用固定名 'deltaforce-static-v2'，导致历次 bundle.js?v=xxx 在同一缓存内只增不减、永不回收。
+const _swVersion = (self.location.search.match(/[?&]v=([a-z0-9]+)/) || [])[1] || 'v0';
+const STATIC_CACHE = 'deltaforce-static-' + _swVersion;
 
 self.addEventListener('install', () => {
   console.log('[SW] install');
@@ -51,6 +57,24 @@ self.addEventListener('fetch', (e) => {
           return resp;
         })
         .catch(() => caches.match(url.pathname))
+    );
+    return;
+  }
+
+  // ★ /data/*（如 metadata.json）：网络优先 + 后台更新
+  //   这些文件不带 ?v= 版本号，若走缓存优先会永久陈旧（_headers 里的 max-age 对 SW 无效）。
+  //   网络失败时仍回退缓存，保证离线可用。
+  if (url.pathname.indexOf('/data/') === 0) {
+    e.respondWith(
+      fetch(e.request)
+        .then((resp) => {
+          if (resp.ok) {
+            const copy = resp.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(e.request, copy));
+          }
+          return resp;
+        })
+        .catch(() => caches.match(e.request))
     );
     return;
   }

@@ -76,19 +76,25 @@ npm i -g wrangler && wrangler pages deploy .
 ├── index.html          # 主页面（PWA）
 ├── manifest.json       # PWA 清单，支持手机/电脑安装到桌面
 ├── sw.js               # Service Worker（后台价格记录 + PWA 安装）
-├── js/                 # 前端模块源码（bundle.js 为构建产物）
+├── js/                 # 前端模块源码（bundle.js 为构建产物，改 js/ 后必须 npm run build）
 ├── css/                # 样式文件
-├── functions/          # Cloudflare Pages Functions（API 代理 + 缓存破除）
-├── workers/cron/       # Cloudflare Cron Worker（每日价格采集）
-├── data/               # 静态元数据（metadata.json）
+├── functions/          # Cloudflare Pages Functions（API 代理 / 元数据 / 历史 / 缓存破除）
+├── workers/cron/       # Cloudflare Cron Worker（每日价格采集，独立部署，非 Pages 的一部分）
+├── data/               # 静态元数据（metadata.json，约 426KB / 1350 件）
 ├── migrations/         # D1 数据库迁移
 ├── miniprogram/        # 微信小程序源码
 ├── scripts/            # 构建与元数据生成脚本
-├── server.js           # 本地代理服务器（便携版）
+├── android/            # 安卓 WebView 壳源码（release.keystore 不入库，也不随 Pages 部署）
+├── download.html       # 安卓 APK / 便携版 ZIP 下载页
+├── CHANGELOG.md        # 修改记录
+├── _headers            # Cloudflare Pages 缓存头与 CSP
+├── wrangler.toml       # Pages 的 D1/KV 绑定（Cron 不在此配置，见 workers/cron/）
+├── .assetsignore       # Pages 上传排除清单（.env / android/ 等，属安全配置）
+├── server.js           # 本地代理服务器（便携版；自带 /api/metadata 与 /api/history 实现）
 ├── installer.iss       # Inno Setup 安装包脚本 → 生成 setup.exe
 ├── setup.bat           # 便携版桌面安装脚本
 ├── start.bat           # 一键启动脚本
-├── .env                # API Token 配置（本地，不入库）
+├── .env                # API Token 配置（本地，不入库；且必须在 .assetsignore 中排除）
 └── delta-force-logo.png
 ```
 
@@ -108,5 +114,16 @@ CI 流程（push 到 main 自动执行）：
 
 1. `check`：语法检查 → 单元/冒烟测试 → bundle 一致性校验，任一失败即阻止部署；
 2. 部署到 Cloudflare Pages（delta-force-v5）；
-3. `smoke-test`：部署后自动验证平台的首页和 `/api/metadata` 均可访问；
-4. 每周一 11:00（北京时间）自动重新生成元数据，有变化则提交并重新部署。
+3. 部署 Cron Worker（delta-force-cron，每日采集价格写入 D1）；
+4. `smoke-test`：部署后自动验证平台的首页和 `/api/metadata` 均可访问；
+5. 每周一 11:00（北京时间）自动重新生成元数据，有变化则提交并重新部署。
+
+> **关于第 3 步（重要）**：Cloudflare Pages Functions **不支持** Cron Triggers，
+> Dashboard 的 Pages 项目里也找不到该配置项。D1 价格历史完全依赖独立 Worker `workers/cron/`。
+> 若只部署 Pages，30 天价格曲线不会有云端数据，只会退化为客户端本地快照（换设备即丢失）。
+> 该步骤需要额外 Secret `UPSTREAM_API_TOKEN`（上游 orzice.com 的 Token）；
+> 未配置时工作流会跳过并输出告警，不会让主流程失败。
+
+> **关于第 5 步**：`scripts/generate-metadata.js` 内置了保护——若因限流/网络导致采集条目
+> 低于旧文件的 90%（或少于 1000 件），会拒绝写入并让任务失败，
+> 避免残缺的 `metadata.json` 被自动提交到线上。

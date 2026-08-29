@@ -79,6 +79,19 @@ export async function onRequest(context) {
     });
   }
 
+  // ─── 来源校验 ───
+  // ★ 位置很关键：必须排在 /api/metadata 与 /api/history/:id 之前。
+  //   原实现把它放在这两个业务分支之后，导致它们对任意站点开放（跨站浏览器可直接读取 D1 历史）。
+  //   注意语义：isAuthorizedOrigin 对【无 Origin】的服务端请求放行（curl / CI 脚本 / Cron Worker），
+  //   因此本校验的作用是「拒绝跨站浏览器读取」，不能阻止脚本化调用——后者由限流与 WAF 规则兜底。
+  //   也正因如此，上移校验不会影响 scripts/generate-metadata.js 与 workers/cron（它们无 Origin）。
+  if (!isAuthorizedOrigin(request)) {
+    return new Response(JSON.stringify({ code: -1, msg: '未授权的来源' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+
   // ─── 元数据查询 /api/metadata ───
   // ★ 合并策略: KV（Cron 增量更新, 含新物品）∪ 静态文件（全量基线 data/metadata.json）
   //   这样即使 KV 只有部分数据, 也由静态文件补全缺失条目, 元数据始终完整
@@ -136,14 +149,6 @@ export async function onRequest(context) {
   const historyMatch = url.pathname.match(/^\/api\/history\/(\d+)$/);
   if (historyMatch) {
     return handleHistoryRequest(env, parseInt(historyMatch[1], 10));
-  }
-
-  // ─── 来源校验 ───
-  if (!isAuthorizedOrigin(request)) {
-    return new Response(JSON.stringify({ code: -1, msg: '未授权的来源' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
   }
 
   // ─── 解析 endpoint 和 params ───
