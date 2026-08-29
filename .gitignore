@@ -3,10 +3,12 @@ node_modules/
 package-lock.json
 
 # 敏感文件 — 绝不上传
-.env
-.env.local
-.env.production
+.env*
 project.private.config.json
+
+# 分发产物（改走 GitHub Release，不入库；部署下载见 download.html 的 Release 链接）
+delta-force.apk
+delta-force-portable.zip
 
 # Cloudflare Workers 本地缓存
 .wrangler/

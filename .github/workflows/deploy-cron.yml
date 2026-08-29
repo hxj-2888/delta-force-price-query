@@ -56,7 +56,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: 63ebb412ea5aaa7b38f49b2eb93c534e
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
           workingDirectory: workers/cron
           command: deploy
           secrets: |

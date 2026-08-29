@@ -31,7 +31,8 @@ Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 [Files]
 Source: ".\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; 排除安装器自身目录
-Excludes: "installer\*,.git\*,node_modules\*,miniprogram\*,miniprogram.zip,functions\*,workers\*,migrations\*,test\*,.env*,.gitignore,_headers,wrangler.toml,DEPLOY.md,README.md,project.config.json,project.private.config.json,.vercel\*,.wrangler\*"
+; ★ 安装包只含运行时文件；绝不打入：签名私钥/源码目录/CI 配置/分发产物
+Excludes: "installer\*,.git\*,node_modules\*,miniprogram\*,miniprogram.zip,functions\*,workers\*,migrations\*,test\*,.env*,.gitignore,_headers,wrangler.toml,DEPLOY.md,README.md,project.config.json,project.private.config.json,.vercel\*,.wrangler\*,.assetsignore,android\*,scripts\*,.github\*,*.keystore,*.jks,*.pem,*.key,*.apk,*.zip"
 
 [Dirs]
 Name: "{app}"; Permissions: users-full

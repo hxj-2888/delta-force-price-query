@@ -25,7 +25,7 @@ if %errorlevel% neq 0 (
 
 :: 2. 复制所有文件
 echo [→] 正在复制文件...
-xcopy /E /Y /Q ".\*" "%INSTALL_DIR%\" >nul 2>&1
+xcopy /E /Y /Q /EXCLUDE:"%~dp0installer-exclude.txt" ".\*" "%INSTALL_DIR%\" >nul 2>&1
 echo [✓] 文件复制完成
 
 :: 3. 创建桌面快捷方式 (VBS)

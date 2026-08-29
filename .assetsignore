@@ -48,9 +48,11 @@ wrangler.toml
 .vercel/
 
 # 安卓工程（含 release.keystore 签名私钥, 绝不可公网访问）
-# 注: 根目录的 delta-force.apk / delta-force-portable.zip 是 download.html 的分发产物,
-#     暂仍随 Pages 发布; 建议后续迁移到 GitHub Release 后再在此处排除。
 android/
+
+# 安装包分发产物: 已迁移至 GitHub Release (download.html 链接指向 Release 资产)
+delta-force.apk
+delta-force-portable.zip
 
 # 系统垃圾
 *.log

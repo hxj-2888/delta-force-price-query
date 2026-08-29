@@ -1,0 +1,24 @@
+# xcopy /EXCLUDE exclude list (substring match, hit = not copied)
+# setup.bat must NEVER copy: signing keys / android dir / source & CI dirs / distributables
+\android\
+\scripts\
+\github\
+\installer\
+\test\
+\functions\
+\workers\
+\migrations\
+\miniprogram\
+\.git\
+\.wrangler\
+\.vercel\
+.keystore
+.jks
+.pem
+.key
+.apk
+.zip
+.env
+.gitignore
+.assetsignore
+installer-exclude.txt

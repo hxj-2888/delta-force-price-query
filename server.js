@@ -90,7 +90,6 @@ function serveFile(res, filePath) {
     const content = fs.readFileSync(filePath);
     res.writeHead(200, {
       'Content-Type': mime,
-      'Access-Control-Allow-Origin': '*',
       'Content-Security-Policy': CSP_LOCAL,
       // 入口与资源一律禁用缓存，避免更新后桌面版仍加载旧页面（云端靠 ?v= 版本号，本地没有）
       'Cache-Control': 'no-cache'
@@ -301,6 +300,11 @@ const server = http.createServer((req, res) => {
 
   // 本地元数据（必须早于 /api 代理，否则会被当成上游接口转发）
   if (pathname === '/api/metadata' && req.method === 'GET') {
+    if (!isAuthorizedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ code: -1, msg: '未授权的来源' }));
+      return;
+    }
     if (!checkRateLimit(getClientIp(req))) {
       res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' });
       res.end(JSON.stringify({ code: -1, msg: '请求过于频繁, 请稍后再试' }));
@@ -311,6 +315,11 @@ const server = http.createServer((req, res) => {
 
   // 本地无云端价格历史：返回失败码，前端自动降级到本地 IndexedDB/localStorage 快照
   if (/^\/api\/history\/\d+$/.test(pathname) && req.method === 'GET') {
+    if (!isAuthorizedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ code: -1, msg: '未授权的来源' }));
+      return;
+    }
     return serveHistoryUnavailable(res);
   }
 
@@ -341,7 +350,7 @@ const server = http.createServer((req, res) => {
                     'wrangler.toml', '_headers',
                     'installer.iss', 'setup.bat', 'start.bat',
                     'miniprogram.zip', 'DEPLOY.md', 'README.md'];
-  var PATH_PREFIX_BLACKLIST = ['migrations/', 'functions/', 'workers/', 'miniprogram/', '.wrangler/', '.vercel/'];
+  var PATH_PREFIX_BLACKLIST = ['.git/', '.github/', 'migrations/', 'functions/', 'workers/', 'miniprogram/', '.wrangler/', '.vercel/'];
   if (BLACKLIST.indexOf(basename) >= 0 || basename.startsWith('.env')) {
     res.writeHead(403);
     res.end('Forbidden');
