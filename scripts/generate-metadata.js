@@ -31,11 +31,14 @@ function fetchOnce(cat, page) {
 
     // 审计 M1(2026-08-29):代理端可启用 PROXY_KEY 来校验无 Origin 的脚本调用，
     // 启用后本脚本必须带上 X-Proxy-Key，否则 403；未启用时该头会被忽略（向后兼容）。
+    // ★ trim 兜底：若 Secret 在设置时被工具带入换行/空白（如 PowerShell 管道），
+    //   不清理会触发 Node "Invalid character in header content" 直接报错（实测踩过）。
     const headers = {
       'User-Agent': 'DeltaForceMetadataGen/1.0',
       'Accept': 'application/json'
     };
-    if (process.env.PROXY_KEY) headers['X-Proxy-Key'] = process.env.PROXY_KEY;
+    const proxyKey = (process.env.PROXY_KEY || '').trim();
+    if (proxyKey) headers['X-Proxy-Key'] = proxyKey;
 
     const req = https.get(url, {
       headers,
