@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title 三角洲行动 - 安装到桌面
+title 落幕查 - 安装到桌面
 cd /d "%~dp0"
 
 echo ════════════════════════════════════════════════
-echo    三角洲行动 - 变卖物价格查询  桌面安装
+echo    落幕查 - 变卖物价格查询  桌面安装
 echo ════════════════════════════════════════════════
 echo.
 
@@ -35,11 +35,11 @@ set "VBS=%TEMP%\shortcut.vbs"
 
 > "%VBS%" echo Set ws = WScript.CreateObject("WScript.Shell")
 >> "%VBS%" echo deskPath = ws.SpecialFolders("Desktop")
->> "%VBS%" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\三角洲行动-变卖物价格查询.lnk")
+>> "%VBS%" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\落幕查-变卖物价格查询.lnk")
 >> "%VBS%" echo shortcut.TargetPath = "%INSTALL_DIR%\start.bat"
 >> "%VBS%" echo shortcut.WorkingDirectory = "%INSTALL_DIR%"
 >> "%VBS%" echo shortcut.IconLocation = "%INSTALL_DIR%\icon.ico,0"
->> "%VBS%" echo shortcut.Description = "三角洲行动 - 变卖物实时价格查询"
+>> "%VBS%" echo shortcut.Description = "落幕查 - 变卖物实时价格查询"
 >> "%VBS%" echo shortcut.WindowStyle = 1
 >> "%VBS%" echo shortcut.Save
 
@@ -52,7 +52,7 @@ if not "%SHORTCUT_OK%"=="0" (
     echo [!] 自定义图标设置失败，使用系统图标兜底...
     > "%TEMP%\shortcut2.vbs" echo Set ws = WScript.CreateObject("WScript.Shell")
     >> "%TEMP%\shortcut2.vbs" echo deskPath = ws.SpecialFolders("Desktop")
-    >> "%TEMP%\shortcut2.vbs" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\三角洲行动-变卖物价格查询.lnk")
+    >> "%TEMP%\shortcut2.vbs" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\落幕查-变卖物价格查询.lnk")
     >> "%TEMP%\shortcut2.vbs" echo shortcut.IconLocation = "shell32.dll,13"
     >> "%TEMP%\shortcut2.vbs" echo shortcut.Save
     cscript //nologo "%TEMP%\shortcut2.vbs" >nul 2>&1
@@ -66,7 +66,7 @@ echo ┌────────────────────────
 echo │  安装完成！                                │
 echo │                                            │
 echo │  桌面已生成快捷方式:                        │
-echo │  "三角洲行动-变卖物价格查询"                │
+echo │  "落幕查-变卖物价格查询"                  │
 echo │                                            │
 echo │  首次使用前请先配置 API Token:              │
 echo │  双击快捷方式后，脚本会引导你完成配置        │

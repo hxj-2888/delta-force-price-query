@@ -370,7 +370,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('  三角洲行动 - 变卖物价格查询');
+  console.log('  落幕查 - 变卖物价格查询');
   console.log('  本地服务器已启动');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('');

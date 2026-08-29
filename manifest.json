@@ -1,7 +1,7 @@
 {
-  "name": "三角洲行动 - 变卖物价格查询",
-  "short_name": "三角洲价格查询",
-  "description": "三角洲行动变卖物实时价格查询工具",
+  "name": "落幕查 - 变卖物价格查询",
+  "short_name": "落幕查",
+  "description": "变卖物实时价格查询工具",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

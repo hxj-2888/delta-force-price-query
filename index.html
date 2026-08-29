@@ -1,5 +1,5 @@
 ﻿<!--
-index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v20260829p
+index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20260829q
 功能清单: 预取v3(item_price_all+metadata双请求合并) | 加载动画+进度条 | 首页(筛选/排序/分页/涨跌Top2)
 列表页(分类/排序/分页) | 详情页(价格图表/收藏) | 搜索页(实时搜索/历史/最近浏览/收藏) | 底部Tab导航
 依赖: js/bundle.js(合并所有JS模块) css/layout.css css/components.css
@@ -14,7 +14,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   <meta http-equiv="Cache-Control" content="no-cache">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>三角洲行动 - 变卖物价格查询</title>
+  <title>落幕查 - 变卖物价格查询</title>
   <!-- favicon：ico 兼容性最好（Safari/旧浏览器不支持 webp 图标），webp 作为现代浏览器备选 -->
   <link rel="icon" href="/icon.ico?v=2" sizes="any">
   <link rel="icon" type="image/webp" href="/delta-force-logo.webp?v=2">
@@ -24,7 +24,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="三角洲价格查询">
+  <meta name="apple-mobile-web-app-title" content="落幕查">
   <!-- ★ 预连接上游 API 域名，减少 TLS 握手延迟 -->
   <link rel="preconnect" href="https://orzice.com" crossorigin>
   <link rel="dns-prefetch" href="https://orzice.com">
@@ -483,7 +483,7 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   <div class="loading-screen" id="loadingScreen">
   <div class="loading-logo-wrap">
     <div class="loading-logo-glow" id="loadingGlow"></div>
-    <img class="loading-logo-img" id="loadingLogo" src="delta-force-logo.webp?v=2" alt="三角洲行动" onerror="this.src='delta-force-logo.png?v=2'">
+    <img class="loading-logo-img" id="loadingLogo" src="delta-force-logo.webp?v=2" alt="落幕查" onerror="this.src='delta-force-logo.png?v=2'">
   </div>
   <div class="loading-progress-wrap">
     <div class="loading-progress-track">
@@ -500,8 +500,8 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
     <!-- ===== 首页（合并价格异动）===== -->
     <div class="page active" id="page-home">
       <div class="header">
-        <img class="header-logo" src="delta-force-logo.webp?v=2" alt="三角洲行动" onerror="this.src='delta-force-logo.png?v=2'">
-        <div class="header-title">三角洲行动</div>
+        <img class="header-logo" src="delta-force-logo.webp?v=2" alt="落幕查" onerror="this.src='delta-force-logo.png?v=2'">
+        <div class="header-title">落幕查</div>
         <div class="header-subtitle">变卖物实时价格查询</div>
         <div class="header-info">
           <span class="refresh-all" onclick="refreshAllData()">刷新全部</span>
@@ -682,8 +682,8 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   </div>
 
   <!-- Service Worker 注册（必须在 bundle 之前加载） -->
-  <script src="js/sw-register.js?v=v20260829p" defer></script>
+  <script src="js/sw-register.js?v=v20260829q" defer></script>
   <!-- ★ 单文件 bundle：减少 HTTP 请求 6→1，defer 不阻塞解析 -->
-  <script src="js/bundle.js?v=v20260829p" defer></script>
+  <script src="js/bundle.js?v=v20260829q" defer></script>
 </body>
 </html>

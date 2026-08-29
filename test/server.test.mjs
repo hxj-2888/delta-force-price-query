@@ -64,10 +64,10 @@ test('server.js 冒烟: 静态服务 / 敏感文件 / 来源校验 / 限流', as
 
   await waitReady();
 
-  // 静态首页
+  // 静态首页（应用名：落幕查，2026-08-29 由「三角洲行动」更名）
   const home = await request('/');
   assert.equal(home.status, 200);
-  assert.match(home.body, /三角洲行动/);
+  assert.match(home.body, /落幕查/);
 
   // 敏感文件
   const envFile = await request('/.env');

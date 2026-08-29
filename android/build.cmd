@@ -34,7 +34,7 @@ echo [2/6] link manifest + resources...
 "%BT%\aapt2.exe" link -o "%OUT%\unsigned.apk" -I "%PLAT%" ^
   --manifest "%ROOT%AndroidManifest.xml" -R "%OUT%\res.zip" --auto-add-overlay ^
   --java "%OUT%\gen" --min-sdk-version 24 --target-sdk-version 34 ^
-  --version-code 1 --version-name 1.0.0 || goto :err
+  --version-code 2 --version-name 3.0 || goto :err
 
 echo [3/6] compile java...
 javac -encoding UTF-8 -source 1.8 -target 1.8 -classpath "%PLAT%" -d "%OUT%\classes" ^
@@ -51,7 +51,13 @@ popd
 "%BT%\zipalign.exe" -f 4 "%OUT%\unsigned.apk" "%OUT%\aligned.apk" || goto :err
 
 echo [6/6] sign...
-rem Passwords must NOT be hardcoded: read from env KEYSTORE_PASS / KEY_PASS, prompted if unset.
+rem Passwords must NOT be hardcoded: read from gitignored root .env (KEYSTORE_PASS / KEY_PASS), then env, then prompt.
+if "%KEYSTORE_PASS%"=="" for /f "usebackq tokens=1,* delims==" %%a in ("%~dp0..\.env") do (
+  if /i "%%a"=="KEYSTORE_PASS" set "KEYSTORE_PASS=%%b"
+)
+if "%KEY_PASS%"=="" for /f "usebackq tokens=1,* delims==" %%a in ("%~dp0..\.env") do (
+  if /i "%%a"=="KEY_PASS" set "KEY_PASS=%%b"
+)
 if "%KEYSTORE_PASS%"=="" set /p KEYSTORE_PASS=Keystore pass (KEYSTORE_PASS):
 if "%KEY_PASS%"=="" set /p KEY_PASS=Key pass (KEY_PASS):
 if not exist "%~dp0release.keystore" (

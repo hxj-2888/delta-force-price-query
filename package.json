@@ -1,7 +1,7 @@
 {
   "name": "delta-force-price-query",
   "version": "1.0.0",
-  "description": "三角洲行动 - 变卖物实时价格查询工具",
+  "description": "落幕查 - 变卖物实时价格查询工具",
   "private": true,
   "main": "server.js",
   "bin": "server.js",
@@ -14,7 +14,7 @@
     "generate-metadata": "node scripts/generate-metadata.js",
     "predeploy": "node scripts/build.js"
   },
-  "keywords": ["三角洲行动", "价格查询", "变卖物"],
+  "keywords": ["落幕查", "价格查询", "变卖物"],
   "author": "",
   "license": "UNLICENSED"
 }

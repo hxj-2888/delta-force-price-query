@@ -1,8 +1,8 @@
-; 三角洲行动 - 变卖物价格查询  Windows 安装包
+; 落幕查 - 变卖物价格查询  Windows 安装包
 ; 使用 Inno Setup 6 编译 → 生成 setup.exe
 ; 下载 Inno Setup: https://jrsoftware.org/isinfo.php
 
-#define MyAppName "三角洲行动-变卖物价格查询"
+#define MyAppName "落幕查-变卖物价格查询"
 #define MyAppNameEn "DeltaForcePriceQuery"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "DeltaForce"
@@ -16,7 +16,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppNameEn}
 DefaultGroupName={#MyAppName}
 OutputDir=.\installer
-OutputBaseFilename=三角洲行动-变卖物价格查询_安装包_v{#MyAppVersion}
+OutputBaseFilename=落幕查_安装包_v{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -39,7 +39,7 @@ Name: "{app}"; Permissions: users-full
 
 [Icons]
 ; 桌面快捷方式
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\start.bat"; WorkingDir: "{app}"; Comment: "三角洲行动变卖物实时价格查询"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\start.bat"; WorkingDir: "{app}"; Comment: "落幕查 变卖物实时价格查询"
 
 ; 开始菜单
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\start.bat"; WorkingDir: "{app}"
@@ -47,7 +47,7 @@ Name: "{autoprograms}\{#MyAppName}\卸载"; Filename: "{uninstallexe}"
 
 [Run]
 ; 安装完成后自动运行
-Filename: "{app}\start.bat"; Description: "立即启动三角洲行动价格查询"; Flags: nowait postinstall shellexec
+Filename: "{app}\start.bat"; Description: "立即启动落幕查价格查询"; Flags: nowait postinstall shellexec
 
 [Code]
 // 安装前检测 Node.js

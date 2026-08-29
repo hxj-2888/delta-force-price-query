@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-08-29 — 应用更名「落幕查」（`v20260829q`）
+
+> 起因：用户要求应用名改为「落幕查」，移除主页「三角洲行动」字样，安卓端版本号升至 3.0。
+> 说明：无 JS 源码改动，bundle 因工作区行尾归一（CRLF）重建，版本号顺延 `v20260829p → v20260829q`。
+
+### 更名范围
+
+- **网页端**：`index.html` 标题 / 头部标题 / PWA 名称、`manifest.json` name/short_name/description、`download.html` 标题与图标名提示。
+- **桌面端**：`start.bat` / `setup.bat` 窗口标题与快捷方式名、`installer.iss` 安装包名与快捷方式。
+- **安卓端**：`AndroidManifest.xml` label →「落幕查」，`versionName 1.0.0 → 3.0`、`versionCode 1 → 2`（`build.cmd` 的 aapt2 参数同步）。
+- **小程序端**：`app.json` / 首页导航标题、项目描述。
+- **其他**：`package.json` 描述与关键词、`server.js` 启动横幅、`test/server.test.mjs` 首页冒烟断言（`三角洲行动` → `落幕查`）。
+- 未动：`js/` 源码与 `bundle.js`（无 JS 改动，bundle 版本保持 `v20260829p`）；README/CHANGELOG 中的历史记载；download.html 中小程序的微信搜索名（平台侧名称，代码改不到）。
+
+### 构建脚本
+
+- `android/build.cmd`：签名密码优先从 gitignored 根 `.env` 读取（`KEYSTORE_PASS`/`KEY_PASS`），其次环境变量，最后交互提示。
+
+---
+
 ## 2026-08-29 — 列表小图分辨率提升（`v20260829p`）
 
 > 起因：高分屏（DPR≥2）上列表物品图发糊，用户要求提高拉取像素。
