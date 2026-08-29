@@ -27,4 +27,6 @@ Thumbs.db
 *.log
 # Android signing key / build output (not committed)
 android/release.keystore
+android/release.keystore.old-*
+android/*.idsig
 android/DeltaForce.apk
