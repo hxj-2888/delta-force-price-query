@@ -7,7 +7,7 @@ rem Sign: keystore at android\release.keystore; passwords from env
 rem   KEYSTORE_PASS / KEY_PASS (prompted if unset). Keystore gitignored.
 rem ============================================================
 setlocal
-set "SDK=C:\Users\ASUS\AppData\Local\Android\Sdk"
+set "SDK=%LOCALAPPDATA%\Android\Sdk"
 set "BT=%SDK%\build-tools\34.0.0"
 set "PLAT=%SDK%\platforms\android-34\android.jar"
 set "SZ=C:\Program Files\7-Zip\7z.exe"

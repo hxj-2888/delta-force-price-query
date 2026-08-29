@@ -52,6 +52,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ★ 安装包不进 git 仓库（安全），部署时从 GitHub Release 拉回随 Pages 分发
+      #   国内用户走 pages.dev 同源直发下载；Release 仅作 CI 内部中转与备用源
+      - name: Pull distributables from GitHub Release
+        run: |
+          curl -fsSL --retry 3 -o delta-force.apk \
+            "https://github.com/${{ github.repository }}/releases/latest/download/delta-force.apk"
+          curl -fsSL --retry 3 -o delta-force-portable.zip \
+            "https://github.com/${{ github.repository }}/releases/latest/download/delta-force-portable.zip"
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

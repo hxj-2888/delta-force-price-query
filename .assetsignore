@@ -50,9 +50,9 @@ wrangler.toml
 # 安卓工程（含 release.keystore 签名私钥, 绝不可公网访问）
 android/
 
-# 安装包分发产物: 已迁移至 GitHub Release (download.html 链接指向 Release 资产)
-delta-force.apk
-delta-force-portable.zip
+# 注: delta-force.apk / delta-force-portable.zip 不入库（仓库保持零二进制）,
+#     由 CI 在部署前从 GitHub Release 拉回工作区, 随 Pages 分发（download.html 相对链接）。
+#     CI 拉取步骤见 .github/workflows/deploy.yml 的 "Pull distributables" 。
 
 # 系统垃圾
 *.log

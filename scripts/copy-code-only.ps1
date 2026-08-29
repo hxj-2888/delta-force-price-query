@@ -1,5 +1,5 @@
-﻿$src = "C:\Users\ASUS\Desktop\delta-force-deploy"
-$dst = "C:\Users\ASUS\Desktop\delta-force-deploy-code"
+﻿$src = $PSScriptRoot | Split-Path
+$dst = Join-Path (Split-Path $src) "delta-force-deploy-code"
 
 # Clean destination
 if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
