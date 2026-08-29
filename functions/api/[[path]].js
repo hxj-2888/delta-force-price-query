@@ -83,12 +83,26 @@ function isAuthorizedOrigin(request) {
 //   scripts/generate-metadata.js（Node）与 workers/cron 都靠无 Origin 调用。
 //   但它同时意味着任何人都可写脚本循环调用本代理，持续消耗上游 API_TOKEN 配额，
 //   而限流（120 次/分钟/IP）只需换 IP 即可绕过。
-// 方案：引入可选环境变量 PROXY_KEY，只约束「无 Origin 的脚本调用」：
+// 方案：引入可选环境变量 PROXY_KEY，只约束「非浏览器发起的脚本调用」：
 //   - 未配置 → 放行（平滑升级，不会因漏配 Secret 导致 CI 全挂）；
-//   - 已配置 → 无 Origin 请求必须带 X-Proxy-Key 头且完全匹配，否则 403。
-// 浏览器同源请求始终不受影响（由 isAuthorizedOrigin 把关）。
+//   - 已配置 → 非浏览器请求必须带 X-Proxy-Key 头且完全匹配，否则 403。
+//
+// ★ 关键：判断依据不能是「是否有 Origin 头」。按 Fetch 规范，浏览器**同源 GET/HEAD
+//   请求不发送 Origin 头**（只有跨源请求与同源非 GET 才带）。若按有无 Origin 判断，
+//   正常用户的同源 GET（如 /api/metadata）会被误当成脚本调用挡掉（实测 403）。
+//   正确区分浏览器请求靠 Sec-Fetch-* 系列头：浏览器强制添加、页面 JS 无法伪造，
+//   curl / Node / CI 脚本不会带。见 isBrowserRequest。
+function isBrowserRequest(request) {
+  if (request.headers.get('origin')) return true; // 跨源请求（CORS）
+  const site = request.headers.get('sec-fetch-site');
+  if (site) return site !== 'none';               // same-origin / same-site → 浏览器
+  // 无 Sec-Fetch-* 的老浏览器兼容兜底：UA + Accept-Language 组合（弱证据）
+  const ua = request.headers.get('user-agent') || '';
+  return /^Mozilla\//i.test(ua) && !!request.headers.get('accept-language');
+}
+
 function checkScriptAccess(request, env) {
-  if (request.headers.get('origin')) return null; // 浏览器请求：交给 isAuthorizedOrigin
+  if (isBrowserRequest(request)) return null;     // 浏览器请求：不施加脚本密钥要求
   const key = (env && env.PROXY_KEY ? env.PROXY_KEY : '').trim();
   if (!key) return null;                          // 未启用：维持原有行为
   if (request.headers.get('x-proxy-key') === key) return null;
