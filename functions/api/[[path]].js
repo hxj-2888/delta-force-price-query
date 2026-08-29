@@ -216,6 +216,16 @@ export async function onRequest(context) {
     });
   }
 
+  // endpoint 枚举白名单（安全审计 2026-08-29）：host 固定后仍不希望本代理+token 可调上游任意子路径，
+  // 只放行业务实际使用的接口；新增上游接口时在此登记
+  const ALLOWED_ENDPOINTS = ['item_list', 'item_price_all'];
+  if (!ALLOWED_ENDPOINTS.includes(endpoint)) {
+    return new Response(JSON.stringify({ code: -1, msg: '不支持的 endpoint' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
+
   // ─── 构建上游 URL ───
   const token = (env.API_TOKEN || '').trim();
   if (!token) {

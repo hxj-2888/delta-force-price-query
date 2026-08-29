@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-08-29 — 安全加固（`v20260829q`，无前端产物变更）
+
+> 全项目安全审计后的整改；bundle 未变，版本号沿用。
+
+- `/api/proxy`（functions 与 server.js 同步）：endpoint 由字符集校验收紧为**枚举白名单**
+  （当前仅 `item_list` / `item_price_all`），防止代理+token 被用来调用上游任意子路径。
+- 新增 `deploy-pages.ps1`：本地部署改为**白名单暂存**——实测 `.assetsignore` 对
+  `wrangler pages deploy` 无效（那是 Workers static assets 的特性），整目录直推会把
+  磁盘上的 `.env`（签名密码）与 `android/release.keystore` 公开；禁止再手动整目录直推。
+- 移除无效的 `.assetsignore`；CHANGELOG 移除本机备份目录路径。
+
+---
+
 ## 2026-08-29 — 应用更名「落幕查」（`v20260829q`）
 
 > 起因：用户要求应用名改为「落幕查」，移除主页「三角洲行动」字样，安卓端版本号升至 3.0。
@@ -40,7 +53,7 @@
 ## 2026-08-29 — 安全与稳定性修复（`v20260829j`）
 
 > 起因：全项目风险分析后的一次集中整改。
-> 改动前备份：`C:\Users\ASUS\Desktop\delta-force-deploy-backup-20260829`（完整副本，含 `.git`）。
+> 改动前备份：（本机备份目录，路径略）（完整副本，含 `.git`）。
 
 ### P0-1 修复：桌面版 / 便携版 / 安装包版物品名称全部显示为「物品#ID」
 

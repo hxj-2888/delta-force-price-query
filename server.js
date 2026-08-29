@@ -213,6 +213,15 @@ function proxyApi(req, res) {
       return;
     }
 
+    // endpoint 枚举白名单（安全审计 2026-08-29）：与 functions/api/[[path]].js 保持一致，
+    // 防止本代理+token 被用来调用上游任意子路径；新增上游接口时两处同步登记
+    var ALLOWED_ENDPOINTS = ['item_list', 'item_price_all'];
+    if (ALLOWED_ENDPOINTS.indexOf(endpoint) < 0) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ code: -1, msg: '不支持的 endpoint' }));
+      return;
+    }
+
     // 使用 URLSearchParams 正确处理查询参数编码，附加 token
     var params = new URLSearchParams();
     Object.keys(queryParams).forEach(function (k) {
