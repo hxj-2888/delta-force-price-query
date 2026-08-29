@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260829m — 自动生成于 2026-08-29 04:55:29
+// v20260829p — 自动生成于 2026-08-29 07:49:17
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -125,12 +125,13 @@ function sanitizeUrl(url) {
 
 // 列表小图专用：playerhub 的原图是 304x336（约 65KB），而列表/首页只用 36x36 展示，
 // 首屏 40 张就要拉约 2.6MB，这是"图标迟迟不显示"的直接原因——不是加载失败，而是加载慢。
-// 腾讯云 CI 支持 imageMogr2 缩略参数，实测 72x/format/webp 单张仅 1.3KB（体积降到 2%）。
+// 腾讯云 CI 支持 imageMogr2 缩略参数，144x/format/webp 单张约 3KB，可覆盖 36px 展示 × 3~4 倍屏（DPR）。
+// 曾用过 72x（1.3KB/张），在高分屏（DPR≥2）上发糊，2026-08-29 提升到 144x。
 // 只对已知支持该参数的域名生效，其他 CDN 原样返回，避免拼出不存在的参数导致 404。
 function smallPicUrl(url, size) {
   if (!url || typeof url !== 'string') return '';
   if (url.indexOf('playerhub.df.qq.com/') < 0) return url;
-  var s = (size || 72);
+  var s = (size || 144);
   var sep = url.indexOf('?') >= 0 ? '&' : '?';
   return url + sep + 'imageMogr2/thumbnail/' + s + 'x/format/webp';
 }
@@ -1815,7 +1816,7 @@ function _renderTopMoverFromData(all) {
       var periodText = t.isDay7 ? '近7天' : '今日';
       var freshness = _topMoverApiDone ? ' <span style="font-size:9px;color:#4fc3f7;font-weight:normal">●实时</span>' : '';
       var picHtml = item.pic
-        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:36px;height:36px;border-radius:6px;object-fit:contain;margin-right:10px" onerror="this.style.display=\'none\'">'
+        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:36px;height:36px;border-radius:6px;object-fit:contain;margin-right:10px" onerror="this.style.display=\'none\'">'
         : '';
       return '<div class="tm-row" onclick="openTopMover(' + Number(item.id) + ')" style="display:flex;align-items:center;padding:6px 16px;cursor:pointer;transition:all 0.15s">' +
         picHtml +
@@ -1865,7 +1866,7 @@ function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
   var gradeBg = (item._category !== 'gun' && item.grade) ? 'background:' + getGradeColor(item.grade) + '15;border-color:' + getGradeColor(item.grade) + '30;' : '';
   var gradeDiamond = (item._category !== 'gun' && item.grade) ? '<div class="grade-diamond" style="background:' + getGradeColor(item.grade) + '"></div>' : '';
   var loadingAttr = isEager ? 'loading="eager" decoding="sync"' : 'loading="lazy" decoding="async"';
-  var picHtml = item.pic ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" ' + loadingAttr + ' onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">' : '<span class="pic-placeholder">-</span>';
+  var picHtml = item.pic ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" ' + loadingAttr + ' onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">' : '<span class="pic-placeholder">-</span>';
   var gradeTag = (item._category !== 'gun' && item.grade) ? '<span class="item-grade" style="color:' + getGradeColor(item.grade) + '">' + getGradeText(item.grade) + '</span>' : '';
   var sparkHtml = _renderMiniSparkline(item);
   return '<div class="item-card fade-in" data-item-id="' + Number(item.id) + '" onclick="openPriceMover(' + Number(item.id) + ')" style="position:relative;' + gradeBg + '">' +
@@ -2192,7 +2193,7 @@ function renderList(items, showCategory) {
     var gradeBg = (item._category !== 'gun' && item.grade) ? 'background:' + getGradeColor(item.grade) + '15;border-color:' + getGradeColor(item.grade) + '30;' : '';
     var gradeDiamond = (item._category !== 'gun' && item.grade) ? '<div class="grade-diamond" style="background:' + getGradeColor(item.grade) + '"></div>' : '';
     var picHtml = item.pic
-      ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">'
+      ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">'
       : '<span class="pic-placeholder">-</span>';
     var catGradeTag = (item._category !== 'gun' && item.grade) ? '<span class="item-grade" style="color:' + getGradeColor(item.grade) + '">' + getGradeText(item.grade) + '</span>' : '';
     var attrs = [];
@@ -2404,7 +2405,7 @@ function renderRecentViews() {
   container.innerHTML = views.map(function(item) {
     var bl = item.bl || 0;
     var picHtml = item.pic
-      ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
+      ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
       : '<span class="pic-placeholder" style="font-size:20px">-</span>';
     return '\n        <div class="result-item fade-in" onclick="openDetailFromRecent(' + Number(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
   }).join('');
@@ -2422,7 +2423,7 @@ function renderFavorites() {
   container.innerHTML = favs.map(function(item) {
     var bl = item.bl || 0;
     var picHtml = item.pic
-      ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
+      ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
       : '<span class="pic-placeholder" style="font-size:20px">-</span>';
     return '\n        <div class="result-item fade-in" onclick="openDetailFromFavorite(' + Number(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
   }).join('');
@@ -2438,7 +2439,7 @@ function renderSearchResults(results, keyword) {
     results.map(function(item) {
       var bl = item.bl || 0;
       var picHtml = item.pic
-        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
+        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
         : '<span class="pic-placeholder" style="font-size:20px">-</span>';
       return '\n          <div class="result-item fade-in" onclick="openDetailFromSearch(' + Number(item.id) + ')">\n            <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n              ' + picHtml + '\n            </div>\n            <div class="item-info">\n              <div class="item-name-row">\n                <span class="item-name">' + escapeHtml(item.name) + '</span>\n                <span class="item-grade" style="background:rgba(102,126,234,0.15);color:#667eea;font-size:10px;padding:2px 8px;border-radius:8px;margin-left:8px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n              </div>\n              <div class="item-price-row">\n                <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n                <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n              </div>\n            </div>\n            <span class="item-arrow">›</span>\n          </div>';
     }).join('');
@@ -2466,7 +2467,7 @@ function renderFavTab() {
   content.innerHTML = '\n      <div class="list-stats">\n        <span>共 ' + items.length + ' 件收藏</span>\n        <span class="history-clear" onclick="clearFavorites(); renderFavTab();" style="color:#f44336;cursor:pointer">清空收藏</span>\n      </div>\n      ' + items.map(function(item) {
         var bl = item.bl || 0;
         var picHtml = item.pic
-          ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 72)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">'
+          ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">'
           : '<span class="pic-placeholder">-</span>';
         return '\n        <div class="item-card fade-in" onclick="openPriceMover(' + Number(item.id) + ')" style="position:relative">\n          <div class="item-pic">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
       }).join('');
@@ -2524,7 +2525,7 @@ function checkFavoritePriceChanges() {
   var cardHtml = changes.map(function(c) {
     var changeText = (c.pct > 0 ? '+' : '') + c.pct.toFixed(1) + '%';
     var picHtml = c.pic
-      ? '<img src="' + sanitizeUrl(smallPicUrl(c.pic, 72)) + '" alt="" loading="lazy" onerror="this.parentElement.innerHTML=\'<span style=font-size:16px>-</span>\'">'
+      ? '<img src="' + sanitizeUrl(smallPicUrl(c.pic, 144)) + '" alt="" loading="lazy" onerror="this.parentElement.innerHTML=\'<span style=font-size:16px>-</span>\'">'
       : '<span style="font-size:16px">-</span>';
     return '<div class="price-changed-item" onclick="openDetail(' + Number(c.id) + ')">\n        <div class="item-pic">' + picHtml + '</div>\n        <div class="item-info">\n          <div class="item-name">' + escapeHtml(c.name) + '</div>\n          <div class="item-price-row">\n            <span class="item-cur-price">\xA5' + formatPrice(c.price) + '</span>\n            <span class="item-change-pct ' + c.dir + '">' + changeText + '</span>\n          </div>\n        </div>\n      </div>';
   }).join('');

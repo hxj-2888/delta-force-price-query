@@ -60,12 +60,13 @@ function sanitizeUrl(url) {
 
 // 列表小图专用：playerhub 的原图是 304x336（约 65KB），而列表/首页只用 36x36 展示，
 // 首屏 40 张就要拉约 2.6MB，这是"图标迟迟不显示"的直接原因——不是加载失败，而是加载慢。
-// 腾讯云 CI 支持 imageMogr2 缩略参数，实测 72x/format/webp 单张仅 1.3KB（体积降到 2%）。
+// 腾讯云 CI 支持 imageMogr2 缩略参数，144x/format/webp 单张约 3KB，可覆盖 36px 展示 × 3~4 倍屏（DPR）。
+// 曾用过 72x（1.3KB/张），在高分屏（DPR≥2）上发糊，2026-08-29 提升到 144x。
 // 只对已知支持该参数的域名生效，其他 CDN 原样返回，避免拼出不存在的参数导致 404。
 function smallPicUrl(url, size) {
   if (!url || typeof url !== 'string') return '';
   if (url.indexOf('playerhub.df.qq.com/') < 0) return url;
-  var s = (size || 72);
+  var s = (size || 144);
   var sep = url.indexOf('?') >= 0 ? '&' : '?';
   return url + sep + 'imageMogr2/thumbnail/' + s + 'x/format/webp';
 }

@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-08-29 — 列表小图分辨率提升（`v20260829p`）
+
+> 起因：高分屏（DPR≥2）上列表物品图发糊，用户要求提高拉取像素。
+
+### 列表物品图 72px → 144px
+
+- **改动**：`smallPicUrl` 缩略参数从 `thumbnail/72x` 提升到 `thumbnail/144x`
+  （`js/utils.js` 默认值 + `render/home.js`、`render/list.js`、`render/search.js`、`render/favtab.js` 共 8 处调用点）。
+  腾讯云 CI webp 下单张约 1.3KB → 约 3KB，36px 展示位在 3~4 倍屏上不再发糊，首屏增量约 100KB。
+- **实测**：`node scripts/build.js --check` 通过、`npm test` 8/8 通过、`node scripts/lint.js` 43 文件通过。
+
+---
+
 ## 2026-08-29 — 安全与稳定性修复（`v20260829j`）
 
 > 起因：全项目风险分析后的一次集中整改。
