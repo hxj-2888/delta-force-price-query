@@ -3,7 +3,15 @@
 # 效果: 自动部署 Cloudflare Pages 正式版（delta-force-v5）
 # 依赖 GitHub Secrets（Settings → Secrets and variables → Actions）:
 #   CF_API_TOKEN     Cloudflare API Token（需含 Pages/Workers Scripts/D1/KV 的 Edit 权限）
+#   PROXY_KEY        （可选，强烈建议配置）代理防滥用密钥，见下方说明
 # 注意: 仓库根 wrangler.toml 的 D1/KV 绑定在 CI 中直接生效。
+# 注意: API_TOKEN / PROXY_KEY 属于 Pages Functions 的运行期 Secret，不在此处注入——
+#   请在 Cloudflare Dashboard 或本地执行：
+#     wrangler pages secret put API_TOKEN  --project-name=delta-force-v5
+#     wrangler pages secret put PROXY_KEY  --project-name=delta-force-v5
+#   PROXY_KEY 用于封堵「无 Origin 的脚本调用」直接消耗上游 Token 配额（审计 M1）：
+#   配置后，脚本调用必须带匹配的 X-Proxy-Key 头，浏览器同源访问不受任何影响。
+#   未配置时代理维持原有行为（仅靠限流），不会因漏配导致站点不可用。
 
 name: deploy
 

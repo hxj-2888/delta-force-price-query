@@ -359,8 +359,16 @@ const server = http.createServer((req, res) => {
                     'wrangler.toml', '_headers',
                     'installer.iss', 'setup.bat', 'start.bat',
                     'miniprogram.zip', 'DEPLOY.md', 'README.md'];
-  var PATH_PREFIX_BLACKLIST = ['.git/', '.github/', 'migrations/', 'functions/', 'workers/', 'miniprogram/', '.wrangler/', '.vercel/'];
-  if (BLACKLIST.indexOf(basename) >= 0 || basename.startsWith('.env')) {
+  // 审计 2026-08-29（M6 修复）：原路径前缀黑名单漏了 android/ 等目录，本地服务器可被匿名下载
+  //   http://127.0.0.1:3000/android/release.keystore —— 安卓签名密钥直接泄露。
+  //   密码在 .env（已列文件黑名单），但密钥文件泄露后仍可被离线暴力破解。
+  //   现按「目录前缀 + 扩展名」双重拦截，任何位置的签名/私钥文件一律 403。
+  var PATH_PREFIX_BLACKLIST = ['.git/', '.github/', 'migrations/', 'functions/', 'workers/',
+                               'miniprogram/', '.wrangler/', '.vercel/', 'android/',
+                               'scripts/', 'test/', 'installer/', 'dist/'];
+  var BLOCKED_EXT = ['.keystore', '.jks', '.p12', '.pem', '.key', '.pfx'];
+  if (BLACKLIST.indexOf(basename) >= 0 || basename.startsWith('.env')
+      || BLOCKED_EXT.some(function (ext) { return basename.endsWith(ext); })) {
     res.writeHead(403);
     res.end('Forbidden');
     return;

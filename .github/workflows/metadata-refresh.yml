@@ -30,6 +30,10 @@ jobs:
 
       - name: Generate metadata
         run: node scripts/generate-metadata.js
+        env:
+          # 审计 M1:代理启用 PROXY_KEY 后，脚本调用必须带 X-Proxy-Key。
+          # 未配置该 Secret 时变量为空，脚本不带该头，行为与启用前一致（向后兼容）。
+          PROXY_KEY: ${{ secrets.PROXY_KEY }}
 
       - name: Commit if changed
         id: commit

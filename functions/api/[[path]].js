@@ -78,6 +78,26 @@ function isAuthorizedOrigin(request) {
   return false;
 }
 
+// ========== 脚本调用鉴权（审计 M1，2026-08-29）==========
+// 背景：isAuthorizedOrigin 对【无 Origin】的请求一律放行——这是刻意为之，
+//   scripts/generate-metadata.js（Node）与 workers/cron 都靠无 Origin 调用。
+//   但它同时意味着任何人都可写脚本循环调用本代理，持续消耗上游 API_TOKEN 配额，
+//   而限流（120 次/分钟/IP）只需换 IP 即可绕过。
+// 方案：引入可选环境变量 PROXY_KEY，只约束「无 Origin 的脚本调用」：
+//   - 未配置 → 放行（平滑升级，不会因漏配 Secret 导致 CI 全挂）；
+//   - 已配置 → 无 Origin 请求必须带 X-Proxy-Key 头且完全匹配，否则 403。
+// 浏览器同源请求始终不受影响（由 isAuthorizedOrigin 把关）。
+function checkScriptAccess(request, env) {
+  if (request.headers.get('origin')) return null; // 浏览器请求：交给 isAuthorizedOrigin
+  const key = (env && env.PROXY_KEY ? env.PROXY_KEY : '').trim();
+  if (!key) return null;                          // 未启用：维持原有行为
+  if (request.headers.get('x-proxy-key') === key) return null;
+  return new Response(JSON.stringify({ code: -1, msg: '未授权的脚本调用' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -123,6 +143,10 @@ export async function onRequest(context) {
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
     });
   }
+
+  // 审计 M1:脚本调用鉴权（无 Origin 请求需 X-Proxy-Key，未配置 PROXY_KEY 时不启用）
+  const scriptDenied = checkScriptAccess(request, env);
+  if (scriptDenied) return scriptDenied;
 
   // ─── 元数据查询 /api/metadata ───
   // ★ 合并策略: KV（Cron 增量更新, 含新物品）∪ 静态文件（全量基线 data/metadata.json）

@@ -29,11 +29,16 @@ function fetchOnce(cat, page) {
     const params = `endpoint=item_list&types=${cat}&p=${page}`;
     const url = `https://${PROXY_HOST}${PROXY_PATH}?${params}`;
 
+    // 审计 M1(2026-08-29):代理端可启用 PROXY_KEY 来校验无 Origin 的脚本调用，
+    // 启用后本脚本必须带上 X-Proxy-Key，否则 403；未启用时该头会被忽略（向后兼容）。
+    const headers = {
+      'User-Agent': 'DeltaForceMetadataGen/1.0',
+      'Accept': 'application/json'
+    };
+    if (process.env.PROXY_KEY) headers['X-Proxy-Key'] = process.env.PROXY_KEY;
+
     const req = https.get(url, {
-      headers: {
-        'User-Agent': 'DeltaForceMetadataGen/1.0',
-        'Accept': 'application/json'
-      },
+      headers,
       timeout: 30000
     }, (res) => {
       let body = '';
