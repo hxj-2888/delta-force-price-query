@@ -1,6 +1,9 @@
 # Cloudflare Pages 部署排除清单
 # 只影响 pages deploy 上传内容, 不影响 git 跟踪
-# (wrangler pages deploy 会同时尊重 .gitignore 与 .assetsignore)
+# ⚠️ 只依赖本文件: Cloudflare 官方文档仅保证 .assetsignore 生效,
+#    未承诺 wrangler pages deploy 会一并尊重 .gitignore。
+#    凡是不允许公网访问的文件（.env / 签名密钥等）必须写在这里, 不能指望 .gitignore。
+# 校验方法: 部署后 curl -I https://<域名>/.env 应返回 404, 且 /android/release.keystore 不可下载。
 
 # 本地开发/打包工具
 server.js
@@ -15,6 +18,7 @@ dist/
 scripts/
 README.md
 DEPLOY.md
+CHANGELOG.md
 
 # 测试代码（仅本地/git 使用）
 test/
@@ -31,6 +35,22 @@ migrations/
 .github/
 .gitignore
 .gitattributes
+
+# ★ 敏感文件 — 绝不可公网访问（.gitignore 不可依赖, 必须在此重复声明）
+.env
+.env.*
+*.keystore
+*.jks
+*.pem
+*.key
+wrangler.toml
+.wrangler/
+.vercel/
+
+# 安卓工程（含 release.keystore 签名私钥, 绝不可公网访问）
+# 注: 根目录的 delta-force.apk / delta-force-portable.zip 是 download.html 的分发产物,
+#     暂仍随 Pages 发布; 建议后续迁移到 GitHub Release 后再在此处排除。
+android/
 
 # 系统垃圾
 *.log

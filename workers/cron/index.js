@@ -12,6 +12,22 @@ const API_PATH = '/workApi/v1/sjz_api';
 const CATS = ['gun', 'ammo', 'acc', 'helmet', 'armor', 'chest', 'bag', 'key', 'collection', 'consume'];
 const META_FIELDS = ['name', 'pic', 'grade', 'ShopSellType', 'desc', 'secondClassCN', 'length', 'width', 'weight', 'Weight', 'objectID', 'tid'];
 
+// ===== 带超时的 fetch =====
+// Cron Worker 有 CPU / 墙钟预算，任何上游调用都必须设上限。
+// 超时或网络错误统一返回 null，由调用方降级，避免整个 scheduled 任务被拖死。
+async function fetchWithTimeout(url, init, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, Object.assign({}, init, { signal: controller.signal }));
+  } catch (e) {
+    console.error(`[Cron] 请求失败/超时(${timeoutMs}ms): ${e.message}`);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default {
   async scheduled(event, env, ctx) {
     // 单 cron "0 22 * * *" 同时处理：每日价格采集 + 每日增量元数据检查
@@ -24,11 +40,14 @@ async function runScheduled(env, ctx) {
   if (!token) { console.error('[Cron] API_TOKEN 未配置'); return; }
 
   // ★ 拉取 item_price_all（价格+元数据共享这一次请求）
+  // 必须加超时：Cron Worker 有 CPU / 墙钟上限，上游挂起会把本次执行整个拖死，
+  // 导致「价格采集 + 元数据刷新」双双失败且无人察觉。阈值与 Pages Functions 对齐（25s）。
   console.log('[Cron] 拉取 item_price_all...');
   const priceUrl = `https://${API_HOST}${API_PATH}/item_price_all?token=${encodeURIComponent(token)}`;
-  const priceResp = await fetch(priceUrl, {
+  const priceResp = await fetchWithTimeout(priceUrl, {
     headers: { 'User-Agent': 'DeltaForceCron/1.0', 'Accept': 'application/json' },
-  });
+  }, 25000);
+  if (!priceResp) { console.error('[Cron] item_price_all 请求超时，放弃本次执行'); return; }
   if (!priceResp.ok) { console.error(`[Cron] item_price_all 返回 ${priceResp.status}`); return; }
 
   const priceData = await priceResp.json();
@@ -132,9 +151,13 @@ async function collectDailyPrices(env, priceData) {
 
     // ★ 每日无条件全量写入，价格不变也存一行，保证每天都有数据点
     // D1 免费版 5GB，按 1307 物品 × 365 天 = ~48 万行/年 ≈ 50MB/年，完全够用
+    // ★ 用 UPSERT 取代 INSERT OR REPLACE：REPLACE 的语义是「删旧行 + 插新行」，
+    //   会让 id 自增列不断 churn 并推高 sqlite_sequence；UPSERT 是原地更新同一行。
     const statements = items.map(item =>
-      env.DB.prepare(`INSERT OR REPLACE INTO price_history (item_id, price, name, recorded_date) VALUES (?, ?, ?, ?)`)
-        .bind(item.id, item.price, item.name || '', today)
+      env.DB.prepare(
+        'INSERT INTO price_history (item_id, price, name, recorded_date) VALUES (?, ?, ?, ?) ' +
+        'ON CONFLICT(item_id, recorded_date) DO UPDATE SET price = excluded.price, name = excluded.name'
+      ).bind(item.id, item.price, item.name || '', today)
     );
 
     const BATCH_SIZE = 100;
@@ -183,21 +206,33 @@ async function refreshMetadata(env, priceData, token) {
     if (newIdSet.size === 0) { console.log('[Cron-meta] 无需更新，退出'); return; }
 
     // Step 4: 逐分类翻页扫描，直到所有新物品都被找到（或翻完全部分类）
+    // ★ 时间预算：全量翻页可达上百次请求，而 Cron Worker 有 CPU / 墙钟上限。
+    //   超出预算就中断，已收集到的部分照常写回 KV；剩下没找到的 ID 下次 cron 会重新计算
+    //   （newIdSet 每次都从 priceData 与现有 KV 对比得出），不会留下永久缺口。
+    const META_DEADLINE_MS = 40 * 1000;
+    const REQ_TIMEOUT_MS = 15000;
+    const metaStartedAt = Date.now();
     let newCount = 0;
+    let budgetExceeded = false;
+
     for (const cat of CATS) {
       if (newIdSet.size === 0) break;
       let page = 1;
       let totalPages = 1;
       while (page <= totalPages && newIdSet.size > 0) {
+        if (Date.now() - metaStartedAt > META_DEADLINE_MS) { budgetExceeded = true; break; }
+
         const url = `https://${API_HOST}${API_PATH}/item_list?types=${cat}&p=${page}&token=${encodeURIComponent(token)}`;
+        const resp = await fetchWithTimeout(url, {
+          headers: { 'User-Agent': 'DeltaForceMetaRefresh/1.0', 'Accept': 'application/json' },
+        }, REQ_TIMEOUT_MS);
+
         let data = null;
-        try {
-          const resp = await fetch(url, {
-            headers: { 'User-Agent': 'DeltaForceMetaRefresh/1.0', 'Accept': 'application/json' },
-          });
-          if (resp.ok) data = await resp.json();
-        } catch (e) {
-          console.warn(`[Cron-meta] ${cat} p${page} 请求失败:`, e.message);
+        if (resp && resp.ok) {
+          try { data = await resp.json(); } catch (e) { data = null; }
+        }
+        if (!resp || !resp.ok) {
+          console.warn(`[Cron-meta] ${cat} p${page} 请求失败，跳过该分类`);
           break;
         }
         if (!data || data.code !== 0 || !Array.isArray(data.data)) {
@@ -229,9 +264,14 @@ async function refreshMetadata(env, priceData, token) {
         }
         page++;
       }
+      if (budgetExceeded) break;
     }
 
-    // Step 5: 写回 KV
+    if (budgetExceeded) {
+      console.warn(`[Cron-meta] 已用满 ${META_DEADLINE_MS / 1000}s 时间预算，提前中断；剩余 ${newIdSet.size} 个将在下次 cron 继续`);
+    }
+
+    // Step 5: 写回 KV（即使被预算中断，已收集到的部分也要落盘，避免白跑一趟）
     if (newCount > 0) {
       await env.METADATA_KV.put('metadata', JSON.stringify(existingMeta));
       console.log(`[Cron-meta] 完成: ${newCount} 个新物品元数据已写入 KV, 总计 ${Object.keys(existingMeta).length} 件` +

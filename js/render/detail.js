@@ -27,8 +27,10 @@ function renderDetail(item) {
   if (item.length || item.width || item.weight || item.Weight) {
     var propItems = '';
     if (item.secondClassCN) propItems += '<div class="info-item"><span class="info-label">分类</span><span class="info-value">' + escapeHtml(item.secondClassCN) + '</span></div>';
-    if (item.length && item.width) propItems += '<div class="info-item"><span class="info-label">占格</span><span class="info-value">' + item.length + '\xD7' + item.width + '</span></div>';
-    if (item.weight || item.Weight) propItems += '<div class="info-item"><span class="info-label">重量</span><span class="info-value">' + (item.weight || item.Weight) + ' kg</span></div>';
+    // ★ 这些字段直接来自上游 API。预取路径（index.html）不经过 js/api.js 的 sanitizeItemArray，
+    //   必须转义后再拼进 innerHTML，否则异常字符串会破坏 DOM 结构。
+    if (item.length && item.width) propItems += '<div class="info-item"><span class="info-label">占格</span><span class="info-value">' + escapeHtml(item.length) + '\xD7' + escapeHtml(item.width) + '</span></div>';
+    if (item.weight || item.Weight) propItems += '<div class="info-item"><span class="info-label">重量</span><span class="info-value">' + escapeHtml(item.weight || item.Weight) + ' kg</span></div>';
     if (item.grade) propItems += '<div class="info-item"><span class="info-label">等级</span><span class="info-value" style="color:' + getGradeColor(item.grade) + '">' + getGradeText(item.grade) + '</span></div>';
     if (item.objectID) propItems += '<div class="info-item"><span class="info-label">ID</span><span class="info-value" style="font-size:13px">' + escapeHtml(item.objectID) + '</span></div>';
     propsHtml = '\n      <div class="section">\n        <div class="section-title">物品属性</div>\n        <div class="info-grid">' + propItems + '</div>\n      </div>';

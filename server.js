@@ -68,12 +68,33 @@ const MIME = {
   '.webp': 'image/webp'
 };
 
+// ===== 本地版 CSP =====
+// _headers 里的 CSP 只对 Cloudflare Pages 生效，桌面版（server.js）此前完全没有 CSP。
+// 本地场景的差异：所有请求都走同源 /api，connect-src 只需 'self'；
+// script-src 仍需 'unsafe-inline'，因为 index.html 的预取脚本是内联的（已知妥协）。
+const CSP_LOCAL = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' https: data:",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'none'"
+].join('; ');
+
 function serveFile(res, filePath) {
   const ext = path.extname(filePath);
   const mime = MIME[ext] || 'application/octet-stream';
   try {
     const content = fs.readFileSync(filePath);
-    res.writeHead(200, { 'Content-Type': mime, 'Access-Control-Allow-Origin': '*' });
+    res.writeHead(200, {
+      'Content-Type': mime,
+      'Access-Control-Allow-Origin': '*',
+      'Content-Security-Policy': CSP_LOCAL,
+      // 入口与资源一律禁用缓存，避免更新后桌面版仍加载旧页面（云端靠 ?v= 版本号，本地没有）
+      'Cache-Control': 'no-cache'
+    });
     res.end(content);
   } catch (e) {
     res.writeHead(404);
@@ -111,6 +132,43 @@ function collectBody(req, cb) {
   req.on('data', function (c) { chunks.push(c); });
   req.on('end', function () { cb(Buffer.concat(chunks).toString('utf8')); });
   req.on('error', function () { cb(''); });
+}
+
+// ===== 本地端点：与 Cloudflare Functions 对齐（server.js 自行实现，不走上游代理）=====
+// 背景：云端 functions/api/[[path]].js 提供 /api/metadata（KV∪静态）与 /api/history/:id（D1）。
+// 本地没有 KV/D1，若不在此拦截，请求会掉进 proxyApi 的 URL path 兜底逻辑，
+// 被当成上游接口转发到 orzice.com/workApi/v1/sjz_api/metadata → 上游返回错误 JSON，
+// 而 index.html 的预取脚本只 r.json() 不校验 code，于是全部物品名退化为「物品#ID」。
+
+var _metadataCache = { mtimeMs: -1, body: null };
+
+function serveMetadata(res) {
+  var file = path.join(__dirname, 'data', 'metadata.json');
+  try {
+    var stat = fs.statSync(file);
+    if (!_metadataCache.body || _metadataCache.mtimeMs !== stat.mtimeMs) {
+      _metadataCache = { mtimeMs: stat.mtimeMs, body: fs.readFileSync(file) };
+    }
+  } catch (e) {
+    // 文件缺失时返回空对象：前端会走 item_list 补全兜底，而不是整页崩溃
+    _metadataCache = { mtimeMs: -1, body: null };
+  }
+  res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-cache'
+  });
+  res.end(_metadataCache.body || Buffer.from('{}'));
+}
+
+// 本地无 D1，明确返回失败码，让 js/store/cache.js 的 getOrFetchCloudSnapshots 降级到本地快照
+function serveHistoryUnavailable(res) {
+  res.writeHead(200, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store'
+  });
+  res.end(JSON.stringify({ code: -1, msg: '本地模式无云端价格历史，已使用本地快照' }));
 }
 
 function proxyApi(req, res) {
@@ -238,13 +296,31 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 去掉查询串后的路径（用于精确匹配，避免 /api-xxx 之类被误判成 /api/*）
+  const pathname = req.url.split('?')[0].split('#')[0];
+
+  // 本地元数据（必须早于 /api 代理，否则会被当成上游接口转发）
+  if (pathname === '/api/metadata' && req.method === 'GET') {
+    if (!checkRateLimit(getClientIp(req))) {
+      res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' });
+      res.end(JSON.stringify({ code: -1, msg: '请求过于频繁, 请稍后再试' }));
+      return;
+    }
+    return serveMetadata(res);
+  }
+
+  // 本地无云端价格历史：返回失败码，前端自动降级到本地 IndexedDB/localStorage 快照
+  if (/^\/api\/history\/\d+$/.test(pathname) && req.method === 'GET') {
+    return serveHistoryUnavailable(res);
+  }
+
   // API 代理: /api/* → https://orzice.com/workApi/v1/sjz_api/*
-  if (req.url.startsWith('/api')) {
+  if (pathname === '/api' || pathname.indexOf('/api/') === 0) {
     return proxyApi(req, res);
   }
 
   // 根路径 → index.html
-  if (req.url === '/' || req.url === '/index.html') {
+  if (pathname === '/' || pathname === '/index.html') {
     return serveFile(res, path.join(__dirname, 'index.html'));
   }
 

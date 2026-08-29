@@ -82,6 +82,12 @@ if (CHECK_MODE) {
     if (swRegRef[1] !== version) errors.push('sw-register.js 中 sw.js 版本号不一致: ' + swRegRef[1] + ' ≠ ' + version);
     if (funcRef[1] !== version) errors.push('functions/index.js VERSION 不一致: ' + funcRef[1] + ' ≠ ' + version);
 
+    // 头部注释里的 build: 版本容易与实际脱节（曾停滞在 v20260731q 而实际已是 v20260805w），纳入强制校验
+    const buildComment = html.match(/\| build: (v[a-z0-9]+)/);
+    if (buildComment && buildComment[1] !== version) {
+      errors.push('index.html 头部 build 注释版本不一致: ' + buildComment[1] + ' ≠ ' + version);
+    }
+
     const bundlePath = path.join(JS_DIR, 'bundle.js');
     if (!fs.existsSync(bundlePath)) {
       errors.push('缺少 js/bundle.js, 请先运行 node scripts/build.js');
@@ -118,6 +124,8 @@ const indexPath = path.join(__dirname, '..', 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
 html = html.replace(/bundle\.js\?v=[a-z0-9]+/g, 'bundle.js?v=' + version);
 html = html.replace(/sw-register\.js\?v=[a-z0-9]+/g, 'sw-register.js?v=' + version);
+// 同步头部注释里的 build: 版本，避免注释与实际版本长期脱节
+html = html.replace(/\| build: v[a-z0-9]+/g, '| build: ' + version);
 
 // ★ CSS 仅在实际内容变化时更新版本号，避免不必要的缓存失效
 const cssDir = path.join(__dirname, '..', 'css');

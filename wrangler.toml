@@ -12,5 +12,9 @@ database_id = "b1a4f06e-4236-4a79-9ab4-1cd0fa72b224"
 binding = "METADATA_KV"
 id = "252ac6dfa5ab47f491d6f5752abae6db"
 
-# Cron 触发器: Dashboard → Workers & Pages → 项目 → Settings → Functions → Cron Triggers
-# 表达式: 0 22 * * * （UTC 22:00 = 北京时间 06:00）
+# ⚠️ Cron 触发器不在本项目（Pages）里配置。
+#    Cloudflare Pages Functions 只导出 onRequest，不支持 scheduled/Cron Triggers，
+#    Dashboard 的 Pages 项目里也找不到 "Cron Triggers" 配置项。
+#    真正的每日采集任务是独立 Worker: workers/cron/（自带 [triggers] crons = ["0 22 * * *"]）
+#    部署方式见 DEPLOY.md 第 4 节；CI 中由 .github/workflows/deploy-cron.yml 自动部署。
+#    本文件在 Pages 部署时只负责 D1(DB) 与 KV(METADATA_KV) 绑定。

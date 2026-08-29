@@ -59,6 +59,14 @@ jobs:
           accountId: 63ebb412ea5aaa7b38f49b2eb93c534e
           command: pages deploy . --project-name=delta-force-v5 --branch=main --commit-hash=${{ github.sha }}
 
+  # ===== Cron Worker（每日价格采集 → D1）=====
+  # Pages Functions 不支持 Cron，必须单独部署 workers/cron/，否则 30 天价格曲线永远为空。
+  deploy-cron:
+    name: Deploy Cron Worker
+    needs: deploy-cloudflare
+    uses: ./.github/workflows/deploy-cron.yml
+    secrets: inherit
+
   # ===== 部署后冒烟验证: Cloudflare 首页与 API 可达 =====
   smoke-test:
     name: Post-deploy smoke test

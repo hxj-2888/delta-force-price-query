@@ -1,5 +1,5 @@
 ﻿<!--
-index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v20260731q
+index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v20260829k
 功能清单: 预取v3(item_price_all+metadata双请求合并) | 加载动画+进度条 | 首页(筛选/排序/分页/涨跌Top2)
 列表页(分类/排序/分页) | 详情页(价格图表/收藏) | 搜索页(实时搜索/历史/最近浏览/收藏) | 底部Tab导航
 依赖: js/bundle.js(合并所有JS模块) css/layout.css css/components.css
@@ -15,7 +15,11 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>三角洲行动 - 变卖物价格查询</title>
+  <!-- favicon：ico 兼容性最好（Safari/旧浏览器不支持 webp 图标），webp 作为现代浏览器备选 -->
+  <link rel="icon" href="/icon.ico" sizes="any">
   <link rel="icon" type="image/webp" href="/delta-force-logo.webp">
+  <!-- iOS「添加到主屏幕」图标；缺失时 iOS 会拿页面截图充当 -->
+  <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -96,14 +100,35 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
 
       // ★ 核心：并行拉取价格 + 元数据，客户端合并
       // metadata 优先从 /api/metadata（KV动态更新）获取，失败降级到静态文件
+      // ★ 必须校验响应：代理异常时常以 HTTP 200 返回 { code:-1, msg } 错误体
+      //   （典型场景：本地 server.js 没有 /api/metadata 路由时，请求被当成上游接口转发），
+      //   若只 r.json() 不校验，metadata[id] 恒为 undefined，全站物品名会退化为「物品#ID」。
       var metadataPromise = fetch('/api/metadata')
-        .then(function(r) { return r.json(); })
-        .catch(function() {
-          console.warn('[prefetch] /api/metadata 不可用，降级到静态文件');
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('结构非法');
+          if (typeof data.code !== 'undefined' && data.code !== 0) throw new Error('code=' + data.code);
+          if (Object.keys(data).length === 0) throw new Error('内容为空');
+          return data;
+        })
+        .catch(function(e) {
+          console.warn('[prefetch] /api/metadata 不可用(' + (e && e.message) + ')，降级到静态文件');
           return fetch('/data/metadata.json')
-            .then(function(r) { return r.json(); })
-            .catch(function() {
-              console.error('[prefetch] 静态 metadata 也失败，物品将显示为"物品#ID"');
+            .then(function(r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })
+            .then(function(data) {
+              if (!data || typeof data !== 'object' || Array.isArray(data) || Object.keys(data).length === 0) {
+                throw new Error('内容为空或结构非法');
+              }
+              return data;
+            })
+            .catch(function(e2) {
+              console.error('[prefetch] 静态 metadata 也失败(' + (e2 && e2.message) + ')，物品将显示为"物品#ID"');
               running._metadataFailed = true;
               return {};
             });
@@ -146,12 +171,25 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
 
       // ★ 元数据补全补丁（v3 修复）: 上次补全学到的 name/分类 持久化到 localStorage,
       //   避免元数据不完整时每次页面加载都重复拉 10 个分类第 1 页（10 次上游请求）。
-      var _metaPatchKey = 'deltaforce_meta_patch_v1';
+      // v2 加固：这份缓存的内容会流入渲染层（patch.name / patch.pic），虽然渲染时已有
+      // escapeHtml / sanitizeUrl，但仍需控制其规模与存活时间——它此前无条数上限、无过期、
+      // 无结构版本，会无限累积已下架物品，且被污染后会长期驻留。
+      var _metaPatchKey = 'deltaforce_meta_patch_v2';
+      var _META_PATCH_MAX = 2000;                    // 条数上限
+      var _META_PATCH_TTL = 90 * 24 * 3600 * 1000;   // 存活 90 天
       var _metaPatch = {};
       try {
+        localStorage.removeItem('deltaforce_meta_patch_v1');   // 清理无结构的旧版本
         var _patchRaw = localStorage.getItem(_metaPatchKey);
-        if (_patchRaw) _metaPatch = JSON.parse(_patchRaw) || {};
-      } catch (e) {}
+        if (_patchRaw) {
+          var _parsed = JSON.parse(_patchRaw);
+          if (_parsed && _parsed.__ts && (Date.now() - _parsed.__ts) < _META_PATCH_TTL) {
+            _metaPatch = _parsed.data || {};
+          } else {
+            localStorage.removeItem(_metaPatchKey);   // 过期或结构不符 → 丢弃，本轮重新学习
+          }
+        }
+      } catch (e) { _metaPatch = {}; }
 
       Promise.all([
         _fetchPriceAllWithRetry().then(function(r) { return r.json(); }),
@@ -281,7 +319,18 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
               }
 
               if (_patched > 0) {
-                try { localStorage.setItem(_metaPatchKey, JSON.stringify(_metaPatch)); } catch (e) {}
+                try {
+                  var _pk = Object.keys(_metaPatch);
+                  if (_pk.length > _META_PATCH_MAX) {
+                    // 超出上限时淘汰最早写入的一批（Object.keys 对字符串键按插入序返回）
+                    _pk.slice(0, _pk.length - _META_PATCH_MAX).forEach(function (k) { delete _metaPatch[k]; });
+                  }
+                  localStorage.setItem(_metaPatchKey, JSON.stringify({ __ts: Date.now(), data: _metaPatch }));
+                } catch (e) {
+                  // 配额不足：直接清空。缓存丢失只是多一次补全请求，不能让它影响主流程
+                  console.warn('[prefetch] metaPatch 写入失败，已清空');
+                  try { localStorage.removeItem(_metaPatchKey); } catch (e2) {}
+                }
                 console.log('[prefetch] 补全完成: ' + _patched + ' 个物品获得元数据');
               } else {
                 console.warn('[prefetch] item_list page1 未找到剩余未知物品的元数据');
@@ -324,6 +373,23 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
         _topMoverApiDone = true;
         running._topMoverData = _topMoverData;
         running._topMoverApiDone = true;
+
+        // ★ 数据净化：预取路径不走 js/api.js 的 sanitizeItemArray（此刻 bundle.js 尚未加载完）。
+        //   渲染层会把 id/length/width/weight 等字段直接拼进 innerHTML（见 js/render/detail.js），
+        //   这里统一收敛为有限数字，避免上游异常数据破坏 DOM 结构。
+        var NUM_FIELDS = ['id', 'tid', 'price', 'bl', 'day_3_bl', 'day_7_bl', 'day_30_bl',
+                          'grade', 'length', 'width', 'weight', 'Weight', 'price_start',
+                          'priceStart', 'day_3_price', 'day_7_price', 'day_30_price', 'is_get_time'];
+        for (var si = 0; si < merged.length; si++) {
+          var sit = merged[si];
+          for (var sf = 0; sf < NUM_FIELDS.length; sf++) {
+            var skey = NUM_FIELDS[sf];
+            if (sit[skey] === undefined || sit[skey] === null || sit[skey] === '') continue;
+            var snum = Number(sit[skey]);
+            if (!isFinite(snum)) snum = 0;
+            sit[skey] = snum;
+          }
+        }
 
         _dataReady = true;
         _notifyArrive(merged);
@@ -616,8 +682,8 @@ index.html — 三角洲行动变卖物价格查询 PWA 主入口 | build: v2026
   </div>
 
   <!-- Service Worker 注册（必须在 bundle 之前加载） -->
-  <script src="js/sw-register.js?v=v20260805w" defer></script>
+  <script src="js/sw-register.js?v=v20260829k" defer></script>
   <!-- ★ 单文件 bundle：减少 HTTP 请求 6→1，defer 不阻塞解析 -->
-  <script src="js/bundle.js?v=v20260805w" defer></script>
+  <script src="js/bundle.js?v=v20260829k" defer></script>
 </body>
 </html>

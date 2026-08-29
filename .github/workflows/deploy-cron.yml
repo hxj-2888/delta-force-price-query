@@ -1,0 +1,72 @@
+# ===== GitHub Actions — Cloudflare Cron Worker 自动部署 =====
+# 背景: Pages Functions 不支持 Cron Triggers，每日价格采集靠独立 Worker（workers/cron/）。
+#       若只跑 deploy.yml，该 Worker 永远不会被部署 → D1 price_history 长期为空。
+# 触发: push 到 main（与 Pages 部署同步）/ 手动 workflow_dispatch / 被 deploy.yml 调用
+# 依赖 GitHub Secrets（Settings → Secrets and variables → Actions）:
+#   CF_API_TOKEN        Cloudflare API Token（需含 Workers Scripts 的 Edit 权限）
+#   UPSTREAM_API_TOKEN  上游 orzice.com 开放平台的 API Token（会写入 Worker 的 API_TOKEN secret）
+# 说明: 未配置 UPSTREAM_API_TOKEN 时自动跳过并告警，不会让主流程变红。
+
+name: deploy-cron
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/cron/**'
+      - '.github/workflows/deploy-cron.yml'
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      CF_API_TOKEN:
+        required: true
+      UPSTREAM_API_TOKEN:
+        required: false
+
+concurrency:
+  group: deploy-cron-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-cron-worker:
+    name: Deploy Cron Worker (delta-force-cron)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check upstream token secret
+        id: secret-check
+        run: |
+          if [ -z "${{ secrets.UPSTREAM_API_TOKEN }}" ]; then
+            echo "::warning title=跳过 Cron Worker 部署::未配置 Secret UPSTREAM_API_TOKEN，D1 价格历史将不会自动采集"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Syntax check cron worker
+        run: node --check workers/cron/index.js
+
+      - name: Deploy Cron Worker
+        if: steps.secret-check.outputs.skip == 'false'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: 63ebb412ea5aaa7b38f49b2eb93c534e
+          workingDirectory: workers/cron
+          command: deploy
+          secrets: |
+            API_TOKEN
+        env:
+          API_TOKEN: ${{ secrets.UPSTREAM_API_TOKEN }}
+
+      - name: Verify deployment
+        if: steps.secret-check.outputs.skip == 'false'
+        run: |
+          echo "Cron Worker 已部署: delta-force-cron"
+          echo "调度: 0 22 * * * UTC = 北京时间每天 06:00"
+          echo "提示: 首次部署后可在 Dashboard → Workers & Pages → delta-force-cron → Triggers 复核"
