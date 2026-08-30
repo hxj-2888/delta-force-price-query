@@ -24,10 +24,16 @@
 
 ### 部署到云端
 
-部署到 Cloudflare Pages（免费）：
+部署到 Cloudflare Pages（免费）——**必须走白名单暂存脚本，禁止 `wrangler pages deploy .` 整目录直推**
+（整目录直推会把磁盘上的 `.env`（API Token / 签名密码）、`android/release.keystore`（签名私钥）、
+`.wrangler/`（Cloudflare 账户信息）等一并公开到线上；`.assetsignore` 对 `wrangler pages deploy` 无效，勿再依赖）：
+
+```powershell
+npm i -g wrangler
+powershell -ExecutionPolicy Bypass -File .\deploy-pages.ps1
 ```
-npm i -g wrangler && wrangler pages deploy .
-```
+
+> 脚本内 `$PROJECT` 默认为 `delta-force-v5`，自建部署时改成你自己的 Pages 项目名。
 
 ### 用户安装到桌面
 
@@ -45,7 +51,9 @@ npm i -g wrangler && wrangler pages deploy .
 
 ## 分发方式三：便携版 ZIP（发给高级用户）
 
-将整个项目打包为 ZIP，解压后双击 `start.bat` 即可。
+发行目录由 `setup.bat` 生成（自动按 `installer-exclude.txt` 排除 `.env` / 签名密钥 / `android/` 等），或将发行目录打包为 ZIP，解压后双击 `start.bat` 即可。
+
+**切勿手工压缩整个项目目录**——会把 `.env`（Token/签名密码）与 `android/release.keystore`（签名私钥）一起带进 ZIP。
 
 前置条件：需安装 Node.js（https://nodejs.org）
 
@@ -89,12 +97,12 @@ npm i -g wrangler && wrangler pages deploy .
 ├── CHANGELOG.md        # 修改记录
 ├── _headers            # Cloudflare Pages 缓存头与 CSP
 ├── wrangler.toml       # Pages 的 D1/KV 绑定（Cron 不在此配置，见 workers/cron/）
-├── .assetsignore       # Pages 上传排除清单（.env / android/ 等，属安全配置）
+├── deploy-pages.ps1    # 安全部署脚本：白名单暂存后部署（.env/密钥/笔记等永不公开）
 ├── server.js           # 本地代理服务器（便携版；自带 /api/metadata 与 /api/history 实现）
 ├── installer.iss       # Inno Setup 安装包脚本 → 生成 setup.exe
 ├── setup.bat           # 便携版桌面安装脚本
 ├── start.bat           # 一键启动脚本
-├── .env                # API Token 配置（本地，不入库；且必须在 .assetsignore 中排除）
+├── .env                # 本地私密配置（API Token / 签名密码）：不入库、不部署、不随任何 ZIP 分发
 └── delta-force-logo.png
 ```
 

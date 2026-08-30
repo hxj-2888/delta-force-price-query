@@ -12,8 +12,10 @@ wrangler d1 execute delta-force-prices --remote --file=migrations/0001_create_pr
 ```
 
 ## 3. 部署 Pages（前端 + API 代理）
-```bash
-wrangler pages deploy . --branch=preview
+```powershell
+# 白名单暂存后部署。禁止 wrangler pages deploy . 整目录直推：
+# 会把 .env（Token/签名密码）、release.keystore、.wrangler 一并公开到线上
+powershell -ExecutionPolicy Bypass -File .\deploy-pages.ps1
 ```
 
 ## 4. 部署 Cron Worker（独立 Worker，定时采集价格）
