@@ -135,14 +135,66 @@ function serveMetadata(res) {
   res.end(_metadataCache.body || Buffer.from('{}'));
 }
 
-// 本地无 D1，明确返回失败码，让 js/store/cache.js 的 getOrFetchCloudSnapshots 降级到本地快照
+// ===== 通用中继：GET 请求转发到线上 Pages 部署 =====
+// 带 localhost Origin 通过其来源鉴权，且按浏览器调用处理（不触发 X-Proxy-Key）。
+// onError：中继失败时的降级回调（如历史端点降级为本地快照提示），不传则返回 502/504。
+function relayGet(req, res, targetPath, onError) {
+  var options = {
+    hostname: RELAY_HOST,
+    port: 443,
+    path: targetPath,
+    method: 'GET',
+    headers: {
+      'User-Agent': 'DeltaForcePriceQuery/1.0',
+      'Accept': 'application/json',
+      'Origin': `http://localhost:${PORT}`
+    }
+  };
+  console.log(`[API中继] ${req.url} → https://${RELAY_HOST}${targetPath}`);
+  let responded = false;
+  const proxyReq = https.request(options, (proxyRes) => {
+    let body = '';
+    proxyRes.on('data', chunk => body += chunk);
+    proxyRes.on('end', () => {
+      if (responded) return;
+      responded = true;
+      res.writeHead(proxyRes.statusCode, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store'
+      });
+      res.end(body);
+      console.log(`[API中继] 响应 ${proxyRes.statusCode}, ${body.length} 字节`);
+    });
+  });
+  proxyReq.on('error', (err) => {
+    if (responded) return;
+    responded = true;
+    console.error(`[API中继] 错误: ${err.message}`);
+    if (onError) { onError(err); return; }
+    res.writeHead(502);
+    res.end(JSON.stringify({ code: -1, msg: '中继请求失败: ' + err.message }));
+  });
+  proxyReq.setTimeout(15000, () => {
+    if (responded) return;
+    responded = true;
+    proxyReq.destroy();
+    console.error('[API中继] 超时(15s)');
+    if (onError) { onError(new Error('timeout')); return; }
+    res.writeHead(504);
+    res.end(JSON.stringify({ code: -1, msg: '中继请求超时' }));
+  });
+  proxyReq.end();
+}
+
+// 线上不可用时的降级：让 js/store/cache.js 的 getOrFetchCloudSnapshots 降级到本地快照
 function serveHistoryUnavailable(res) {
   res.writeHead(200, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Cache-Control': 'no-store'
   });
-  res.end(JSON.stringify({ code: -1, msg: '本地模式无云端价格历史，已使用本地快照' }));
+  res.end(JSON.stringify({ code: -1, msg: '云端价格历史暂不可达，已使用本地快照' }));
 }
 
 function proxyApi(req, res) {
@@ -297,8 +349,9 @@ const server = http.createServer((req, res) => {
     return serveMetadata(res);
   }
 
-  // 本地无云端价格历史：返回失败码，前端自动降级到本地 IndexedDB/localStorage 快照
-  if (/^\/api\/history\/\d+$/.test(pathname) && req.method === 'GET') {
+  // 价格历史（后端 D1 记录）：中继到线上 /api/history/:id；线上不可用时降级本地快照
+  var historyMatch = pathname.match(/^\/api\/history\/(\d+)$/);
+  if (historyMatch && req.method === 'GET') {
     if (!isAuthorizedOrigin(req)) {
       res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ code: -1, msg: '未授权的来源' }));
@@ -309,7 +362,9 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ code: -1, msg: '请求过于频繁, 请稍后再试' }));
       return;
     }
-    return serveHistoryUnavailable(res);
+    return relayGet(req, res, '/api/history/' + historyMatch[1], function () {
+      serveHistoryUnavailable(res);
+    });
   }
 
   // API 中继: /api/* → https://delta-force-v5.pages.dev/api/*
