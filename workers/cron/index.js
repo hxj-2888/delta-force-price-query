@@ -35,9 +35,38 @@ export default {
   },
 };
 
+// ===== 采集心跳（2026-09-27）：每次执行把状态写入 KV，供 /api/cron-status 查询 =====
+// 背景：2026-08-30~09-23 上游 token 失效导致 Cron 静默失败 25 天无人察觉
+//（backfill 仅回溯 3 天，超过即成永久缺口）。心跳让断档当天就能被发现。
+// KV 写频：每天 1~2 次，远低于 1 key/秒 限制。
+const HEARTBEAT_KEY = 'cron_heartbeat';
+
+async function writeHeartbeat(env, patch) {
+  if (!env.METADATA_KV) return;
+  try {
+    let prev = {};
+    try {
+      const raw = await env.METADATA_KV.get(HEARTBEAT_KEY, 'json');
+      if (raw && typeof raw === 'object') prev = raw;
+    } catch (_) { /* 读失败视作空，不阻断主流程 */ }
+    await env.METADATA_KV.put(HEARTBEAT_KEY, JSON.stringify(Object.assign({}, prev, patch)));
+  } catch (e) {
+    console.error('[Cron-heartbeat] 写入失败:', e.message);
+  }
+}
+
+function beijingDateStr(d) {
+  return new Date(d.getTime() + 8 * 3600 * 1000).toISOString().split('T')[0];
+}
+
 async function runScheduled(env, ctx) {
+  const nowIso = new Date().toISOString();
   const token = (env.API_TOKEN || '').trim();
-  if (!token) { console.error('[Cron] API_TOKEN 未配置'); return; }
+  if (!token) {
+    console.error('[Cron] API_TOKEN 未配置');
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: 'API_TOKEN 未配置' });
+    return;
+  }
 
   // ★ 拉取 item_price_all（价格+元数据共享这一次请求）
   // 必须加超时：Cron Worker 有 CPU / 墙钟上限，上游挂起会把本次执行整个拖死，
@@ -47,12 +76,29 @@ async function runScheduled(env, ctx) {
   const priceResp = await fetchWithTimeout(priceUrl, {
     headers: { 'User-Agent': 'DeltaForceCron/1.0', 'Accept': 'application/json' },
   }, 25000);
-  if (!priceResp) { console.error('[Cron] item_price_all 请求超时，放弃本次执行'); return; }
-  if (!priceResp.ok) { console.error(`[Cron] item_price_all 返回 ${priceResp.status}`); return; }
+  if (!priceResp) {
+    console.error('[Cron] item_price_all 请求超时，放弃本次执行');
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: 'item_price_all 请求超时' });
+    return;
+  }
+  if (!priceResp.ok) {
+    console.error(`[Cron] item_price_all 返回 ${priceResp.status}`);
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: `item_price_all HTTP ${priceResp.status}` });
+    return;
+  }
 
-  const priceData = await priceResp.json();
+  let priceData;
+  try {
+    priceData = await priceResp.json();
+  } catch (e) {
+    console.error(`[Cron] item_price_all JSON 解析失败: ${e.message}`);
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: 'item_price_all JSON 解析失败' });
+    return;
+  }
   if (priceData.code !== 0 || !Array.isArray(priceData.data)) {
-    console.error(`[Cron] item_price_all 异常: code=${priceData.code}`); return;
+    console.error(`[Cron] item_price_all 异常: code=${priceData.code}`);
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: `item_price_all code=${priceData.code}` });
+    return;
   }
   console.log(`[Cron] 获取到 ${priceData.data.length} 个物品`);
 
@@ -61,8 +107,17 @@ async function runScheduled(env, ctx) {
     await backfillMissingDays(env, priceData);
   }
 
-  // 任务 1: 采集每日价格到 D1
-  await collectDailyPrices(env, priceData);
+  // 任务 1: 采集每日价格到 D1（成功与否决定心跳的 lastSuccessDate）
+  const collect = await collectDailyPrices(env, priceData);
+  if (collect && collect.ok) {
+    await writeHeartbeat(env, {
+      lastSuccessDate: beijingDateStr(new Date()),
+      lastSuccessAt: new Date().toISOString(),
+      itemCount: collect.items,
+    });
+  } else {
+    await writeHeartbeat(env, { lastFailAt: new Date().toISOString(), lastFailReason: 'D1 批量写入失败' });
+  }
 
   // 任务 2: 增量刷新元数据到 KV（仅检查是否有新物品）
   await refreshMetadata(env, priceData, token);
@@ -137,13 +192,17 @@ async function backfillMissingDays(env, priceData) {
 }
 
 // ===== 每日价格采集（每日无条件写入，保证 30 天曲线无缺口） =====
+// 返回 { ok, items, written, errors } 供心跳判断采集是否成功
 async function collectDailyPrices(env, priceData) {
-  if (!env.DB) { console.error('[Cron-price] D1 数据库未绑定'); return; }
+  if (!env.DB) {
+    console.error('[Cron-price] D1 数据库未绑定');
+    return { ok: false, items: 0, written: 0, errors: 0 };
+  }
 
   try {
     const items = priceData.data.filter(item => item.id && item.price > 0);
     console.log(`[Cron-price] ${items.length} 个有效物品`);
-    if (items.length === 0) return;
+    if (items.length === 0) return { ok: false, items: 0, written: 0, errors: 0 };
 
     const now = new Date();
     const beijing = new Date(now.getTime() + 8 * 3600 * 1000);
@@ -173,8 +232,10 @@ async function collectDailyPrices(env, priceData) {
       }
     }
     console.log(`[Cron-price] 完成: ${items.length} 个物品, ${written} 条已写入` + (errors ? `, ${errors} 批失败` : ''));
+    return { ok: errors === 0, items: items.length, written, errors };
   } catch (err) {
     console.error('[Cron-price] 执行失败:', err.message);
+    return { ok: false, items: 0, written: 0, errors: 0 };
   }
 }
 

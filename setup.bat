@@ -1,45 +1,44 @@
 @echo off
-chcp 65001 >nul
-title è½å¹•æŸ¥ - å®‰è£…åˆ°æ¡Œé¢
+title ÂäÄ»²é - °²×°µ½×ÀÃæ
 cd /d "%~dp0"
 
-echo â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-echo    è½å¹•æŸ¥ - å˜å–ç‰©ä»·æ ¼æŸ¥è¯¢  æ¡Œé¢å®‰è£…
-echo â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+echo ¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T
+echo    ÂäÄ»²é - ±äÂôÎï¼Û¸ñ²éÑ¯  ×ÀÃæ°²×°
+echo ¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T
 echo.
 
 set "INSTALL_DIR=%APPDATA%\DeltaForcePriceQuery"
 
-echo å³å°†å®‰è£…åˆ°: %INSTALL_DIR%
+echo ¼´½«°²×°µ½: %INSTALL_DIR%
 echo.
-echo æŒ‰ä»»æ„é”®å¼€å§‹å®‰è£…ï¼Œæˆ–å…³é—­çª—å£å–æ¶ˆ...
+echo °´ÈÎÒâ¼ü¿ªÊ¼°²×°£¬»ò¹Ø±Õ´°¿ÚÈ¡Ïû...
 pause >nul
 
-:: 1. åˆ›å»ºå®‰è£…ç›®å½•
+:: 1. ´´½¨°²×°Ä¿Â¼
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 if %errorlevel% neq 0 (
-    echo [âœ—] æ— æ³•åˆ›å»ºå®‰è£…ç›®å½•
+    echo [X] ÎÞ·¨´´½¨°²×°Ä¿Â¼
     pause
     exit /b 1
 )
 
-:: 2. å¤åˆ¶æ‰€æœ‰æ–‡ä»¶
-echo [â†’] æ­£åœ¨å¤åˆ¶æ–‡ä»¶...
+:: 2. ¸´ÖÆËùÓÐÎÄ¼þ
+echo [¡ú] ÕýÔÚ¸´ÖÆÎÄ¼þ...
 xcopy /E /Y /Q /EXCLUDE:"%~dp0installer-exclude.txt" ".\*" "%INSTALL_DIR%\" >nul 2>&1
-echo [âœ“] æ–‡ä»¶å¤åˆ¶å®Œæˆ
+echo [OK] ÎÄ¼þ¸´ÖÆÍê³É
 
-:: 3. åˆ›å»ºæ¡Œé¢å¿«æ·æ–¹å¼ (VBS)
-echo [â†’] æ­£åœ¨åˆ›å»ºæ¡Œé¢å¿«æ·æ–¹å¼...
+:: 3. ´´½¨×ÀÃæ¿ì½Ý·½Ê½ (VBS)
+echo [¡ú] ÕýÔÚ´´½¨×ÀÃæ¿ì½Ý·½Ê½...
 set "DESKTOP=%USERPROFILE%\Desktop"
 set "VBS=%TEMP%\shortcut.vbs"
 
 > "%VBS%" echo Set ws = WScript.CreateObject("WScript.Shell")
 >> "%VBS%" echo deskPath = ws.SpecialFolders("Desktop")
->> "%VBS%" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\è½å¹•æŸ¥-å˜å–ç‰©ä»·æ ¼æŸ¥è¯¢.lnk")
+>> "%VBS%" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\ÂäÄ»²é-±äÂôÎï¼Û¸ñ²éÑ¯.lnk")
 >> "%VBS%" echo shortcut.TargetPath = "%INSTALL_DIR%\start.bat"
 >> "%VBS%" echo shortcut.WorkingDirectory = "%INSTALL_DIR%"
 >> "%VBS%" echo shortcut.IconLocation = "%INSTALL_DIR%\icon.ico,0"
->> "%VBS%" echo shortcut.Description = "è½å¹•æŸ¥ - å˜å–ç‰©å®žæ—¶ä»·æ ¼æŸ¥è¯¢"
+>> "%VBS%" echo shortcut.Description = "ÂäÄ»²é - ±äÂôÎïÊµÊ±¼Û¸ñ²éÑ¯"
 >> "%VBS%" echo shortcut.WindowStyle = 1
 >> "%VBS%" echo shortcut.Save
 
@@ -47,33 +46,32 @@ cscript //nologo "%VBS%" >nul 2>&1
 set "SHORTCUT_OK=%errorlevel%"
 del "%VBS%" >nul 2>&1
 
-:: å¦‚æžœ logo å›¾æ ‡è®¾ç½®å¤±è´¥ï¼ˆcscript è¿”å›žéž 0ï¼‰ï¼Œç”¨ç³»ç»Ÿå›¾æ ‡å…œåº•
+:: Èç¹û logo Í¼±êÉèÖÃÊ§°Ü£¨cscript ·µ»Ø·Ç 0£©£¬ÓÃÏµÍ³Í¼±ê¶µµ×
 if not "%SHORTCUT_OK%"=="0" (
-    echo [!] è‡ªå®šä¹‰å›¾æ ‡è®¾ç½®å¤±è´¥ï¼Œä½¿ç”¨ç³»ç»Ÿå›¾æ ‡å…œåº•...
+    echo [!] ×Ô¶¨ÒåÍ¼±êÉèÖÃÊ§°Ü£¬Ê¹ÓÃÏµÍ³Í¼±ê¶µµ×...
     > "%TEMP%\shortcut2.vbs" echo Set ws = WScript.CreateObject("WScript.Shell")
     >> "%TEMP%\shortcut2.vbs" echo deskPath = ws.SpecialFolders("Desktop")
-    >> "%TEMP%\shortcut2.vbs" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\è½å¹•æŸ¥-å˜å–ç‰©ä»·æ ¼æŸ¥è¯¢.lnk")
+    >> "%TEMP%\shortcut2.vbs" echo Set shortcut = ws.CreateShortcut(deskPath ^& "\ÂäÄ»²é-±äÂôÎï¼Û¸ñ²éÑ¯.lnk")
     >> "%TEMP%\shortcut2.vbs" echo shortcut.IconLocation = "shell32.dll,13"
     >> "%TEMP%\shortcut2.vbs" echo shortcut.Save
     cscript //nologo "%TEMP%\shortcut2.vbs" >nul 2>&1
     del "%TEMP%\shortcut2.vbs" >nul 2>&1
 )
-echo [âœ“] æ¡Œé¢å¿«æ·æ–¹å¼å·²åˆ›å»º
+echo [OK] ×ÀÃæ¿ì½Ý·½Ê½ÒÑ´´½¨
 
-:: 4. é¦–æ¬¡è¿è¡Œï¼Œæ£€æŸ¥é…ç½®
+:: 4. °²×°Íê³É
 echo.
-echo â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-echo â”‚  å®‰è£…å®Œæˆï¼                                â”‚
-echo â”‚                                            â”‚
-echo â”‚  æ¡Œé¢å·²ç”Ÿæˆå¿«æ·æ–¹å¼:                        â”‚
-echo â”‚  "è½å¹•æŸ¥-å˜å–ç‰©ä»·æ ¼æŸ¥è¯¢"                  â”‚
-echo â”‚                                            â”‚
-echo â”‚  é¦–æ¬¡ä½¿ç”¨å‰è¯·å…ˆé…ç½® API Token:              â”‚
-echo â”‚  åŒå‡»å¿«æ·æ–¹å¼åŽï¼Œè„šæœ¬ä¼šå¼•å¯¼ä½ å®Œæˆé…ç½®        â”‚
-echo â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+echo ©°©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©´
+echo ©¦  °²×°Íê³É£¡                                ©¦
+echo ©¦                                            ©¦
+echo ©¦  ×ÀÃæÒÑÉú³É¿ì½Ý·½Ê½:                        ©¦
+echo ©¦  "ÂäÄ»²é-±äÂôÎï¼Û¸ñ²éÑ¯"                  ©¦
+echo ©¦                                            ©¦
+echo ©¦  ÃâÅäÖÃ£¬Ë«»÷¿ì½Ý·½Ê½¼´¿ÉÖ±½ÓÊ¹ÓÃ           ©¦
+echo ©¸©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¼
 echo.
 
 start explorer "%INSTALL_DIR%"
-echo å®‰è£…ç›®å½•å·²æ‰“å¼€ï¼Œå¯ä»¥æŸ¥çœ‹ .env æ–‡ä»¶å¹¶é…ç½® Tokenã€‚
+echo °²×°Ä¿Â¼ÒÑ´ò¿ª¡£Ë«»÷×ÀÃæ¿ì½Ý·½Ê½¼´¿ÉÖ±½ÓÊ¹ÓÃ¡£
 
 pause

@@ -18,7 +18,7 @@ $allowlist = @(
   'delta-force-logo.png', 'delta-force-logo.webp',
   'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon.ico',
   'manifest.json', 'sw.js',
-  'js', 'data', 'functions', 'wrangler.toml', '_headers'
+  'js', 'data', 'functions', '_headers'
 )
 foreach ($item in $allowlist) {
   if (-not (Test-Path $item)) { Write-Host "缺失站点文件: $item" -ForegroundColor Red; exit 1 }

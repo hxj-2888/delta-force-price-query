@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // ===== server.js — Node.js 本地服务器 =====
-// 功能清单: 静态文件服务(MIME映射+路径消毒+黑名单) | API代理(/api/*→orzice.com) | CORS处理
-// .env文件读取(API_TOKEN) | 超时控制(15s) | 安全防护(目录遍历/敏感文件访问/来源校验/限流)
+// 功能清单: 静态文件服务(MIME映射+路径消毒+黑名单) | API中继(/api/*→Pages线上/api/*) | CORS处理
+// 超时控制(15s) | 安全防护(目录遍历/敏感文件访问/来源校验/限流)
 // 启动: node server.js | 访问: http://127.0.0.1:3000（仅绑定回环地址, 不对外网暴露）
 // 依赖: 无(纯Node.js内置模块http/https/fs/path) | 被依赖: 无(独立运行)
-// 改动影响: 修改端口→影响启动脚本; 修改黑名单→影响文件访问; 修改代理逻辑→影响桌面版用户
+// 改动影响: 修改端口→影响启动脚本; 修改黑名单→影响文件访问; 修改中继逻辑→影响桌面版用户
 
 const http = require('http');
 const https = require('https');
@@ -13,47 +13,12 @@ const path = require('path');
 const { createRateLimiter, DEFAULTS } = require('./scripts/rate-limit.cjs');
 
 const PORT = Number(process.env.PORT || 3000);
-const API_HOST = 'orzice.com';
-const API_PATH = '/workApi/v1/sjz_api';
-
-let API_TOKEN = process.env.API_TOKEN;
-
-if (!API_TOKEN) {
-  const envFile = path.join(__dirname, '.env');
-  if (fs.existsSync(envFile)) {
-    try {
-      const envContent = fs.readFileSync(envFile, 'utf8');
-      const lines = envContent.split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('#')) {
-          const eqIdx = trimmed.indexOf('=');
-          if (eqIdx > 0) {
-            const key = trimmed.substring(0, eqIdx).trim();
-            const value = trimmed.substring(eqIdx + 1).trim();
-            if (key === 'API_TOKEN') {
-              API_TOKEN = value;
-              console.log('[OK] 已从 .env 文件读取 API_TOKEN');
-              break;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('读取 .env 文件失败:', e.message);
-    }
-  }
-}
-
-if (!API_TOKEN) {
-  console.error('错误: API_TOKEN 未设置');
-  console.error('');
-  console.error('创建项目根目录下的 .env 文件并写入:');
-  console.error('  API_TOKEN=your_token_here');
-  console.error('');
-  console.error('或设置环境变量后重试: set API_TOKEN=your_token');
-  process.exit(1);
-}
+// 中继模式（2026-09-27）：本地不再持有 API_TOKEN，/api/* 统一中继到线上 Pages 部署，
+// 由其 Cloudflare Functions 用 secret 中的 API_TOKEN 调用上游 orzice.com。
+// 线上鉴权已核实放行 localhost 来源（functions/api/[[path]].js isAuthorizedOrigin 第77行），
+// 且带 Origin 的请求按浏览器调用处理，不触发 X-Proxy-Key 校验。
+const RELAY_HOST = process.env.RELAY_HOST || 'delta-force-v5.pages.dev';
+const RELAY_PATH = '/api';
 
 // MIME 类型映射
 const MIME = {
@@ -101,7 +66,7 @@ function serveFile(res, filePath) {
   }
 }
 
-// ===== 来源校验：只允许本机页面调用（防止恶意网页借用本地代理和 API_TOKEN） =====
+// ===== 来源校验：只允许本机页面调用（防止恶意网页借用本地中继代理） =====
 function isAuthorizedOrigin(req) {
   // 浏览器跨站请求直接拒绝（Fetch Metadata 头 JS 不可伪造）
   if (req.headers['sec-fetch-site'] === 'cross-site') return false;
@@ -121,22 +86,32 @@ var checkRateLimit = createRateLimiter({
 });
 
 function getClientIp(req) {
-  return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-         req.socket.remoteAddress || 'unknown';
+  // 本地服务器仅绑定 127.0.0.1，remoteAddress 恒为本机回环地址；
+  // 不读取 x-forwarded-for：该头可被本机任意进程伪造（每次换 IP 绕开 per-IP 限流）
+  return req.socket.remoteAddress || 'unknown';
 }
 
 // 收集请求体（前端把 { endpoint, params } 放在 POST body，见 js/api.js）
+// 上限 64KB：超限按空 body 处理（后续走 endpoint 白名单 403），防止恶意大 body 撑爆内存
+var MAX_BODY_BYTES = 64 * 1024;
 function collectBody(req, cb) {
   var chunks = [];
-  req.on('data', function (c) { chunks.push(c); });
-  req.on('end', function () { cb(Buffer.concat(chunks).toString('utf8')); });
-  req.on('error', function () { cb(''); });
+  var size = 0;
+  var done = false;
+  var finish = function (str) { if (!done) { done = true; cb(str); } };
+  req.on('data', function (c) {
+    size += c.length;
+    if (size > MAX_BODY_BYTES) { chunks = []; finish(''); return; }
+    chunks.push(c);
+  });
+  req.on('end', function () { finish(Buffer.concat(chunks).toString('utf8')); });
+  req.on('error', function () { finish(''); });
 }
 
 // ===== 本地端点：与 Cloudflare Functions 对齐（server.js 自行实现，不走上游代理）=====
 // 背景：云端 functions/api/[[path]].js 提供 /api/metadata（KV∪静态）与 /api/history/:id（D1）。
 // 本地没有 KV/D1，若不在此拦截，请求会掉进 proxyApi 的 URL path 兜底逻辑，
-// 被当成上游接口转发到 orzice.com/workApi/v1/sjz_api/metadata → 上游返回错误 JSON，
+// 被当成上游接口转发到线上 /api/metadata → 返回错误 JSON，
 // 而 index.html 的预取脚本只 r.json() 不校验 code，于是全部物品名退化为「物品#ID」。
 
 var _metadataCache = { mtimeMs: -1, body: null };
@@ -222,28 +197,28 @@ function proxyApi(req, res) {
       return;
     }
 
-    // 使用 URLSearchParams 正确处理查询参数编码，附加 token
+    // 使用 URLSearchParams 正确处理查询参数编码（token 由中继目标的 Functions secret 注入，本地不经手）
     var params = new URLSearchParams();
     Object.keys(queryParams).forEach(function (k) {
       if (queryParams[k] != null) params.set(k, String(queryParams[k]));
     });
-    params.set('token', API_TOKEN);
-    var baseUrl = API_PATH + '/' + endpoint + '?' + params.toString();
+    var baseUrl = RELAY_PATH + '/' + endpoint + '?' + params.toString();
 
     var options = {
-      hostname: API_HOST,
+      hostname: RELAY_HOST,
       port: 443,
       path: baseUrl,
       method: 'GET',   // 上游接口均为 GET
       headers: {
         'User-Agent': 'DeltaForcePriceQuery/1.0',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        // 声明 localhost 来源：线上 isAuthorizedOrigin 放行本机来源（第77行正则），
+        // 且带 Origin 的请求按浏览器跨源调用处理，不触发 X-Proxy-Key 校验
+        'Origin': `http://localhost:${PORT}`
       }
     };
 
-    // 掩码 token，防止泄露到日志
-    var logUrl = baseUrl.replace(API_TOKEN, '***');
-    console.log(`[API代理] ${req.url} → https://${API_HOST}${logUrl}`);
+    console.log(`[API中继] ${req.url} → https://${RELAY_HOST}${baseUrl}`);
 
     let responded = false;
 
@@ -329,10 +304,15 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ code: -1, msg: '未授权的来源' }));
       return;
     }
+    if (!checkRateLimit(getClientIp(req))) {
+      res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' });
+      res.end(JSON.stringify({ code: -1, msg: '请求过于频繁, 请稍后再试' }));
+      return;
+    }
     return serveHistoryUnavailable(res);
   }
 
-  // API 代理: /api/* → https://orzice.com/workApi/v1/sjz_api/*
+  // API 中继: /api/* → https://delta-force-v5.pages.dev/api/*
   if (pathname === '/api' || pathname.indexOf('/api/') === 0) {
     return proxyApi(req, res);
   }
@@ -395,7 +375,7 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`     http://localhost:${PORT}`);
   console.log(`     http://127.0.0.1:${PORT}`);
   console.log('');
-  console.log('  API 代理: /api/* → https://orzice.com/workApi/v1/sjz_api/*');
+  console.log('  API 中继: /api/* → https://delta-force-v5.pages.dev/api/*');
   console.log('');
   console.log('  按 Ctrl+C 停止服务器');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

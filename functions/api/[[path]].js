@@ -145,6 +145,47 @@ export async function onRequest(context) {
     });
   }
 
+  // ─── Cron 采集心跳 /api/cron-status ───
+  // ★ 刻意放在来源鉴权与脚本鉴权之前：需允许 curl / Uptime 监控（无 Origin、无 X-Proxy-Key）直接探测。
+  //   仅暴露采集时间戳与物品数，无敏感数据。仅读 KV，一次 GET 不触上游。
+  // 背景：2026-08-30~09-23 Cron 因上游 token 失效静默失败 25 天无人察觉（backfill 仅 3 天）。
+  if (url.pathname === '/api/cron-status' && request.method === 'GET') {
+    let hb = null;
+    try { hb = await env.METADATA_KV.get('cron_heartbeat', 'json'); } catch (_) { /* 未绑定/读失败视作无记录 */ }
+    if (!hb || !hb.lastSuccessDate) {
+      return new Response(JSON.stringify({
+        code: 0,
+        data: { healthy: false, lastSuccessDate: null, msg: '暂无心跳记录（Cron 未部署或从未成功采集）' },
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+      });
+    }
+    // 北京时间"今天"；06:00（Cron 调度）之前应看到昨天，之后应看到今天
+    const bj = new Date(Date.now() + 8 * 3600 * 1000);
+    const todayStr = bj.toISOString().split('T')[0];
+    const expectStr = bj.getUTCHours() >= 6
+      ? todayStr
+      : new Date(bj.getTime() - 86400000).toISOString().split('T')[0];
+    const daysBehind = Math.round((new Date(todayStr + 'T00:00:00Z') - new Date(hb.lastSuccessDate + 'T00:00:00Z')) / 86400000);
+    return new Response(JSON.stringify({
+      code: 0,
+      data: {
+        healthy: hb.lastSuccessDate >= expectStr,
+        lastSuccessDate: hb.lastSuccessDate,
+        lastSuccessAt: hb.lastSuccessAt || null,
+        lastRunAt: hb.lastRunAt || null,
+        lastFailAt: hb.lastFailAt || null,
+        lastFailReason: hb.lastFailReason || null,
+        itemCount: typeof hb.itemCount === 'number' ? hb.itemCount : null,
+        daysBehind,
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+    });
+  }
+
   // ─── 来源校验 ───
   // ★ 位置很关键：必须排在 /api/metadata 与 /api/history/:id 之前。
   //   原实现把它放在这两个业务分支之后，导致它们对任意站点开放（跨站浏览器可直接读取 D1 历史）。
