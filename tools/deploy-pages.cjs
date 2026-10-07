@@ -36,7 +36,9 @@ const SITE_ENTRIES = [
   'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon.ico',
   'manifest.json', 'sw.js',
   'js', 'data', 'functions', '_headers',
-  'scripts/rate-limit.cjs',
+  // 函数运行时依赖的模块：functions/api/[[path]].js 与 lib/ 内部都 import 它们，
+  // 暂存目录缺了任何一个，函数打包直接失败（test/rate-limit.test.mjs 有白名单断言）
+  'lib', 'scripts/rate-limit.cjs',
 ];
 // 可选文件：存在才带上（安装包走 GitHub Release 分发，本地磁盘通常没有）
 const OPTIONAL_ENTRIES = ['delta-force.apk', 'delta-force-portable.zip'];

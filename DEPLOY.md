@@ -23,7 +23,7 @@ node tools/deploy-pages.cjs
 > 白名单暂存后部署（与太空杀仓 `tools/deploy-pages.cjs` 同一模式）。
 > 禁止 `wrangler pages deploy .` 整目录直推：`.assetsignore` 对 pages deploy 无效（2026-08-29 实测），
 > 会把 .env（签名密码）、release.keystore、miniprogram/、test/ 等一并公开到线上。
-> 白名单必须包含 `scripts/rate-limit.cjs`——Pages 函数 import 该模块，缺了打包即失败。
+> 白名单必须包含 `lib/` 与 `scripts/rate-limit.cjs`——Pages 函数 import 这些模块，缺了打包即失败。
 > 安装包（apk/zip）不进 git：本地磁盘没有时脚本警告并跳过；CI 部署前从 GitHub Release 拉回。
 
 ## 4. 部署 Cron Worker（独立 Worker，定时采集价格）

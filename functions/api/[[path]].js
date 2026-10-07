@@ -1,24 +1,30 @@
-// ===== functions/api/[[path]].js — Cloudflare Pages API 代理 =====
+// ===== functions/api/[[path]].js — Cloudflare Pages API 代理（路由派发层） =====
 // 功能清单: API代理(转发到上游orzice.com) | 元数据查询(/api/metadata,KV+静态回退) | 价格历史(/api/history/:id,D1)
-// CORS处理 | 来源鉴权(isAuthorizedOrigin) | 路径校验 | 超时控制(item_price_all:25s/其他:15s)
+//           心跳(/api/cron-status) | CORS处理 | 来源鉴权 | 超时控制(item_price_all:25s/其他:15s)
 // 限流三层: 每 IP(内存) + 全局(D1) + 每客户端 X-Client-Id(内存+D1)
 // 依赖: Cloudflare KV(METADATA_KV) D1(price_history/rate_limit_window/rate_limit_client表) 环境变量(API_TOKEN)
 // 改动影响: 修改API_TOKEN→影响所有API代理; 修改上游URL→影响数据来源; 修改缓存头→影响CDN行为
+//
+// ★ 本文件只保留「限流 + 鉴权 + 路由派发」流水线，业务实现在 lib/（与桌面版共享的部分）
+//   与 lib/handlers/（云端专属）。流水线顺序有安全语义，调整前先读 test/rate-limit.test.mjs
+//   的流水线顺序守卫与下方各步骤注释。
 
 // 限流阈值与内存计数器来自唯一实现 scripts/rate-limit.cjs（与桌面版 server.js 共用，
-// 改阈值只改该文件 DEFAULTS）。部署白名单（tools/deploy-pages.cjs）必须带上该模块文件，
-// 否则函数打包时解析不到 import。
+// 改阈值只改该文件 DEFAULTS）。部署白名单（tools/deploy-pages.cjs）必须携带
+// scripts/rate-limit.cjs 与 lib/ ——暂存目录缺它们函数打包直接失败。
 import {
   CLIENT_ID_RE,
   DEFAULTS,
   createPerKeyLimiter,
   createRateLimiter,
 } from '../../scripts/rate-limit.cjs';
-
-const API_HOST = 'orzice.com';
-const API_PATH = '/workApi/v1/sjz_api';
-
-// ★ 上游 API Token — 必须在 Cloudflare Dashboard 中设置 API_TOKEN 环境变量
+import { isAuthorizedOrigin, checkScriptAccess } from '../../lib/api-auth.cjs';
+import { jsonResponse } from '../../lib/api-response.cjs';
+import { checkGlobalRateLimitDB, checkClientRateLimitDB } from '../../lib/rate-limit-d1.cjs';
+import { handleCronStatus } from '../../lib/handlers/cron-status.cjs';
+import { handleMetadata } from '../../lib/handlers/metadata.cjs';
+import { handleHistoryRequest } from '../../lib/handlers/history.cjs';
+import { handleProxy } from '../../lib/handlers/proxy.cjs';
 
 // ========== 限流（三层） ==========
 // 第一层: 每 IP 内存计数, 每 isolate 生效, 拦截绝大多数高频滥用（快, 零额外 IO）
@@ -34,108 +40,6 @@ const checkClientRateLimitMem = createPerKeyLimiter({
 function normalizeClientId(raw) {
   const id = (raw || '').trim();
   return CLIENT_ID_RE.test(id) ? id : null;
-}
-
-// 全局限流: D1 原子计数, 返回 true=放行
-// 窗口 = 'g' + 北京时间 yyyyMMddHHmm, 旧行每次检查顺带清理（概率 1/20, 控制 D1 写放大）
-async function checkGlobalRateLimitDB(db) {
-  if (!db) return true; // D1 未绑定 → 降级
-  try {
-    const bj = new Date(Date.now() + 8 * 3600 * 1000);
-    const win = 'g' + bj.toISOString().replace(/[-:TZ.]/g, '').slice(0, 12);
-    const { results } = await db.prepare(`
-      INSERT INTO rate_limit_window (win, n) VALUES (?1, 1)
-      ON CONFLICT(win) DO UPDATE SET n = n + 1
-      RETURNING n
-    `).bind(win).all();
-    const n = results && results[0] ? results[0].n : 0;
-    if (Math.random() < 0.05) {
-      db.prepare("DELETE FROM rate_limit_window WHERE win < ?1").bind('g' + win.slice(1)).run().catch(() => {});
-    }
-    return n <= DEFAULTS.maxGlobal;
-  } catch (e) {
-    // 表不存在或 D1 临时故障: 不阻塞业务, 降级为仅内存限流
-    console.warn('[ratelimit] D1 全局限流降级:', e.message);
-    return true;
-  }
-}
-
-// ========== 第三层: 按客户端限流（「同账号」维度, 防脚本刷） ==========
-// 该项目没有账号体系, 以匿名客户端 ID 等价「账号」: 网页端 localStorage 生成、
-// 桌面中继用装机指纹哈希（server.js）, 随 X-Client-Id 头上传。ID 只作限流桶,
-// 不是身份信息; 格式校验（CLIENT_ID_RE）通过才计数, 缺失/非法时回落到既有 IP + 全局两层。
-// 内存层（checkClientRateLimitMem）拦截单节点高频;
-// D1 层（表 rate_limit_client, 迁移 0003）跨节点统一阈值, 故障时降级为仅内存。
-
-// 跨节点按客户端计数: 窗口 = 'c' + 北京时间 yyyyMMddHHmm, 旧行惰性清理（概率 1/20）
-async function checkClientRateLimitDB(db, clientId) {
-  if (!db) return true; // D1 未绑定 → 降级
-  try {
-    const bj = new Date(Date.now() + 8 * 3600 * 1000);
-    const win = 'c' + bj.toISOString().replace(/[-:TZ.]/g, '').slice(0, 12);
-    const { results } = await db.prepare(`
-      INSERT INTO rate_limit_client (win, client, n) VALUES (?1, ?2, 1)
-      ON CONFLICT(win, client) DO UPDATE SET n = n + 1
-      RETURNING n
-    `).bind(win, clientId).all();
-    const n = results && results[0] ? results[0].n : 0;
-    if (Math.random() < 0.05) {
-      db.prepare("DELETE FROM rate_limit_client WHERE win < ?1").bind(win).run().catch(() => {});
-    }
-    return n <= DEFAULTS.maxPerClient;
-  } catch (e) {
-    // 表未创建或 D1 临时故障: 降级为仅内存限流
-    console.warn('[ratelimit] D1 客户端限流降级:', e.message);
-    return true;
-  }
-}
-
-// ========== HTTP 请求处理 ==========
-
-function isAuthorizedOrigin(request) {
-  const siteOrigin = new URL(request.url).origin;
-  const origin = request.headers.get('origin');
-  const fetchSite = request.headers.get('sec-fetch-site');
-  // 浏览器跨站请求直接拒绝（Fetch Metadata 头 JS 不可伪造）
-  if (fetchSite === 'cross-site') return false;
-  if (!origin) return true;
-  if (origin === siteOrigin) return true;
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
-  return false;
-}
-
-// ========== 脚本调用鉴权（审计 M1，2026-08-29）==========
-// 背景：isAuthorizedOrigin 对【无 Origin】的请求一律放行——这是刻意为之，
-//   scripts/generate-metadata.js（Node）与 workers/cron 都靠无 Origin 调用。
-//   但它同时意味着任何人都可写脚本循环调用本代理，持续消耗上游 API_TOKEN 配额，
-//   而限流（120 次/分钟/IP）只需换 IP 即可绕过。
-// 方案：引入可选环境变量 PROXY_KEY，只约束「非浏览器发起的脚本调用」：
-//   - 未配置 → 放行（平滑升级，不会因漏配 Secret 导致 CI 全挂）；
-//   - 已配置 → 非浏览器请求必须带 X-Proxy-Key 头且完全匹配，否则 403。
-//
-// ★ 关键：判断依据不能是「是否有 Origin 头」。按 Fetch 规范，浏览器**同源 GET/HEAD
-//   请求不发送 Origin 头**（只有跨源请求与同源非 GET 才带）。若按有无 Origin 判断，
-//   正常用户的同源 GET（如 /api/metadata）会被误当成脚本调用挡掉（实测 403）。
-//   正确区分浏览器请求靠 Sec-Fetch-* 系列头：浏览器强制添加、页面 JS 无法伪造，
-//   curl / Node / CI 脚本不会带。见 isBrowserRequest。
-function isBrowserRequest(request) {
-  if (request.headers.get('origin')) return true; // 跨源请求（CORS）
-  const site = request.headers.get('sec-fetch-site');
-  if (site) return site !== 'none';               // same-origin / same-site → 浏览器
-  // 无 Sec-Fetch-* 的老浏览器兼容兜底：UA + Accept-Language 组合（弱证据）
-  const ua = request.headers.get('user-agent') || '';
-  return /^Mozilla\//i.test(ua) && !!request.headers.get('accept-language');
-}
-
-function checkScriptAccess(request, env) {
-  if (isBrowserRequest(request)) return null;     // 浏览器请求：不施加脚本密钥要求
-  const key = (env && env.PROXY_KEY ? env.PROXY_KEY : '').trim();
-  if (!key) return null;                          // 未启用：维持原有行为
-  if (request.headers.get('x-proxy-key') === key) return null;
-  return new Response(JSON.stringify({ code: -1, msg: '未授权的脚本调用' }), {
-    status: 403,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  });
 }
 
 export async function onRequest(context) {
@@ -159,31 +63,19 @@ export async function onRequest(context) {
   // 第一层内存拦截高频; 第二层 D1 全局窗口计数兜底跨节点绕过
   const ip = request.headers.get('cf-connecting-ip') || 'unknown';
   if (!checkRateLimit(ip)) {
-    return new Response(JSON.stringify({ code: -1, msg: '请求过于频繁, 请稍后再试' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' },
-    });
+    return jsonResponse({ code: -1, msg: '请求过于频繁, 请稍后再试' }, 429, { 'Retry-After': '60' });
   }
   if (!await checkGlobalRateLimitDB(env.DB)) {
-    return new Response(JSON.stringify({ code: -1, msg: '当前请求量较大, 请稍后再试' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' },
-    });
+    return jsonResponse({ code: -1, msg: '当前请求量较大, 请稍后再试' }, 429, { 'Retry-After': '60' });
   }
 
   // 第三层: 按客户端跨节点计数（带合法 X-Client-Id 的请求才进入; 防单客户端刷量）
   const clientId = normalizeClientId(request.headers.get('x-client-id'));
   if (clientId && !checkClientRateLimitMem(clientId)) {
-    return new Response(JSON.stringify({ code: -1, msg: '当前客户端请求过于频繁, 请稍后再试' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' },
-    });
+    return jsonResponse({ code: -1, msg: '当前客户端请求过于频繁, 请稍后再试' }, 429, { 'Retry-After': '60' });
   }
   if (clientId && !await checkClientRateLimitDB(env.DB, clientId)) {
-    return new Response(JSON.stringify({ code: -1, msg: '当前客户端请求过于频繁, 请稍后再试' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' },
-    });
+    return jsonResponse({ code: -1, msg: '当前客户端请求过于频繁, 请稍后再试' }, 429, { 'Retry-After': '60' });
   }
 
   // ─── Cron 采集心跳 /api/cron-status ───
@@ -191,40 +83,7 @@ export async function onRequest(context) {
   //   仅暴露采集时间戳与物品数，无敏感数据。仅读 KV，一次 GET 不触上游。
   // 背景：2026-08-30~09-23 Cron 因上游 token 失效静默失败 25 天无人察觉（backfill 仅 3 天）。
   if (url.pathname === '/api/cron-status' && request.method === 'GET') {
-    let hb = null;
-    try { hb = await env.METADATA_KV.get('cron_heartbeat', 'json'); } catch (_) { /* 未绑定/读失败视作无记录 */ }
-    if (!hb || !hb.lastSuccessDate) {
-      return new Response(JSON.stringify({
-        code: 0,
-        data: { healthy: false, lastSuccessDate: null, msg: '暂无心跳记录（Cron 未部署或从未成功采集）' },
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
-      });
-    }
-    // 北京时间"今天"；06:00（Cron 调度）之前应看到昨天，之后应看到今天
-    const bj = new Date(Date.now() + 8 * 3600 * 1000);
-    const todayStr = bj.toISOString().split('T')[0];
-    const expectStr = bj.getUTCHours() >= 6
-      ? todayStr
-      : new Date(bj.getTime() - 86400000).toISOString().split('T')[0];
-    const daysBehind = Math.round((new Date(todayStr + 'T00:00:00Z') - new Date(hb.lastSuccessDate + 'T00:00:00Z')) / 86400000);
-    return new Response(JSON.stringify({
-      code: 0,
-      data: {
-        healthy: hb.lastSuccessDate >= expectStr,
-        lastSuccessDate: hb.lastSuccessDate,
-        lastSuccessAt: hb.lastSuccessAt || null,
-        lastRunAt: hb.lastRunAt || null,
-        lastFailAt: hb.lastFailAt || null,
-        lastFailReason: hb.lastFailReason || null,
-        itemCount: typeof hb.itemCount === 'number' ? hb.itemCount : null,
-        daysBehind,
-      },
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
-    });
+    return handleCronStatus(env);
   }
 
   // ─── 来源校验 ───
@@ -234,10 +93,7 @@ export async function onRequest(context) {
   //   因此本校验的作用是「拒绝跨站浏览器读取」，不能阻止脚本化调用——后者由限流与 WAF 规则兜底。
   //   也正因如此，上移校验不会影响 scripts/generate-metadata.js 与 workers/cron（它们无 Origin）。
   if (!isAuthorizedOrigin(request)) {
-    return new Response(JSON.stringify({ code: -1, msg: '未授权的来源' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
+    return jsonResponse({ code: -1, msg: '未授权的来源' }, 403);
   }
 
   // 审计 M1:脚本调用鉴权（无 Origin 请求需 X-Proxy-Key，未配置 PROXY_KEY 时不启用）
@@ -245,56 +101,8 @@ export async function onRequest(context) {
   if (scriptDenied) return scriptDenied;
 
   // ─── 元数据查询 /api/metadata ───
-  // ★ 合并策略: KV（Cron 增量更新, 含新物品）∪ 静态文件（全量基线 data/metadata.json）
-  //   这样即使 KV 只有部分数据, 也由静态文件补全缺失条目, 元数据始终完整
   if (url.pathname === '/api/metadata' && request.method === 'GET') {
-    let kvData = null;
-    try {
-      // 优先从 KV 读取（Cron Worker 更新）
-      if (env && env.METADATA_KV) {
-        const kvRaw = await env.METADATA_KV.get('metadata', 'json');
-        if (kvRaw && typeof kvRaw === 'object' && Object.keys(kvRaw).length > 0) kvData = kvRaw;
-      }
-    } catch (e) {
-      console.warn('[metadata] KV 读取失败:', e.message);
-    }
-
-    // 读取打包的静态全量元数据
-    let staticData = null;
-    try {
-      const staticUrl = new URL('/data/metadata.json', request.url);
-      const staticResp = await fetch(staticUrl);
-      if (staticResp.ok) {
-        const body = await staticResp.text();
-        try { staticData = JSON.parse(body); } catch (e) { console.warn('[metadata] 静态文件 JSON 解析失败'); }
-      }
-    } catch (e) {
-      console.warn('[metadata] 静态文件读取失败:', e.message);
-    }
-
-    // 合并：静态作基线，KV 覆盖同名 key 并补充新 key
-    const merged = Object.assign({}, staticData || {}, kvData || {});
-
-    if (Object.keys(merged).length > 0) {
-      return new Response(JSON.stringify(merged), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=1800, s-maxage=1800',
-        },
-      });
-    }
-
-    // 所有来源都失败，返回空对象（客户端补全兜底）
-    return new Response(JSON.stringify({}), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=300',
-      },
-    });
+    return handleMetadata(request, env);
   }
 
   // ─── 价格历史查询 /api/history/:itemId ───
@@ -303,152 +111,6 @@ export async function onRequest(context) {
     return handleHistoryRequest(env, parseInt(historyMatch[1], 10));
   }
 
-  // ─── 解析 endpoint 和 params ───
-  let endpoint = '';
-  let queryParams = {};
-
-  if (request.method === 'POST') {
-    try {
-      const reqBody = await request.json().catch(() => ({}));
-      endpoint = reqBody.endpoint || '';
-      queryParams = reqBody.params || {};
-    } catch (_) { /* fallback */ }
-  }
-
-  // GET 请求：从查询参数解析
-  if (!endpoint && request.method === 'GET') {
-    endpoint = url.searchParams.get('endpoint') || '';
-    url.searchParams.forEach((value, key) => {
-      if (key !== 'endpoint') queryParams[key] = value;
-    });
-  }
-
-  // Fallback：URL path
-  if (!endpoint) {
-    endpoint = url.pathname.replace(/^\/api\/?/, '').replace(/\/{2,}/g, '/');
-  }
-
-  // 路径校验
-  if (!/^[a-zA-Z0-9_\-/]*$/.test(endpoint)) {
-    return new Response(JSON.stringify({ code: -1, msg: '非法路径' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  // endpoint 枚举白名单（安全审计 2026-08-29）：host 固定后仍不希望本代理+token 可调上游任意子路径，
-  // 只放行业务实际使用的接口；新增上游接口时在此登记
-  const ALLOWED_ENDPOINTS = ['item_list', 'item_price_all'];
-  if (!ALLOWED_ENDPOINTS.includes(endpoint)) {
-    return new Response(JSON.stringify({ code: -1, msg: '不支持的 endpoint' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  // ─── 构建上游 URL ───
-  const token = (env.API_TOKEN || '').trim();
-  if (!token) {
-    return new Response(JSON.stringify({ code: -1, msg: '服务端 API_TOKEN 未配置' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  const upstreamParams = new URLSearchParams();
-  Object.keys(queryParams).forEach(key => {
-    upstreamParams.set(key, queryParams[key]);
-  });
-  upstreamParams.set('token', token);
-  const targetUrl = `https://${API_HOST}${API_PATH}/${endpoint}?${upstreamParams.toString()}`;
-
-  console.log(`[API代理] ${request.method} ${endpoint}`);
-
-  try {
-    const controller = new AbortController();
-    const timeoutMs = endpoint === 'item_price_all' ? 25000 : 15000;
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    const upstream = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'DeltaForcePriceQuery/1.0',
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    if (!upstream.ok) {
-      return new Response(JSON.stringify({ code: -1, msg: `上游 API 返回 ${upstream.status}` }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
-      });
-    }
-
-    const body = await upstream.text();
-    const respHeaders = {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      // ★ 简短缓存：CDN 最多缓存 60 秒，确保用户快速收到版本更新
-      'Cache-Control': 'public, max-age=60, s-maxage=60',
-    };
-
-    return new Response(body, { status: 200, headers: respHeaders });
-  } catch (err) {
-    console.error('[API代理错误]', err.message);
-    return new Response(JSON.stringify({ code: -1, msg: '代理请求失败: ' + err.message }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-}
-
-// ========== 价格历史查询 ==========
-
-async function handleHistoryRequest(env, itemId) {
-  if (!env || !env.DB) {
-    return new Response(JSON.stringify({ code: -1, msg: 'D1 数据库未绑定' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  try {
-    const { results } = await env.DB.prepare(`
-      SELECT item_id  AS itemId,
-             name,
-             price,
-             recorded_date AS d
-      FROM price_history
-      WHERE item_id = ?
-        AND recorded_date >= date('now', '+8 hours', '-30 days')
-      ORDER BY recorded_date DESC
-      LIMIT 31
-    `).bind(itemId).all();
-
-    const snapshots = results.map(r => ({
-      d: r.d,
-      p: r.price,
-    }));
-
-    return new Response(JSON.stringify({
-      code: 0,
-      data: { itemId, name: snapshots.length > 0 ? results[0].name : '', snapshots },
-    }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=300',
-      },
-    });
-  } catch (err) {
-    console.error('[历史查询错误]', err.message);
-    return new Response(JSON.stringify({ code: -1, msg: '查询失败: ' + err.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
+  // ─── 其余 /api/* → 上游代理（endpoint 解析与白名单在 handler 内） ───
+  return handleProxy(request, env, url);
 }
