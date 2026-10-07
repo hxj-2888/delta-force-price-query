@@ -1,7 +1,8 @@
 // ===== functions/api/[[path]].js — Cloudflare Pages API 代理 =====
 // 功能清单: API代理(转发到上游orzice.com) | 元数据查询(/api/metadata,KV+静态回退) | 价格历史(/api/history/:id,D1)
 // CORS处理 | 来源鉴权(isAuthorizedOrigin) | 路径校验 | 超时控制(item_price_all:25s/其他:15s)
-// 依赖: Cloudflare KV(METADATA_KV) D1(price_history表) 环境变量(API_TOKEN)
+// 限流三层: 每 IP(内存) + 全局(D1) + 每客户端 X-Client-Id(内存+D1)
+// 依赖: Cloudflare KV(METADATA_KV) D1(price_history/rate_limit_window/rate_limit_client表) 环境变量(API_TOKEN)
 // 改动影响: 修改API_TOKEN→影响所有API代理; 修改上游URL→影响数据来源; 修改缓存头→影响CDN行为
 
 const API_HOST = 'orzice.com';
@@ -15,8 +16,9 @@ const API_PATH = '/workApi/v1/sjz_api';
 //         D1 故障/未绑定时自动降级, 只靠第一层兜底, 不影响可用性。
 //         规范实现见 scripts/rate-limit.cjs, 改动时请同步各副本。
 const RATE_WINDOW_MS = 60 * 1000;
-const RATE_MAX_PER_IP = 120;   // 每 IP 每分钟
-const RATE_MAX_GLOBAL = 600;   // 全局每分钟（跨节点, D1 计数）
+const RATE_MAX_PER_IP = 120;      // 每 IP 每分钟
+const RATE_MAX_GLOBAL = 600;      // 全局每分钟（跨节点, D1 计数）
+const RATE_MAX_PER_CLIENT = 30;   // 每客户端每分钟（「同账号」维度, 跨节点 D1 计数）
 const rateWindows = new Map();
 let rateGlobal = [];
 
@@ -60,6 +62,56 @@ async function checkGlobalRateLimitDB(db) {
   } catch (e) {
     // 表不存在或 D1 临时故障: 不阻塞业务, 降级为仅内存限流
     console.warn('[ratelimit] D1 全局限流降级:', e.message);
+    return true;
+  }
+}
+
+// ========== 第三层: 按客户端限流（「同账号」维度, 防脚本刷） ==========
+// 该项目没有账号体系, 以匿名客户端 ID 等价「账号」: 网页端 localStorage 生成、
+// 桌面中继用装机指纹哈希（server.js）, 随 X-Client-Id 头上传。ID 只作限流桶,
+// 不是身份信息; 格式校验通过才计数, 缺失/非法时回落到既有 IP + 全局两层。
+// 内存层拦截单节点高频; D1 层（表 rate_limit_client, 迁移 0003）跨节点统一阈值。
+// D1 故障时降级为仅内存, 不影响可用性。
+
+const CLIENT_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
+function normalizeClientId(raw) {
+  const id = (raw || '').trim();
+  return CLIENT_ID_RE.test(id) ? id : null;
+}
+
+const clientWindows = new Map();
+
+function checkClientRateLimitMem(clientId) {
+  const now = Date.now();
+  for (const [key, entry] of clientWindows) {
+    if (now - entry.ts > RATE_WINDOW_MS) clientWindows.delete(key);
+  }
+  const entry = clientWindows.get(clientId) || { ts: now, count: 0 };
+  entry.count++;
+  clientWindows.set(clientId, entry);
+  return entry.count <= RATE_MAX_PER_CLIENT;
+}
+
+// 跨节点按客户端计数: 窗口 = 'c' + 北京时间 yyyyMMddHHmm, 旧行惰性清理（概率 1/20）
+async function checkClientRateLimitDB(db, clientId) {
+  if (!db) return true; // D1 未绑定 → 降级
+  try {
+    const bj = new Date(Date.now() + 8 * 3600 * 1000);
+    const win = 'c' + bj.toISOString().replace(/[-:TZ.]/g, '').slice(0, 12);
+    const { results } = await db.prepare(`
+      INSERT INTO rate_limit_client (win, client, n) VALUES (?1, ?2, 1)
+      ON CONFLICT(win, client) DO UPDATE SET n = n + 1
+      RETURNING n
+    `).bind(win, clientId).all();
+    const n = results && results[0] ? results[0].n : 0;
+    if (Math.random() < 0.05) {
+      db.prepare("DELETE FROM rate_limit_client WHERE win < ?1").bind(win).run().catch(() => {});
+    }
+    return n <= RATE_MAX_PER_CLIENT;
+  } catch (e) {
+    // 表未创建或 D1 临时故障: 降级为仅内存限流
+    console.warn('[ratelimit] D1 客户端限流降级:', e.message);
     return true;
   }
 }
@@ -140,6 +192,21 @@ export async function onRequest(context) {
   }
   if (!await checkGlobalRateLimitDB(env.DB)) {
     return new Response(JSON.stringify({ code: -1, msg: '当前请求量较大, 请稍后再试' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' },
+    });
+  }
+
+  // 第三层: 按客户端跨节点计数（带合法 X-Client-Id 的请求才进入; 防单客户端刷量）
+  const clientId = normalizeClientId(request.headers.get('x-client-id'));
+  if (clientId && !checkClientRateLimitMem(clientId)) {
+    return new Response(JSON.stringify({ code: -1, msg: '当前客户端请求过于频繁, 请稍后再试' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' },
+    });
+  }
+  if (clientId && !await checkClientRateLimitDB(env.DB, clientId)) {
+    return new Response(JSON.stringify({ code: -1, msg: '当前客户端请求过于频繁, 请稍后再试' }), {
       status: 429,
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '60' },
     });

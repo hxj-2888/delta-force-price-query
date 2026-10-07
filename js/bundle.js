@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20260829q — 自动生成于 2026-08-29 08:08:31
+// v20261007s — 自动生成于 2026-10-07 10:05:24
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -828,6 +828,32 @@ function hasSearchIndex() {
 var WORKER_BASE = (typeof window !== 'undefined' && window.__WORKER_BASE) || '';
 var PROXY_URL = WORKER_BASE + '/api/proxy';
 
+// ===== 匿名客户端 ID（限流维度, 非身份信息） =====
+// 端上生成、localStorage 持久化, 随 /api/* 请求带 X-Client-Id; 云端只把它当作
+// 「同一浏览器」的限流桶（见 functions/api/[[path]].js 客户端限流层）。
+// localStorage 不可用（隐私模式等）时退化为本次页面加载随机 ID, 仅影响限流精度。
+var _sessionClientId = null;
+function getClientId() {
+  if (_sessionClientId) return _sessionClientId;
+  try {
+    var saved = localStorage.getItem('df_client_id');
+    if (saved && /^[A-Za-z0-9_-]{8,64}$/.test(saved)) {
+      _sessionClientId = saved;
+      return _sessionClientId;
+    }
+    _sessionClientId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          var r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+    localStorage.setItem('df_client_id', _sessionClientId);
+  } catch (e) {
+    _sessionClientId = 'sess-' + Math.random().toString(36).slice(2, 12) + '-' + Date.now().toString(36);
+  }
+  return _sessionClientId;
+}
+
 var _isWeChat = false;
 if (typeof navigator !== 'undefined' && navigator.userAgent) {
   _isWeChat = /MicroMessenger/i.test(navigator.userAgent);
@@ -867,7 +893,7 @@ async function apiRequest(endpoint, params, retries, noCache) {
 
         var fetchPromise = fetch(PROXY_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Client-Id': getClientId() },
           body: JSON.stringify({ endpoint: endpoint, params: params || {} }),
           signal: controller.signal
         })
@@ -1211,7 +1237,9 @@ async function fetchItemHistory(itemId) {
   var MAX_RETRIES = 2;
   for (var attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      var resp = await fetch(WORKER_BASE + '/api/history/' + Number(itemId));
+      var resp = await fetch(WORKER_BASE + '/api/history/' + Number(itemId), {
+        headers: { 'X-Client-Id': getClientId() }
+      });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       var data = await resp.json();
       return data;

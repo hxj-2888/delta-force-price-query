@@ -9,7 +9,12 @@ wrangler d1 create delta-force-prices
 ## 2. 初始化表结构
 ```bash
 wrangler d1 execute delta-force-prices --remote --file=migrations/0001_create_price_history.sql
+wrangler d1 execute delta-force-prices --remote --file=migrations/0002_rate_limit_window.sql
+wrangler d1 execute delta-force-prices --remote --file=migrations/0003_rate_limit_client.sql
 ```
+> 0003 是按客户端限流（`X-Client-Id`，匿名 ID：网页端 localStorage 生成、桌面版装机指纹哈希）的
+> 计数表。表未创建时限流自动降级为仅内存计数，不影响可用性；阈值常量
+> `RATE_MAX_PER_CLIENT` 在 `functions/api/[[path]].js`（规范实现 `scripts/rate-limit.cjs`）。
 
 ## 3. 部署 Pages（前端 + API 代理）
 ```powershell

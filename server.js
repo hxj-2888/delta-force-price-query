@@ -10,6 +10,8 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const crypto = require('crypto');
 const { createRateLimiter, DEFAULTS } = require('./scripts/rate-limit.cjs');
 
 const PORT = Number(process.env.PORT || 3000);
@@ -19,6 +21,20 @@ const PORT = Number(process.env.PORT || 3000);
 // 且带 Origin 的请求按浏览器调用处理，不触发 X-Proxy-Key 校验。
 const RELAY_HOST = process.env.RELAY_HOST || 'delta-force-v5.pages.dev';
 const RELAY_PATH = '/api';
+
+// 匿名客户端 ID（云端第三层限流的「同账号」桶, 见 functions/api/[[path]].js）：
+// 本地浏览器带来的 X-Client-Id 优先透传（与网页版同一 localStorage ID）；
+// 缺失时用装机指纹哈希（hostname|username 的 SHA-256 前 32 位, 不落盘、不含原始值）。
+function getClientId(req) {
+  var forwarded = req && req.headers && req.headers['x-client-id'];
+  if (typeof forwarded === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(forwarded.trim())) {
+    return forwarded.trim();
+  }
+  return INSTALL_CLIENT_ID;
+}
+const INSTALL_CLIENT_ID = crypto.createHash('sha256')
+  .update(os.hostname() + '|' + os.userInfo().username)
+  .digest('hex').slice(0, 32);
 
 // MIME 类型映射
 const MIME = {
@@ -147,7 +163,8 @@ function relayGet(req, res, targetPath, onError) {
     headers: {
       'User-Agent': 'DeltaForcePriceQuery/1.0',
       'Accept': 'application/json',
-      'Origin': `http://localhost:${PORT}`
+      'Origin': `http://localhost:${PORT}`,
+      'X-Client-Id': getClientId(req)
     }
   };
   console.log(`[API中继] ${req.url} → https://${RELAY_HOST}${targetPath}`);
@@ -265,8 +282,9 @@ function proxyApi(req, res) {
         'User-Agent': 'DeltaForcePriceQuery/1.0',
         'Accept': 'application/json',
         // 声明 localhost 来源：线上 isAuthorizedOrigin 放行本机来源（第77行正则），
-        // 且带 Origin 的请求按浏览器跨源调用处理，不触发 X-Proxy-Key 校验
-        'Origin': `http://localhost:${PORT}`
+        // 且带 Origin 的请求按浏览器跨源调用处理，不触及 X-Proxy-Key 校验
+        'Origin': `http://localhost:${PORT}`,
+        'X-Client-Id': getClientId(req)
       }
     };
 

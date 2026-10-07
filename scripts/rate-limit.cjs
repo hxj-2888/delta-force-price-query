@@ -7,7 +7,8 @@
 const DEFAULTS = {
   windowMs: 60 * 1000,   // 统计窗口
   maxPerIp: 120,         // 每 IP 每分钟
-  maxGlobal: 600         // 全局每分钟（单实例/单进程）
+  maxGlobal: 600,        // 全局每分钟（单实例/单进程）
+  maxPerClient: 30       // 每客户端（X-Client-Id）每分钟——「同账号」限流维度
 };
 
 function createRateLimiter(opts) {
@@ -36,4 +37,25 @@ function createRateLimiter(opts) {
   };
 }
 
-module.exports = { createRateLimiter, DEFAULTS };
+// 按任意键（如客户端 ID）的内存计数器。
+// 云端副本因打包限制将同语义逻辑内联在 functions/api/[[path]].js，改这里请同步。
+function createPerKeyLimiter(opts) {
+  const windowMs = opts.windowMs;
+  const maxPerKey = opts.maxPerKey;
+  const windows = new Map();
+
+  return function check(key) {
+    const now = Date.now();
+
+    for (const [k, entry] of windows) {
+      if (now - entry.ts > windowMs) windows.delete(k);
+    }
+
+    const entry = windows.get(key) || { ts: now, count: 0 };
+    entry.count++;
+    windows.set(key, entry);
+    return entry.count <= maxPerKey;
+  };
+}
+
+module.exports = { createRateLimiter, createPerKeyLimiter, DEFAULTS };
