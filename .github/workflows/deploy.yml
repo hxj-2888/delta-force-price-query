@@ -1,6 +1,9 @@
 # ===== GitHub Actions — Cloudflare Pages 自动部署 =====
 # 触发: push 到 main（或手动 workflow_dispatch）
 # 效果: 自动部署 Cloudflare Pages 正式版（delta-force-v5）
+# ★ 部署源是白名单暂存目录（tools/deploy-pages.cjs 的 SITE_ENTRIES），
+#   绝不能 pages deploy . 整仓直推：会把 miniprogram/、test/、workers/ 等非站点内容
+#   一并公开（本地磁盘还有 .env / release.keystore，同理绝不直推）。
 # 依赖 GitHub Secrets（Settings → Secrets and variables → Actions）:
 #   CF_API_TOKEN     Cloudflare API Token（需含 Pages/Workers Scripts/D1/KV 的 Edit 权限）
 #   PROXY_KEY        （可选，强烈建议配置）代理防滥用密钥，见下方说明
@@ -60,7 +63,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ★ 安装包不进 git 仓库（安全），部署时从 GitHub Release 拉回随 Pages 分发
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ★ 安装包不进 git 仓库（安全），拉到仓库根后由部署脚本随白名单暂存上传；
       #   国内用户走 pages.dev 同源直发下载；Release 仅作 CI 内部中转与备用源
       - name: Pull distributables from GitHub Release
         run: |
@@ -69,12 +77,12 @@ jobs:
           curl -fsSL --retry 3 -o delta-force-portable.zip \
             "https://github.com/${{ github.repository }}/releases/latest/download/delta-force-portable.zip"
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy . --project-name=delta-force-v5 --branch=main --commit-hash=${{ github.sha }}
+      - name: Deploy via whitelist staging (tools/deploy-pages.cjs)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          WRANGLER_CMD: npx wrangler@4
+        run: node tools/deploy-pages.cjs
 
   # ===== Cron Worker（每日价格采集 → D1）=====
   # Pages Functions 不支持 Cron，必须单独部署 workers/cron/，否则 30 天价格曲线永远为空。

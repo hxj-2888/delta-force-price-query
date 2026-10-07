@@ -25,7 +25,9 @@ function request(pathname, options = {}) {
         res.on('end', () => resolve({ status: res.statusCode, body }));
       }
     );
-    req.setTimeout(8000, () => req.destroy(new Error('request timeout')));
+    // 30s：放行路径会真实中继到线上 Pages → 上游 orzice.com，后者单次可达 ~25s
+    // （functions 侧超时 25s），8s 级超时会把「上游慢」误判为「服务器挂起」
+    req.setTimeout(30000, () => req.destroy(new Error('request timeout')));
     req.on('error', reject);
     req.end();
   });

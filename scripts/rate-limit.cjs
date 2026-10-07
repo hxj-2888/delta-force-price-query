@@ -1,8 +1,12 @@
 'use strict';
-// ===== 限流器（规范实现, server.js 引用） =====
-// Cloudflare Pages 函数因平台打包限制保留内联副本
-// （functions/api/[[path]].js），改动本文件后请同步该副本；
-// test/rate-limit.test.mjs 会校验副本常量一致（server.js 直接引用本文件）。
+// ===== 限流器（唯一实现） =====
+// 桌面版 server.js require、云端 Pages 函数（functions/api/[[path]].js）import，
+// 共用同一模块：改阈值或逻辑只改这里，不存在需要手工同步的内联副本。
+// （2026-10-07 前云端持有内联副本靠测试钉常量防漂移，已模块化删除。）
+// test/rate-limit.test.mjs 校验行为与引用关系（server.js 直接引用本文件）。
+
+// 匿名客户端 ID 的格式约束：网页端 localStorage UUID、桌面版装机指纹哈希都须满足
+const CLIENT_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
 const DEFAULTS = {
   windowMs: 60 * 1000,   // 统计窗口
@@ -58,4 +62,4 @@ function createPerKeyLimiter(opts) {
   };
 }
 
-module.exports = { createRateLimiter, createPerKeyLimiter, DEFAULTS };
+module.exports = { createRateLimiter, createPerKeyLimiter, DEFAULTS, CLIENT_ID_RE };

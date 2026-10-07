@@ -17,11 +17,14 @@ wrangler d1 execute delta-force-prices --remote --file=migrations/0003_rate_limi
 > `RATE_MAX_PER_CLIENT` 在 `functions/api/[[path]].js`（规范实现 `scripts/rate-limit.cjs`）。
 
 ## 3. 部署 Pages（前端 + API 代理）
-```powershell
-# 白名单暂存后部署。禁止 wrangler pages deploy . 整目录直推：
-# 会把 .env（Token/签名密码）、release.keystore、.wrangler 一并公开到线上
-powershell -ExecutionPolicy Bypass -File .\deploy-pages.ps1
+```bash
+node tools/deploy-pages.cjs
 ```
+> 白名单暂存后部署（与太空杀仓 `tools/deploy-pages.cjs` 同一模式）。
+> 禁止 `wrangler pages deploy .` 整目录直推：`.assetsignore` 对 pages deploy 无效（2026-08-29 实测），
+> 会把 .env（签名密码）、release.keystore、miniprogram/、test/ 等一并公开到线上。
+> 白名单必须包含 `scripts/rate-limit.cjs`——Pages 函数 import 该模块，缺了打包即失败。
+> 安装包（apk/zip）不进 git：本地磁盘没有时脚本警告并跳过；CI 部署前从 GitHub Release 拉回。
 
 ## 4. 部署 Cron Worker（独立 Worker，定时采集价格）
 ```bash

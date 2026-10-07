@@ -5,41 +5,35 @@
 // 依赖: Cloudflare KV(METADATA_KV) D1(price_history/rate_limit_window/rate_limit_client表) 环境变量(API_TOKEN)
 // 改动影响: 修改API_TOKEN→影响所有API代理; 修改上游URL→影响数据来源; 修改缓存头→影响CDN行为
 
+// 限流阈值与内存计数器来自唯一实现 scripts/rate-limit.cjs（与桌面版 server.js 共用，
+// 改阈值只改该文件 DEFAULTS）。部署白名单（tools/deploy-pages.cjs）必须带上该模块文件，
+// 否则函数打包时解析不到 import。
+import {
+  CLIENT_ID_RE,
+  DEFAULTS,
+  createPerKeyLimiter,
+  createRateLimiter,
+} from '../../scripts/rate-limit.cjs';
+
 const API_HOST = 'orzice.com';
 const API_PATH = '/workApi/v1/sjz_api';
 
 // ★ 上游 API Token — 必须在 Cloudflare Dashboard 中设置 API_TOKEN 环境变量
 
-// ========== 限流（双层） ==========
-// 第一层: 内存计数, 每 isolate 生效, 拦截绝大多数高频滥用（快, 零额外 IO）
+// ========== 限流（三层） ==========
+// 第一层: 每 IP 内存计数, 每 isolate 生效, 拦截绝大多数高频滥用（快, 零额外 IO）
 // 第二层: D1 原子 UPSERT 全局窗口计数, 跨边缘节点统一阈值（按分钟窗口）
-//         D1 故障/未绑定时自动降级, 只靠第一层兜底, 不影响可用性。
-//         规范实现见 scripts/rate-limit.cjs, 改动时请同步各副本。
-const RATE_WINDOW_MS = 60 * 1000;
-const RATE_MAX_PER_IP = 120;      // 每 IP 每分钟
-const RATE_MAX_GLOBAL = 600;      // 全局每分钟（跨节点, D1 计数）
-const RATE_MAX_PER_CLIENT = 30;   // 每客户端每分钟（「同账号」维度, 跨节点 D1 计数）
-const rateWindows = new Map();
-let rateGlobal = [];
+// 第三层: 每客户端 X-Client-Id 内存 + D1 计数（「同账号」维度, 防脚本刷）
+// D1 层故障/未绑定时自动降级为仅内存, 不影响可用性。
+const checkRateLimit = createRateLimiter(DEFAULTS);
+const checkClientRateLimitMem = createPerKeyLimiter({
+  windowMs: DEFAULTS.windowMs,
+  maxPerKey: DEFAULTS.maxPerClient,
+});
 
-function checkRateLimit(ip) {
-  const now = Date.now();
-
-  // 清理过期窗口
-  for (const [key, entry] of rateWindows) {
-    if (now - entry.ts > RATE_WINDOW_MS) rateWindows.delete(key);
-  }
-  rateGlobal = rateGlobal.filter(t => now - t < RATE_WINDOW_MS);
-
-  const entry = rateWindows.get(ip) || { ts: now, count: 0 };
-  entry.count++;
-  rateWindows.set(ip, entry);
-
-  if (entry.count > RATE_MAX_PER_IP || rateGlobal.length >= RATE_MAX_GLOBAL) {
-    return false;
-  }
-  rateGlobal.push(now);
-  return true;
+function normalizeClientId(raw) {
+  const id = (raw || '').trim();
+  return CLIENT_ID_RE.test(id) ? id : null;
 }
 
 // 全局限流: D1 原子计数, 返回 true=放行
@@ -58,7 +52,7 @@ async function checkGlobalRateLimitDB(db) {
     if (Math.random() < 0.05) {
       db.prepare("DELETE FROM rate_limit_window WHERE win < ?1").bind('g' + win.slice(1)).run().catch(() => {});
     }
-    return n <= RATE_MAX_GLOBAL;
+    return n <= DEFAULTS.maxGlobal;
   } catch (e) {
     // 表不存在或 D1 临时故障: 不阻塞业务, 降级为仅内存限流
     console.warn('[ratelimit] D1 全局限流降级:', e.message);
@@ -69,29 +63,9 @@ async function checkGlobalRateLimitDB(db) {
 // ========== 第三层: 按客户端限流（「同账号」维度, 防脚本刷） ==========
 // 该项目没有账号体系, 以匿名客户端 ID 等价「账号」: 网页端 localStorage 生成、
 // 桌面中继用装机指纹哈希（server.js）, 随 X-Client-Id 头上传。ID 只作限流桶,
-// 不是身份信息; 格式校验通过才计数, 缺失/非法时回落到既有 IP + 全局两层。
-// 内存层拦截单节点高频; D1 层（表 rate_limit_client, 迁移 0003）跨节点统一阈值。
-// D1 故障时降级为仅内存, 不影响可用性。
-
-const CLIENT_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
-
-function normalizeClientId(raw) {
-  const id = (raw || '').trim();
-  return CLIENT_ID_RE.test(id) ? id : null;
-}
-
-const clientWindows = new Map();
-
-function checkClientRateLimitMem(clientId) {
-  const now = Date.now();
-  for (const [key, entry] of clientWindows) {
-    if (now - entry.ts > RATE_WINDOW_MS) clientWindows.delete(key);
-  }
-  const entry = clientWindows.get(clientId) || { ts: now, count: 0 };
-  entry.count++;
-  clientWindows.set(clientId, entry);
-  return entry.count <= RATE_MAX_PER_CLIENT;
-}
+// 不是身份信息; 格式校验（CLIENT_ID_RE）通过才计数, 缺失/非法时回落到既有 IP + 全局两层。
+// 内存层（checkClientRateLimitMem）拦截单节点高频;
+// D1 层（表 rate_limit_client, 迁移 0003）跨节点统一阈值, 故障时降级为仅内存。
 
 // 跨节点按客户端计数: 窗口 = 'c' + 北京时间 yyyyMMddHHmm, 旧行惰性清理（概率 1/20）
 async function checkClientRateLimitDB(db, clientId) {
@@ -108,7 +82,7 @@ async function checkClientRateLimitDB(db, clientId) {
     if (Math.random() < 0.05) {
       db.prepare("DELETE FROM rate_limit_client WHERE win < ?1").bind(win).run().catch(() => {});
     }
-    return n <= RATE_MAX_PER_CLIENT;
+    return n <= DEFAULTS.maxPerClient;
   } catch (e) {
     // 表未创建或 D1 临时故障: 降级为仅内存限流
     console.warn('[ratelimit] D1 客户端限流降级:', e.message);

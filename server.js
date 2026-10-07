@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
-const { createRateLimiter, DEFAULTS } = require('./scripts/rate-limit.cjs');
+const { createRateLimiter, DEFAULTS, CLIENT_ID_RE } = require('./scripts/rate-limit.cjs');
 
 const PORT = Number(process.env.PORT || 3000);
 // 中继模式（2026-09-27）：本地不再持有 API_TOKEN，/api/* 统一中继到线上 Pages 部署，
@@ -25,9 +25,10 @@ const RELAY_PATH = '/api';
 // 匿名客户端 ID（云端第三层限流的「同账号」桶, 见 functions/api/[[path]].js）：
 // 本地浏览器带来的 X-Client-Id 优先透传（与网页版同一 localStorage ID）；
 // 缺失时用装机指纹哈希（hostname|username 的 SHA-256 前 32 位, 不落盘、不含原始值）。
+// 透传与兜底 ID 都必须过 CLIENT_ID_RE（限流器的统一格式约束）。
 function getClientId(req) {
   var forwarded = req && req.headers && req.headers['x-client-id'];
-  if (typeof forwarded === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(forwarded.trim())) {
+  if (typeof forwarded === 'string' && CLIENT_ID_RE.test(forwarded.trim())) {
     return forwarded.trim();
   }
   return INSTALL_CLIENT_ID;
