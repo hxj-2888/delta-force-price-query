@@ -110,6 +110,9 @@ function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
   var loadingAttr = isEager ? 'loading="eager" decoding="sync"' : 'loading="lazy" decoding="async"';
   var picHtml = item.pic ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" ' + loadingAttr + ' onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">' : '<span class="pic-placeholder">-</span>';
   var gradeTag = (item._category !== 'gun' && item.grade) ? '<span class="item-grade" style="color:' + getGradeColor(item.grade) + '">' + getGradeText(item.grade) + '</span>' : '';
+  // 品类标签：只在分类不唯一（全部/多选）时显示，单分类视图下它是冗余信息
+  var catTag = homeCategoryFilter.length === 1 ? '' :
+    '<span class="item-cat-tag">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>';
   var sparkHtml = _renderMiniSparkline(item);
   return '<div class="item-card fade-in" data-item-id="' + Number(item.id) + '" onclick="openPriceMover(' + Number(item.id) + ')" style="position:relative;' + gradeBg + '">' +
     gradeDiamond +
@@ -117,12 +120,15 @@ function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
     '<div class="item-info">' +
       '<div class="item-name-row">' +
         '<span class="item-name">' + escapeHtml(item.name) + '</span>' +
-        gradeTag +
+        catTag + gradeTag +
       '</div>' +
       '<div class="item-price-row">' +
         '<span class="item-price">\xA5' + formatPrice(item.price) + '</span>' +
-        '<span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>' +
+        '<span class="item-change ' + getChangeClass(bl) + '">' +
+          '<span class="chg-arrow">' + formatChangeArrow(bl) + '</span>' + formatChange(bl) +
+        '</span>' +
       '</div>' +
+      renderItemRangeRow(item) +
       sparkHtml +
     '</div>' +
     '<span class="item-arrow">›</span>' +
@@ -183,44 +189,13 @@ function renderHomeMovers(resetPage) {
     return;
   }
 
-  var filtered = all;
-  if (homeCategoryFilter !== 'all') {
-    filtered = all.filter(function(item) { return item._category === homeCategoryFilter; });
-  }
-  if (homePriceRange !== 'all') {
-    filtered = filtered.filter(function(item) {
-      var p = item.price || 0;
-      if (homePriceRange === 'lt1w') return p < 10000;
-      if (homePriceRange === '1-10w') return p >= 10000 && p < 100000;
-      if (homePriceRange === '10-100w') return p >= 100000 && p < 1000000;
-      if (homePriceRange === 'gt100w') return p >= 1000000;
-      return true;
-    });
-  }
+  // ★ 筛选/排序统一走 shared 的 getHomeFilteredItems，与「查看 N 件」预估同源，避免两处口径漂移
   var field = homePeriod;
-  filtered = filtered.filter(function(item) {
-    var val = getFieldByPeriod(item, field);
-    return val != null && !isNaN(val);
-  });
-
-  var dirMul = homeSortDir === 'desc' ? -1 : 1;
-  if (homeSortBy === 'default') {
-    if (homeCategoryFilter !== 'all') {
-      // 分类视图：保持原有分类排序逻辑，绝不动
-      filtered.sort(function(a, b) { return (getItemSignificance(b) - getItemSignificance(a)); });
-    } else {
-      // 全部视图：已加载的数据与图片优先进首屏（见 _homeDefaultAllSort）
-      filtered.sort(_homeDefaultAllSort);
-    }
-  } else if (homeSortBy === 'change') {
-    filtered.sort(function(a, b) {
-      return ((getFieldByPeriod(a, field) || 0) - (getFieldByPeriod(b, field) || 0)) * dirMul;
-    });
-  } else {
-    filtered.sort(function(a, b) { return ((a.price || 0) - (b.price || 0)) * dirMul; });
-  }
-
+  var filtered = getHomeFilteredItems(all);
   _homeAllFiltered = filtered;
+
+  renderHomeStatBar(filtered, field);
+  renderHomeChips();
 
   var totalPages = Math.ceil(filtered.length / HOME_PAGE_SIZE) || 1;
   if (homeCurrentPage > totalPages) homeCurrentPage = totalPages;
@@ -228,7 +203,7 @@ function renderHomeMovers(resetPage) {
   var items = filtered.slice(offset, offset + HOME_PAGE_SIZE);
 
   if (items.length === 0) {
-    listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-icon" style="font-size:24px">-</div><div class="empty-text" style="font-size:12px">暂无数据</div></div>';
+    listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-icon" style="font-size:24px">-</div><div class="empty-text" style="font-size:12px">\u6682\u65E0\u6570\u636E\uFF0C\u8BD5\u8BD5\u653E\u5BBD\u7B5B\u9009\u6761\u4EF6</div></div>';
     return;
   }
 
@@ -244,42 +219,58 @@ function renderHomeMovers(resetPage) {
   listEl.innerHTML = html;
 }
 
+// ===== 市场概览条（结果数 / 均价 / 涨跌家数 / 更新时间） =====
+function renderHomeStatBar(filtered, field) {
+  var bar = document.getElementById('homeStatBar');
+  if (!bar) return;
+  var set = function(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; };
+
+  var total = filtered.length;
+  var sum = 0, up = 0, down = 0, priced = 0, latestTs = 0;
+  for (var i = 0; i < filtered.length; i++) {
+    var it = filtered[i];
+    if (it.price > 0) { sum += it.price; priced++; }
+    var v = getFieldByPeriod(it, field) || 0;
+    if (v > 0) up++; else if (v < 0) down++;
+    if (it.is_get_time > latestTs) latestTs = it.is_get_time;
+  }
+  var avg = priced ? Math.round(sum / priced) : 0;
+
+  set('hsCount', formatLargeNum(total));
+  set('hsAvg', avg ? '\xA5' + formatPrice(avg) : '--');
+  set('hsUp', up);
+  set('hsDn', down);
+  var updEl = document.getElementById('hsUpd');
+  if (updEl) {
+    var ft = latestTs ? formatTime(latestTs) : '--';
+    if (ft === '--') {
+      var ar = document.getElementById('autoRefreshTime');
+      ft = ar ? ar.textContent.replace('自动刷新 ', '') : '--';
+    }
+    updEl.textContent = ft;
+  }
+  // 全跌/全涨时给个方向色，便于一眼判断今天整体行情
+  var mood = document.getElementById('hsMood');
+  if (mood) {
+    mood.textContent = up > down ? '普涨' : down > up ? '普跌' : '持平';
+    mood.className = 'hs-mood ' + (up > down ? 'up' : down > up ? 'down' : 'flat');
+  }
+}
+
 function renderHomeMoversWithData(items) {
   var listEl = document.getElementById('homeMoversList');
   if (!listEl || !items || items.length === 0) {
     if (listEl) listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-text" style="font-size:12px">数据加载中...</div></div>';
     return;
   }
-  var filtered = items;
-  if (homeCategoryFilter !== 'all') {
-    filtered = items.filter(function(item) { return item._category === homeCategoryFilter; });
-  }
-  if (homePriceRange !== 'all') {
-    filtered = filtered.filter(function(item) {
-      var p = item.price || 0;
-      if (homePriceRange === 'lt1w') return p < 10000;
-      if (homePriceRange === '1-10w') return p >= 10000 && p < 100000;
-      if (homePriceRange === '10-100w') return p >= 100000 && p < 1000000;
-      if (homePriceRange === 'gt100w') return p >= 1000000;
-      return true;
-    });
-  }
   var field = homePeriod;
-  filtered = filtered.filter(function(item) { var v = getFieldByPeriod(item, field); return v != null && !isNaN(v); });
-  if (homeSortBy === 'default') {
-    if (homeCategoryFilter !== 'all') filtered.sort(function(a,b) { return getItemSignificance(b) - getItemSignificance(a); });
-    else filtered.sort(_homeDefaultAllSort);
-  } else if (homeSortBy === 'change') {
-    var dm = homeSortDir === 'desc' ? -1 : 1;
-    filtered.sort(function(a,b) { return ((getFieldByPeriod(a,field)||0) - (getFieldByPeriod(b,field)||0)) * dm; });
-  } else {
-    var dm2 = homeSortDir === 'desc' ? -1 : 1;
-    filtered.sort(function(a,b) { return ((a.price||0) - (b.price||0)) * dm2; });
-  }
+  var filtered = getHomeFilteredItems(items);
   _homeAllFiltered = filtered;
+  renderHomeStatBar(filtered, field);
+  renderHomeChips();
   homeCurrentPage = 1;
   var pItems = filtered.slice(0, HOME_PAGE_SIZE);
-  if (pItems.length === 0) { listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-text" style="font-size:12px">暂无数据</div></div>'; return; }
+  if (pItems.length === 0) { listEl.innerHTML = '<div class="empty-container" style="padding:20px"><div class="empty-text" style="font-size:12px">暂无数据，试试放宽筛选条件</div></div>'; return; }
   var maxAbsBl = 0;
   pItems.forEach(function(item) { var a = Math.abs(getFieldByPeriod(item, field)||0); if (a > maxAbsBl) maxAbsBl = a; });
   var html = pItems.map(function(item, idx) { return _renderHomeItemCard(item, field, maxAbsBl, idx < 4); }).join('');
@@ -363,4 +354,79 @@ function scheduleHomeSilentUpdate() {
       renderHomeTopMover();
     }
   }, 500);
+}
+
+/* ================= 首页内联搜索联想 =================
+   与搜索页（page-search）并存：这里只做「边输边给」的前 6 条快速跳转，
+   完整结果、历史、最近浏览仍走搜索页。两者共用 searchByIndex 索引。 */
+var _homeSuggTimer = null;
+
+function onHomeSearchInput(kw) {
+  var clr = document.getElementById('homeSearchClear');
+  if (clr) clr.classList.toggle('visible', !!kw);
+  if (_homeSuggTimer) clearTimeout(_homeSuggTimer);
+  if (!kw || !kw.trim()) { hideHomeSugg(); return; }
+  _homeSuggTimer = setTimeout(function() { renderHomeSugg(kw); }, 180);
+}
+
+function renderHomeSugg(kw) {
+  var box = document.getElementById('homeSugg');
+  if (!box) return;
+  var all = getHomeAllItems();
+  if (all.length === 0) { hideHomeSugg(); return; }
+
+  var hits = searchByIndex(all, kw.trim());
+  hits.sort(function(a, b) { return (b.price || 0) - (a.price || 0); });
+  var top = hits.slice(0, 6);
+
+  if (top.length === 0) {
+    box.innerHTML = '<div class="sugg-empty">\u672A\u627E\u5230\u201C' + escapeHtml(kw) +
+      '\u201D\u76F8\u5173\u7269\u54C1<br><span style="font-size:11px">\u6362\u4E2A\u5173\u952E\u8BCD\u6216\u6E05\u7A7A\u7B5B\u9009\u8BD5\u8BD5</span></div>';
+    box.classList.add('show');
+    return;
+  }
+
+  box.innerHTML = top.map(function(item) {
+    var bl = getFieldByPeriod(item, homePeriod) || 0;
+    var pic = item.pic
+      ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+      : '';
+    return '<div class="sugg-item" onclick="openPriceMover(' + Number(item.id) + ')">' +
+        '<span class="sugg-pic">' + pic + '</span>' +
+        '<span class="sugg-name">' + escapeHtml(item.name) + '</span>' +
+        '<span class="sugg-price">\xA5' + formatPrice(item.price) + '</span>' +
+        '<span class="sugg-chg ' + getChangeClass(bl) + '">' + formatChangeArrow(bl) + formatChange(bl) + '</span>' +
+      '</div>';
+  }).join('') +
+  '<div class="sugg-all" onclick="showSearchWith(document.getElementById(\'homeSearchInput\').value)">\u67E5\u770B\u5168\u90E8 ' +
+    hits.length + ' \u4E2A\u7ED3\u679C \u203A</div>';
+  box.classList.add('show');
+}
+
+function hideHomeSugg() {
+  var box = document.getElementById('homeSugg');
+  if (box) box.classList.remove('show');
+}
+
+function clearHomeSearch() {
+  var el = document.getElementById('homeSearchInput');
+  if (el) { el.value = ''; el.focus(); }
+  var clr = document.getElementById('homeSearchClear');
+  if (clr) clr.classList.remove('visible');
+  hideHomeSugg();
+}
+
+// 带词进搜索页（回车 / 联想底部「查看全部结果」）
+function showSearchWith(kw) {
+  hideHomeSugg();
+  showSearch();
+  if (kw && kw.trim()) {
+    var el = document.getElementById('searchInput');
+    if (el) el.value = kw;
+    var clr = document.getElementById('searchClear');
+    if (clr) clr.classList.add('visible');
+    var hint = document.getElementById('searchHint');
+    if (hint) hint.style.display = 'none';
+    doSearch(kw);
+  }
 }

@@ -35,6 +35,10 @@ const SITE_ENTRIES = [
   'delta-force-logo.png', 'delta-force-logo.webp',
   'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon.ico',
   'manifest.json', 'sw.js',
+  // ★ css 必须显式列出：曾漏掉它，线上 /css/*.css 命中 Pages 的 SPA 兜底，
+  //   返回 index.html 且 Content-Type: text/html、状态码 200。浏览器会静默丢弃
+  //   非 CSS 内容的样式表 → 页面零样式（JS 与 /api 正常，所以表现为「有数据、格式烂掉」）。
+    'css',
   'js', 'data', 'functions', '_headers',
   // 函数运行时依赖的模块：functions/api/[[path]].js 与 lib/ 内部都 import 它们，
   // 暂存目录缺了任何一个，函数打包直接失败（test/rate-limit.test.mjs 有白名单断言）
@@ -78,6 +82,31 @@ console.log('暂存目录: ' + stage);
 console.log('待上传文件数: ' + files.length + '（仅站点资源与限流模块，不含 miniprogram/test/workers/.env/keystore）');
 const total = files.reduce((s, f) => s + fs.statSync(path.join(stage, f)).size, 0);
 console.log('总体积: ' + (total / 1048576).toFixed(2) + ' MB');
+
+// ★ 部署前核对 index.html 引用的每个站内资源都真的进了暂存目录。
+//   白名单是手工维护的，漏一个目录不会有任何报错：Pages 的 SPA 兜底会把
+//   /css/layout.css 这类缺失资源变成「200 + index.html(text/html)」，
+//   样式表被浏览器静默丢弃，线上表现为「有数据但格式烂掉」，极难定位。
+//   这里把「引用了但没上传」变成部署前的硬失败。
+const stagedIndex = fs.readFileSync(path.join(stage, 'index.html'), 'utf8');
+const refs = new Set();
+for (const m of stagedIndex.matchAll(/(?:href|src)="([^"]+)"/g)) {
+  let ref = m[1].trim();
+  if (!ref || ref.startsWith('#')) continue;
+  if (/^(https?:)?\/\//i.test(ref)) continue;                 // 外链
+  if (/^(data:|mailto:|tel:|javascript:|blob:)/i.test(ref)) continue;
+  ref = ref.split(/[?#]/)[0];
+  if (!ref) continue;
+  ref = ref.replace(/^\.?\//, '');                             // 兼容 'css/a.css' 与 '/css/a.css'
+  if (ref) refs.add(ref);
+}
+const missing = [...refs].filter((r) => !fs.existsSync(path.join(stage, r)));
+if (missing.length > 0) {
+  console.error('\n✗ index.html 引用了未进入暂存目录的资源，拒绝部署:');
+  missing.forEach((m) => console.error('  - /' + m + (fs.existsSync(path.join(ROOT, m)) ? '（本地存在，漏加进 SITE_ENTRIES）' : '（本地也不存在）')));
+  process.exit(1);
+}
+console.log('资源引用核对通过: index.html 的 ' + refs.size + ' 个站内引用均已就位');
 
 console.log('\n创建 Pages 项目（已存在则忽略报错）...');
 spawnSync(WRANGLER, ['pages', 'project', 'create', PROJECT, '--production-branch', BRANCH],

@@ -22,6 +22,7 @@ var searchTimer;
 
 // ===== 页面导航 =====
 function showPage(name) {
+  if (typeof hideHomeSugg === 'function') hideHomeSugg();
   Object.values(pages).forEach(function(p) { p.classList.remove('active'); });
   var page = pages[name];
   if (page) {

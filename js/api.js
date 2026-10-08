@@ -70,7 +70,10 @@ async function apiRequest(endpoint, params, retries, noCache) {
     var result = await (function(attemptN) {
       return new Promise(function(resolve, reject) {
         var controller = new AbortController();
-        var timeoutId = setTimeout(function() { controller.abort(); }, 25000);
+        // ★ 35s 而非 25s：上游经 Cloudflare Functions 转发单次实测 9~15s，
+        //   服务端中继的硬上限是 22s（RELAY_TIMEOUT_MS）、线上 Functions 是 25s。
+        //   页面预算必须高于这些上限，否则服务端还在正常返回，页面却先报超时。
+        var timeoutId = setTimeout(function() { controller.abort(); }, 35000);
 
         var fetchPromise = fetch(PROXY_URL, {
           method: 'POST',

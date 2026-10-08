@@ -9,6 +9,22 @@
 
 const http = require('http');
 const path = require('path');
+
+// ===== 文件日志（launcher.vbs 静默启动时设置 LOG_FILE）=====
+// 桌面启动器改为无窗口启动后，用户再也看不到 console 输出；这里把同样的内容
+// 追加到日志文件，否则「打不开 / 没数据」将完全无从排查。
+// 未设置 LOG_FILE（start.bat 手动启动）时保持原样，只写 console。
+const LOG_FILE = process.env.LOG_FILE;
+if (LOG_FILE) {
+  const fs = require('fs');
+  for (const level of ['log', 'error', 'warn']) {
+    const original = console[level].bind(console);
+    console[level] = (...args) => {
+      original(...args);
+      try { fs.appendFileSync(LOG_FILE, args.join(' ') + '\n'); } catch (e) { /* 日志失败不影响服务 */ }
+    };
+  }
+}
 const { createRateLimiter, DEFAULTS } = require('./scripts/rate-limit.cjs');
 const { getClientId } = require('./lib/node/client-id.cjs');
 const { isAuthorizedOrigin, getClientIp } = require('./lib/node/security.cjs');

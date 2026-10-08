@@ -33,19 +33,9 @@ const MODULES = [
   'app/init'
 ];
 
-function makeVersion() {
-  const now = new Date();
-  const dateStr = now.getFullYear() +
-    String(now.getMonth() + 1).padStart(2, '0') +
-    String(now.getDate()).padStart(2, '0');
-  return 'v' + dateStr + String('abcdefghijklmnopqrstuvwxyz'[Math.min(now.getHours(), 25)]);
-}
-
-// 拼接各模块（body 部分与时间戳无关, 保证 --check 可复现比较）
-function buildBundle(version) {
-  let bundle = '// 三角洲行动 — JS Bundle (all modules combined)\n';
-  bundle += '// ' + version + ' — 自动生成于 ' + new Date().toISOString().replace('T', ' ').substring(0, 19) + '\n\n';
-
+// 只拼接模块正文（与版本号、时间戳无关, 保证 --check 可复现比较）
+function buildBundleBody() {
+  let body = '';
   for (const mod of MODULES) {
     const filePath = path.join(JS_DIR, mod + '.js');
     if (!fs.existsSync(filePath)) {
@@ -53,10 +43,37 @@ function buildBundle(version) {
       process.exit(1);
     }
     const content = fs.readFileSync(filePath, 'utf8');
-    bundle += '// ===== ' + mod + '.js =====\n';
-    bundle += content.trim() + '\n\n';
+    body += '// ===== ' + mod + '.js =====\n';
+    body += content.trim() + '\n\n';
   }
-  return bundle;
+  return body;
+}
+
+// 头部两行（版本 + 生成时间戳）
+function bundleHeader(version) {
+  return '// 三角洲行动 — JS Bundle (all modules combined)\n' +
+    '// ' + version + ' — 自动生成于 ' + new Date().toISOString().replace('T', ' ').substring(0, 19) + '\n\n';
+}
+
+// 拼接各模块
+function buildBundle(version) {
+  return bundleHeader(version) + buildBundleBody();
+}
+
+// ★ 版本号必须随「内容」变化, 不能只依赖日期+小时。
+//   原实现同一小时内重建两次会得到完全相同的版本号, 而 index.html /
+//   sw-register.js 的 ?v= 与 Service Worker 都以它为缓存键——于是当天改完代码
+//   重新构建上线, 用户浏览器仍命中旧 bundle, 修复完全不生效（新旧 URL 相同）。
+//   追加正文内容哈希（与 CSS 已有的 -<hash> 同一思路）后：
+//   内容变 → 版本变 → 缓存失效；内容不变 → 版本稳定, --check 可复现。
+function makeVersion(body) {
+  const now = new Date();
+  const dateStr = now.getFullYear() +
+    String(now.getMonth() + 1).padStart(2, '0') +
+    String(now.getDate()).padStart(2, '0');
+  const stamp = 'v' + dateStr + String('abcdefghijklmnopqrstuvwxyz'[Math.min(now.getHours(), 25)]);
+  const hash = require('crypto').createHash('md5').update(body).digest('hex').substring(0, 8);
+  return stamp + '-' + hash;
 }
 
 // ===== 校验模式: 不写任何文件, 只检查一致性 =====
@@ -64,11 +81,11 @@ if (CHECK_MODE) {
   const indexPath = path.join(__dirname, '..', 'index.html');
   const html = fs.readFileSync(indexPath, 'utf8');
 
-  const bundleRef = html.match(/bundle\.js\?v=([a-z0-9]+)/);
-  const swRef = html.match(/sw-register\.js\?v=([a-z0-9]+)/);
+  const bundleRef = html.match(/bundle\.js\?v=([a-z0-9]+(?:-[a-f0-9]+)?)/);
+  const swRef = html.match(/sw-register\.js\?v=([a-z0-9]+(?:-[a-f0-9]+)?)/);
   const swRegPath = path.join(JS_DIR, 'sw-register.js');
   const swReg = fs.readFileSync(swRegPath, 'utf8');
-  const swRegRef = swReg.match(/sw\.js\?v=([a-z0-9]+)/);
+  const swRegRef = swReg.match(/sw\.js\?v=([a-z0-9]+(?:-[a-f0-9]+)?)/);
   const funcIndexPath = path.join(__dirname, '..', 'functions', 'index.js');
   const funcContent = fs.readFileSync(funcIndexPath, 'utf8');
   const funcRef = funcContent.match(/export const VERSION = '([^']+)'/);
@@ -83,7 +100,7 @@ if (CHECK_MODE) {
     if (funcRef[1] !== version) errors.push('functions/index.js VERSION 不一致: ' + funcRef[1] + ' ≠ ' + version);
 
     // 头部注释里的 build: 版本容易与实际脱节（曾停滞在 v20260731q 而实际已是 v20260805w），纳入强制校验
-    const buildComment = html.match(/\| build: (v[a-z0-9]+)/);
+    const buildComment = html.match(/\| build: (v[a-z0-9]+(?:-[a-f0-9]+)?)/);
     if (buildComment && buildComment[1] !== version) {
       errors.push('index.html 头部 build 注释版本不一致: ' + buildComment[1] + ' ≠ ' + version);
     }
@@ -112,7 +129,7 @@ if (CHECK_MODE) {
 }
 
 // ===== 正常构建模式 =====
-const version = makeVersion();
+const version = makeVersion(buildBundleBody());
 const bundle = buildBundle(version);
 
 // 写入 bundle.js
@@ -122,10 +139,10 @@ fs.writeFileSync(bundlePath, bundle, 'utf8');
 // 更新 index.html 中的版本号（bundle.js + sw-register.js 总是更新；CSS 仅当实际修改时才更新）
 const indexPath = path.join(__dirname, '..', 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
-html = html.replace(/bundle\.js\?v=[a-z0-9]+/g, 'bundle.js?v=' + version);
-html = html.replace(/sw-register\.js\?v=[a-z0-9]+/g, 'sw-register.js?v=' + version);
+html = html.replace(/bundle\.js\?v=[a-z0-9]+(?:-[a-f0-9]+)?/g, 'bundle.js?v=' + version);
+html = html.replace(/sw-register\.js\?v=[a-z0-9]+(?:-[a-f0-9]+)?/g, 'sw-register.js?v=' + version);
 // 同步头部注释里的 build: 版本，避免注释与实际版本长期脱节
-html = html.replace(/\| build: v[a-z0-9]+/g, '| build: ' + version);
+html = html.replace(/\| build: v[a-z0-9]+(?:-[a-f0-9]+)?/g, '| build: ' + version);
 
 // ★ CSS 仅在实际内容变化时更新版本号，避免不必要的缓存失效
 const cssDir = path.join(__dirname, '..', 'css');
@@ -152,7 +169,7 @@ fs.writeFileSync(indexPath, html, 'utf8');
 const swRegPath = path.join(JS_DIR, 'sw-register.js');
 if (fs.existsSync(swRegPath)) {
   let swReg = fs.readFileSync(swRegPath, 'utf8');
-  swReg = swReg.replace(/sw\.js\?v=[a-z0-9]+/g, 'sw.js?v=' + version);
+  swReg = swReg.replace(/sw\.js\?v=[a-z0-9]+(?:-[a-f0-9]+)?/g, 'sw.js?v=' + version);
   fs.writeFileSync(swRegPath, swReg, 'utf8');
 }
 

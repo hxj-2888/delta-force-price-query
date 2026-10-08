@@ -1,10 +1,15 @@
 ﻿<!--
-index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261007s
+index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261008w-1fbe4791
 功能清单: 预取v3(item_price_all+metadata双请求合并) | 加载动画+进度条 | 首页(筛选/排序/分页/涨跌Top2)
 列表页(分类/排序/分页) | 详情页(价格图表/收藏) | 搜索页(实时搜索/历史/最近浏览/收藏) | 底部Tab导航
 依赖: js/bundle.js(合并所有JS模块) css/layout.css css/components.css
 改动影响: 修改预取逻辑→影响加载速度和数据完整性; 修改DOM结构→影响render.js的innerHTML选择器
 修复(v20260730m): Tab切回首页不重渲染(保持滚动+分页) | 收藏页不触发loadAllItems | 图表数据点日历对齐
+改造(v20261008): ①首页内联搜索+联想(homeSugg, 与搜索页并存) | ②四个筛选面板统一(分类多选带件数/
+价格快捷档+自定义区间/面板内「重置+查看N件」/已选chips回显可单删可清空) | ③市场概览条homeStatBar
+(结果数·均价·涨跌家数·行情·更新时间) | ④列表卡片增强(▲▼箭头/今日开盘·30天前/当前分位/品类标签)
+★ 无「成交量」字段: 上游 item_price_all+metadata 均无成交量, 卡片只用真实锚点(price_start/day_*_price), 不臆造
+★ homeCategoryFilter 已由字符串改为数组(多选), 旧存档在 applyHomeBrowseState 里兼容转换
 -->
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
@@ -145,17 +150,26 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261007s
         });
       }
 
+      // ★ 超时必须大于「服务端中继上限」，否则页面会先放弃：
+      //   上游 orzice.com 经 Cloudflare Functions 转发，单次实测 9~15s；
+      //   本地中继的硬上限是 22s（RELAY_TIMEOUT_MS），线上 Functions 是 25s。
+      //   曾经这里写 15000，正好卡在中继返回之前，页面必然弹「数据加载超时」——
+      //   服务端其实正在正常返回数据。
+        //  留出余量，让服务端先给出可识别的 504，页面据此重试而不是直接报错。
+      var PREFETCH_TIMEOUT_MS = 30000;
+      var PREFETCH_FINAL_TIMEOUT_MS = 35000;
+
       function _fetchPriceAllWithRetry() {
         var url = proxyUrl + '?endpoint=item_price_all';
-        return _fetchWithTimeout(url, 15000).catch(function(err) {
+        return _fetchWithTimeout(url, PREFETCH_TIMEOUT_MS).catch(function(err) {
           console.warn('[prefetch] item_price_all 首次失败(' + err.message + ')，1秒后重试...');
           return new Promise(function(resolve) {
-            setTimeout(function() { resolve(_fetchWithTimeout(url, 15000)); }, 1000);
+            setTimeout(function() { resolve(_fetchWithTimeout(url, PREFETCH_TIMEOUT_MS)); }, 1000);
           });
         }).catch(function(err) {
           console.warn('[prefetch] item_price_all 重试也失败(' + err.message + ')');
           return new Promise(function(resolve) {
-            setTimeout(function() { resolve(_fetchWithTimeout(url, 20000)); }, 1500);
+            setTimeout(function() { resolve(_fetchWithTimeout(url, PREFETCH_FINAL_TIMEOUT_MS)); }, 1500);
           });
         });
       }
@@ -343,6 +357,12 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261007s
 
         _allMerged = merged;
 
+        // ★ 数据迟到时，加载层可能已判定超时并弹出「连接超时 / 重新加载」。
+        //   一旦真正拿到数据就必须撤掉该横幅，否则错误提示会一直压在
+        //   已经正常渲染出价格的页面上（慢上游下极易复现）。
+        var _lateErrWrap = document.getElementById('loadingRetryWrap');
+        if (_lateErrWrap) _lateErrWrap.style.display = 'none';
+
         // ★ 按分类分配
         var catMap = {};
         CATS.forEach(function(c) { catMap[c] = []; });
@@ -474,10 +494,10 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261007s
     button.filter-cat-chip{-webkit-tap-highlight-color:transparent}
     button.toolbar-btn{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
   </style>
-  <link rel="preload" href="css/layout.css?v=v20260803n-90eb71f8" as="style">
-  <link rel="preload" href="css/components.css?v=v20260803n-f9d9d324" as="style">
-  <link rel="stylesheet" href="css/layout.css?v=v20260803n-90eb71f8">
-  <link rel="stylesheet" href="css/components.css?v=v20260803n-f9d9d324">
+  <link rel="preload" href="css/layout.css?v=v20261008w-1fbe4791-06c4b403-1cd2fbbb" as="style">
+  <link rel="preload" href="css/components.css?v=v20261008w-1fbe4791-5ca2fcaa-5ca2fcaa" as="style">
+  <link rel="stylesheet" href="css/layout.css?v=v20261008w-1fbe4791-06c4b403-1cd2fbbb">
+  <link rel="stylesheet" href="css/components.css?v=v20261008w-1fbe4791-5ca2fcaa-5ca2fcaa">
 </head>
 <body>
   <div class="loading-screen" id="loadingScreen">
@@ -525,36 +545,61 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261007s
         </button>
       </div>
 
+      <!-- ★ 已选条件回显（chips）：可单删，可一键清空 -->
+      <div class="home-chips" id="homeFilterChips" style="display:none"></div>
+
       <!-- ★ 时间下拉 -->
       <div class="dropdown-panel" id="timeDropdown" style="display:none" onclick="event.stopPropagation()">
         <button class="dropdown-item active" type="button" data-period="bl" onclick="event.stopPropagation();setHomePeriod('bl')">近1天</button>
         <button class="dropdown-item" type="button" data-period="day_3_bl" onclick="event.stopPropagation();setHomePeriod('day_3_bl')">近3天</button>
         <button class="dropdown-item" type="button" data-period="day_7_bl" onclick="event.stopPropagation();setHomePeriod('day_7_bl')">近7天</button>
+        <div class="dd-foot">
+          <button type="button" class="dd-btn" onclick="event.stopPropagation();resetCurrentDropdown()">重置</button>
+          <button type="button" class="dd-btn primary" onclick="event.stopPropagation();applyHomeDropdown()">查看 <span class="dd-apply-count">0</span> 件</button>
+        </div>
       </div>
 
-      <!-- ★ 价格下拉 -->
+      <!-- ★ 价格下拉：快捷档 + 自定义区间 -->
       <div class="dropdown-panel" id="priceDropdown" style="display:none" onclick="event.stopPropagation()">
         <button class="dropdown-item active" type="button" data-range="all" onclick="event.stopPropagation();setHomePriceRange('all')">全部价格</button>
         <button class="dropdown-item" type="button" data-range="lt1w" onclick="event.stopPropagation();setHomePriceRange('lt1w')">&lt; 1万</button>
         <button class="dropdown-item" type="button" data-range="1-10w" onclick="event.stopPropagation();setHomePriceRange('1-10w')">1万 ~ 10万</button>
         <button class="dropdown-item" type="button" data-range="10-100w" onclick="event.stopPropagation();setHomePriceRange('10-100w')">10万 ~ 100万</button>
         <button class="dropdown-item" type="button" data-range="gt100w" onclick="event.stopPropagation();setHomePriceRange('gt100w')">&gt; 100万</button>
+        <div class="dd-custom">
+          <div class="dd-custom-title">自定义区间（游戏币 ¥）</div>
+          <div class="dd-range">
+            <input id="homePriceMinInput" type="number" inputmode="numeric" min="0" placeholder="最低" oninput="event.stopPropagation();setHomePriceCustom()">
+            <span class="dd-range-sep">—</span>
+            <input id="homePriceMaxInput" type="number" inputmode="numeric" min="0" placeholder="最高" oninput="event.stopPropagation();setHomePriceCustom()">
+          </div>
+          <div class="dd-custom-hint">填了自定义区间就以它为准，不再叠加快捷档</div>
+        </div>
+        <div class="dd-foot">
+          <button type="button" class="dd-btn" onclick="event.stopPropagation();resetCurrentDropdown()">重置</button>
+          <button type="button" class="dd-btn primary" onclick="event.stopPropagation();applyHomeDropdown()">查看 <span class="dd-apply-count">0</span> 件</button>
+        </div>
       </div>
 
-      <!-- ★ 筛选下拉（仅十大分类） -->
+      <!-- ★ 筛选下拉（十大分类，支持多选，带件数） -->
       <div class="dropdown-panel" id="filterDropdown" style="display:none" onclick="event.stopPropagation()">
+        <div class="dd-custom-title" id="filterCatHint">默认全部类型，可多选</div>
         <div class="filter-cat-list" id="filterCatList">
-          <button class="filter-cat-chip active" data-cat="all" onclick="event.stopPropagation();setHomeCategory('all')">全部类型</button>
-          <button class="filter-cat-chip" data-cat="gun" onclick="event.stopPropagation();setHomeCategory('gun')">枪械</button>
-          <button class="filter-cat-chip" data-cat="ammo" onclick="event.stopPropagation();setHomeCategory('ammo')">子弹</button>
-          <button class="filter-cat-chip" data-cat="acc" onclick="event.stopPropagation();setHomeCategory('acc')">配件</button>
-          <button class="filter-cat-chip" data-cat="helmet" onclick="event.stopPropagation();setHomeCategory('helmet')">头盔</button>
-          <button class="filter-cat-chip" data-cat="armor" onclick="event.stopPropagation();setHomeCategory('armor')">护甲</button>
-          <button class="filter-cat-chip" data-cat="chest" onclick="event.stopPropagation();setHomeCategory('chest')">胸挂</button>
-          <button class="filter-cat-chip" data-cat="bag" onclick="event.stopPropagation();setHomeCategory('bag')">背包</button>
-          <button class="filter-cat-chip" data-cat="key" onclick="event.stopPropagation();setHomeCategory('key')">钥匙卡</button>
-          <button class="filter-cat-chip" data-cat="collection" onclick="event.stopPropagation();setHomeCategory('collection')">收集品</button>
-          <button class="filter-cat-chip" data-cat="consume" onclick="event.stopPropagation();setHomeCategory('consume')">消耗品</button>
+          <button class="filter-cat-chip" type="button" data-cat="all" onclick="event.stopPropagation();toggleHomeCategory('all')">全部类型<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="gun" onclick="event.stopPropagation();toggleHomeCategory('gun')">枪械<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="ammo" onclick="event.stopPropagation();toggleHomeCategory('ammo')">子弹<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="acc" onclick="event.stopPropagation();toggleHomeCategory('acc')">配件<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="helmet" onclick="event.stopPropagation();toggleHomeCategory('helmet')">头盔<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="armor" onclick="event.stopPropagation();toggleHomeCategory('armor')">护甲<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="chest" onclick="event.stopPropagation();toggleHomeCategory('chest')">胸挂<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="bag" onclick="event.stopPropagation();toggleHomeCategory('bag')">背包<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="key" onclick="event.stopPropagation();toggleHomeCategory('key')">钥匙卡<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="collection" onclick="event.stopPropagation();toggleHomeCategory('collection')">收集品<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="consume" onclick="event.stopPropagation();toggleHomeCategory('consume')">消耗品<span class="cat-cnt"></span></button>
+        </div>
+        <div class="dd-foot">
+          <button type="button" class="dd-btn" onclick="event.stopPropagation();resetCurrentDropdown()">重置</button>
+          <button type="button" class="dd-btn primary" onclick="event.stopPropagation();applyHomeDropdown()">查看 <span class="dd-apply-count">0</span> 件</button>
         </div>
       </div>
 
@@ -565,16 +610,37 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261007s
         <button class="dropdown-item" type="button" data-sort="change" data-dir="asc" onclick="event.stopPropagation();setHomeSort('change','asc')">涨跌幅 (低到高)</button>
         <button class="dropdown-item" type="button" data-sort="price" data-dir="desc" onclick="event.stopPropagation();setHomeSort('price','desc')">价格 (高到低)</button>
         <button class="dropdown-item" type="button" data-sort="price" data-dir="asc" onclick="event.stopPropagation();setHomeSort('price','asc')">价格 (低到高)</button>
+        <div class="dd-foot">
+          <button type="button" class="dd-btn" onclick="event.stopPropagation();resetCurrentDropdown()">重置</button>
+          <button type="button" class="dd-btn primary" onclick="event.stopPropagation();applyHomeDropdown()">查看 <span class="dd-apply-count">0</span> 件</button>
+        </div>
       </div>
 
-      <div class="search-bar" onclick="showSearch()">
-        <span class="search-placeholder">搜索物品名称...</span>
+      <!-- ★ 首页内联搜索：边输边给联想，点选直接进详情 -->
+      <div class="search-bar" id="homeSearchBar">
+        <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="homeSearchInput" type="search" placeholder="搜索物品名称..." autocomplete="off"
+               oninput="event.stopPropagation();onHomeSearchInput(this.value)"
+               onfocus="event.stopPropagation()"
+               onkeydown="if(event.key==='Enter'){event.stopPropagation();showSearchWith(this.value)}">
+        <span class="search-clear" id="homeSearchClear" onclick="event.stopPropagation();clearHomeSearch()">✕</span>
+        <span class="search-go" onclick="event.stopPropagation();showSearchWith(document.getElementById('homeSearchInput').value)">搜索</span>
+        <div class="home-sugg" id="homeSugg"></div>
       </div>
       <div class="top-mover-card" id="topMover" style="display:none"></div>
       <div class="price-alert" id="priceAlert"></div>
       <div class="price-changed-section" id="priceChangedSection">
         <div class="price-changed-title">收藏价格提醒</div>
         <div id="priceChangedItems"></div>
+      </div>
+
+      <!-- ★ 市场概览条：先看整体行情，再看单品 -->
+      <div class="home-statbar" id="homeStatBar">
+        <div class="hs-cell"><span class="hs-k">当前结果</span><span class="hs-v" id="hsCount">--</span></div>
+        <div class="hs-cell"><span class="hs-k">均价</span><span class="hs-v hs-gold" id="hsAvg">--</span></div>
+        <div class="hs-cell"><span class="hs-k">上涨 / 下跌</span><span class="hs-v"><span class="up" id="hsUp">0</span> / <span class="down" id="hsDn">0</span></span></div>
+        <div class="hs-cell hs-mood-cell"><span class="hs-k">行情</span><span class="hs-mood flat" id="hsMood">持平</span></div>
+        <div class="hs-cell"><span class="hs-k">数据更新</span><span class="hs-v" id="hsUpd">--</span></div>
       </div>
 
       <!-- ★ 首页物品列表 -->
@@ -682,8 +748,8 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261007s
   </div>
 
   <!-- Service Worker 注册（必须在 bundle 之前加载） -->
-  <script src="js/sw-register.js?v=v20261007s" defer></script>
+  <script src="js/sw-register.js?v=v20261008w-1fbe4791" defer></script>
   <!-- ★ 单文件 bundle：减少 HTTP 请求 6→1，defer 不阻塞解析 -->
-  <script src="js/bundle.js?v=v20261007s" defer></script>
+  <script src="js/bundle.js?v=v20261008w-1fbe4791" defer></script>
 </body>
 </html>

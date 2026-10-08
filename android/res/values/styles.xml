@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  落幕查 APK 主题。
+
+  背景：AndroidManifest.xml 之前没有声明 android:theme，res/ 下也没有任何 values 资源，
+  于是 Activity 套用系统默认主题 —— 顶部会多出一条深色标题栏（ActionBar）。本 APK 是纯
+  WebView 壳，页面自带完整头部 UI，这条系统标题栏就压在网页顶部，表现为「黑框遮住顶部」。
+
+  NoActionBar 去掉它；windowBackground 与站点 body 背景（css/base.css 的 #000000）保持一致，
+  这样 WebView 加载完成前的瞬间也是纯黑，不会先闪一下白色。
+-->
+<resources>
+    <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">#000000</item>
+    </style>
+</resources>

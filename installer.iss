@@ -39,15 +39,18 @@ Name: "{app}"; Permissions: users-full
 
 [Icons]
 ; 桌面快捷方式
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\start.bat"; WorkingDir: "{app}"; Comment: "落幕查 变卖物实时价格查询"
+; ★ 指向 launcher.vbs 而非 start.bat：VBS 以无窗口方式启动本地服务器，
+;   并在端口真正就绪后才打开浏览器；start.bat 会弹出命令行黑窗口，且先开浏览器
+;   再启服务器（慢启动时用户看到的是浏览器的「无法访问此页面」）。
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{wscript}\launcher.vbs"; WorkingDir: "{app}"; Comment: "落幕查 变卖物实时价格查询"
 
 ; 开始菜单
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\start.bat"; WorkingDir: "{app}"
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{wscript}\launcher.vbs"; WorkingDir: "{app}"
 Name: "{autoprograms}\{#MyAppName}\卸载"; Filename: "{uninstallexe}"
 
 [Run]
 ; 安装完成后自动运行
-Filename: "{app}\start.bat"; Description: "立即启动落幕查价格查询"; Flags: nowait postinstall shellexec
+Filename: "{wscript}\launcher.vbs"; Description: "立即启动落幕查价格查询"; Parameters: "//nologo ""{app}\launcher.vbs"""; WorkingDir: "{app}"; Flags: nowait postinstall shellexec
 
 [Code]
 // 安装前检测 Node.js

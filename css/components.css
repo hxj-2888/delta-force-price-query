@@ -1,5 +1,5 @@
 ﻿/* ========== 物品卡片 ========== */
-.item-card { display: flex; align-items: center; padding: 14px 16px; margin: 4px 12px; background: rgba(255,255,255,0.04); border-radius: 0; border: 1px solid rgba(255,255,255,0.06); cursor: pointer; transition: all 0.2s; }
+.item-card { display: flex; align-items: center; padding: 14px; margin: 6px 10px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); cursor: pointer; transition: all 0.2s; }
 .item-card:active { background: rgba(102,126,234,0.15); border-color: rgba(102,126,234,0.3); }
 .item-pic { width: 48px; height: 48px; border-radius: 0; overflow: hidden; background: rgba(0,0,0,0.3); margin-right: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .item-pic img { width: 100%; height: 100%; object-fit: contain; }
@@ -12,10 +12,22 @@
 .item-grade { font-size: 10px; padding: 2px 8px; border-radius: 6px; margin-left: 8px; background: rgba(255,255,255,0.06); flex-shrink: 0; }
 .item-price-row { display: flex; align-items: center; }
 .item-price { font-size: 16px; font-weight: bold; color: #ffd700; margin-right: 10px; }
-.item-change { font-size: 12px; font-weight: 500; }
+.item-change { font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
 .item-change.up, .change-up { color: #4caf50; }
 .item-change.down, .change-down { color: #f44336; }
 .item-change.flat, .change-flat { color: #888; }
+/* ▲▼ 箭头：涨跌不只靠颜色区分，色盲/黑白屏也能读 */
+.chg-arrow { font-size: 9px; line-height: 1; opacity: 0.9; }
+.item-cat-tag { font-size: 10px; padding: 2px 6px; border-radius: 5px; margin-left: 6px; background: rgba(255,255,255,0.06); color: #8890b0; flex-shrink: 0; }
+
+/* 区间行：今日开盘 / 30天前 / 当前分位（全部取自上游真实价格锚点） */
+.item-range-row { display: flex; align-items: center; gap: 10px; margin-top: 5px; font-size: 10px; color: #888; flex-wrap: wrap; }
+.item-range-row .ir-item { white-space: nowrap; }
+.item-range-row .ir-item b { color: #aaa; font-weight: 500; margin-left: 2px; }
+.item-range-row .ir-pos { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; }
+.item-range-row .ir-track { display: block; width: 44px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.item-range-row .ir-fill { display: block; height: 100%; background: linear-gradient(90deg, #4caf50, #ffd700, #f44336); }
+.item-range-row .ir-num { color: #666; font-size: 10px; min-width: 28px; text-align: right; }
 .item-arrow { color: #444; font-size: 18px; margin-left: 6px; }
 .item-attrs { margin-top: 4px; }
 .item-attrs-text { font-size: 10px; color: #888; }
@@ -33,6 +45,25 @@
 /* 迷你火花线 */
 .item-sparkline { width: 64px; height: 26px; flex-shrink: 0; margin-left: 2px; align-self: center; }
 .item-sparkline svg { width: 100%; height: 100%; display: block; }
+/* ========== 市场概览条（首页列表上方） ========== */
+.home-statbar {
+  display: flex; align-items: stretch; gap: 0;
+  margin: 6px 10px 8px; padding: 10px 4px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+}
+.home-statbar .hs-cell { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 2px; min-width: 0; }
+.home-statbar .hs-cell + .hs-cell { border-left: 1px solid rgba(255,255,255,0.06); }
+.home-statbar .hs-k { font-size: 10px; color: #666; white-space: nowrap; }
+.home-statbar .hs-v { font-size: 13px; font-weight: 600; color: #ddd; white-space: nowrap; }
+.home-statbar .hs-gold { color: #ffd700; }
+.home-statbar .hs-v .up { color: #4caf50; }
+.home-statbar .hs-v .down { color: #f44336; }
+.home-statbar .hs-mood { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 10px; }
+.home-statbar .hs-mood.up { color: #4caf50; background: rgba(76,175,80,0.12); }
+.home-statbar .hs-mood.down { color: #f44336; background: rgba(244,67,54,0.12); }
+.home-statbar .hs-mood.flat { color: #888; background: rgba(255,255,255,0.06); }
+
 /* ========== 价格提醒 ========== */
 .price-alert { margin: 0 12px 10px; padding: 10px 14px; background: rgba(255,107,53,0.1); border: 1px solid rgba(255,107,53,0.2); border-radius: 0; font-size: 12px; line-height: 1.6; color: #ff8c5a; display: none; }
 .price-alert.show { display: block; }

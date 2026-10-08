@@ -31,7 +31,11 @@ echo │  按 Ctrl+C 可停止服务器                     │
 echo └────────────────────────────────────────────┘
 echo.
 
-start "" http://localhost:3000
+:: Open the browser only once port 3000 actually answers. Opening it before
+:: "node server.js" starts is a race: a slow start lands the user on the
+:: browser error page, which reads as "no data". (launcher.vbs is the normal
+:: no-window entry point; this script is for watching the console output.)
+start "" /b powershell -NoProfile -WindowStyle Hidden -Command "$ErrorActionPreference='SilentlyContinue'; for($i=0;$i -lt 60;$i++){ try{ $c=New-Object Net.Sockets.TcpClient('127.0.0.1',3000); $c.Close(); Start-Process 'http://localhost:3000'; break }catch{ Start-Sleep -Milliseconds 500 } }"
 node server.js
 pause
 exit /b 0

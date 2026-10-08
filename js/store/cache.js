@@ -304,9 +304,12 @@ function saveBrowseState() {
     page: pageStack[pageStack.length - 1] || 'home',
     category: typeof currentCategory !== 'undefined' ? currentCategory : null,
     isAllMode: typeof isAllMode !== 'undefined' ? isAllMode : false,
-    homeCategoryFilter: typeof homeCategoryFilter !== 'undefined' ? homeCategoryFilter : 'all',
+    // homeCategoryFilter 是数组（多选分类），空数组 = 全部类型
+    homeCategoryFilter: typeof homeCategoryFilter !== 'undefined' ? homeCategoryFilter : [],
     homePeriod: typeof homePeriod !== 'undefined' ? homePeriod : 'bl',
     homePriceRange: typeof homePriceRange !== 'undefined' ? homePriceRange : 'all',
+    homePriceMin: typeof homePriceMin !== 'undefined' ? homePriceMin : '',
+    homePriceMax: typeof homePriceMax !== 'undefined' ? homePriceMax : '',
     homeSortBy: typeof homeSortBy !== 'undefined' ? homeSortBy : 'default',
     homeSortDir: typeof homeSortDir !== 'undefined' ? homeSortDir : 'desc',
     homeCurrentPage: typeof homeCurrentPage !== 'undefined' ? homeCurrentPage : 1,

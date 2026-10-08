@@ -95,6 +95,12 @@ document.addEventListener('DOMContentLoaded', function() {
       doSearch(e.target.value);
     }
   });
+
+  // 点击首页搜索框之外 → 收起联想下拉
+  document.addEventListener('click', function(e) {
+    var bar = document.getElementById('homeSearchBar');
+    if (bar && !bar.contains(e.target) && typeof hideHomeSugg === 'function') hideHomeSugg();
+  });
 });
 
 // ===== 页面可见性处理 =====
@@ -160,7 +166,11 @@ renderHome();
   var loadingProgressBar = document.getElementById('loadingProgressBar');
   var loadingStatus = document.getElementById('loadingStatus');
   var loadStart = Date.now();
-  var LOADING_TIMEOUT = 10000;
+  // ★ 必须大于服务端中继上限（本地 22s / 线上 Functions 25s）。这里原本是 10000，
+//   而上游 orzice.com 经 Cloudflare 转发单次就要 10~15s：加载层会在数据还在路上时
+//   就判定超时，弹出「连接超时 / 重新加载」，而数据随后正常到达并渲染——
+//   用户看到的是「页面像坏了」，与真实故障无法区分。
+var LOADING_TIMEOUT = 40000;
   var _loadingHidden = false;
 
   function setProgress(ratio, statusText) {
@@ -175,6 +185,10 @@ renderHome();
   function hideLoading() {
     if (_loadingHidden || loadingScreen.classList.contains('fade-out')) return;
     _loadingHidden = true;
+    // 数据迟到时收起加载层会顺带带上错误横幅，必须一并清掉：
+    // 否则「连接超时 / 重新加载」会一直压在已经渲染出价格的页面上。
+    var errWrap = document.getElementById('loadingRetryWrap');
+    if (errWrap) errWrap.style.display = 'none';
     setProgress(1, '数据就绪');
     setTimeout(function() {
       loadingScreen.classList.add('fade-out');

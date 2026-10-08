@@ -15,7 +15,10 @@ const STORE_NAME = 'daily_prices';
 // 注册方式是 /sw.js?v=<VERSION>（见 js/sw-register.js），这里从自身 URL 取出版本号作为缓存名。
 // 每次发版都会生成新的缓存桶，activate 时自动清掉上一个版本的桶；
 // 旧实现用固定名 'deltaforce-static-v2'，导致历次 bundle.js?v=xxx 在同一缓存内只增不减、永不回收。
-const _swVersion = (self.location.search.match(/[?&]v=([a-z0-9]+)/) || [])[1] || 'v0';
+// ★ 字符类必须含 '-': 构建版本号形如 v20261008v-d5c0e0b8（日期+小时字母+内容哈希），
+//   只匹配 [a-z0-9]+ 会在 '-' 处截断成 v20261008v，同一天同一小时内的两次不同构建
+//   就会共用同一个缓存桶，旧资源被继续复用。这里连哈希一起取完整版本。
+const _swVersion = (self.location.search.match(/[?&]v=([a-z0-9-]+)/) || [])[1] || 'v0';
 const STATIC_CACHE = 'deltaforce-static-' + _swVersion;
 
 self.addEventListener('install', () => {
@@ -52,11 +55,19 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(e.request)
         .then((resp) => {
-          const copy = resp.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put(url.pathname, copy));
+          // ★ 只缓存真正成功的响应：缺失资源会被 Pages 的 SPA 兜底返回成
+          //   「200 + index.html(text/html)」，无条件 cache.put 会把这份错误
+          //   页面按 / 键存下来，之后每次打开都是错的，且极难自查。
+          if (resp.ok) {
+            const copy = resp.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(url.pathname, copy));
+          }
           return resp;
         })
-        .catch(() => caches.match(url.pathname))
+        .catch(() => caches.match(url.pathname).then((hit) => hit || new Response(
+          '<!doctype html><meta charset="utf-8"><p>离线且无缓存，请联网后重试。</p>',
+          { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        )))
     );
     return;
   }

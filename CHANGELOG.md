@@ -4,6 +4,57 @@
 
 ---
 
+## 2026-10-08 — 安卓端 v3.1：修掉启动后顶部的黑框（`versionName` 3.0 → 3.1 / `versionCode` 2 → 3）
+
+- **现象**：手机打开应用，页面顶部压着一条深色「黑框」。
+- **根因**：不是 WebView 的问题——`AndroidManifest.xml` **没有声明 `android:theme`**，`res/values/` 下也没有任何主题资源，
+  Activity 于是套用系统默认主题，窗口顶部自动多出一条 ActionBar（标题栏）；页面底色是深色，
+  深色标题栏叠在深色网页上，看起来就是那条黑框。
+- **改动**：① 新增 `android/res/values/styles.xml`（`AppTheme` 继承 `Theme.DeviceDefault.NoActionBar`，
+  `windowBackground` 对齐站点底色，顺带消掉首屏白闪）；② `<application>` 加 `android:theme="@style/AppTheme"`；
+  ③ `MainActivity` 修掉一段死代码——原来的 `onPageFinished { setVisibility(VISIBLE) }` 从未生效（WebView 默认就是 VISIBLE），
+  现改为真正先 `INVISIBLE` 再显示，并补 `onReceivedError` 兜底（否则加载失败会一直停在隐藏态＝整屏纯黑，像闪退）。
+- **验证**：从产物里查，不只看编译过没过——`android:theme(0x01010000)=@0x7f050000` → `style/AppTheme`，
+  其 `parent=0x01030129`（`Theme.DeviceDefault.NoActionBar`）与 `windowBackground` 均已落地。
+
+---
+
+## 2026-10-08 — 首页四项交互改造（`v20261008w`）
+
+> 来源：一份「变卖物实时价格查询优化方案 Demo」（自带 1379 条造数与 ①②③④ 标注）。
+> 落地方针：**只借功能，不换肤**——沿用现有黑底 + 紫蓝 `#667eea` + 金 `#ffd700` 主色，
+> 仅把卡片与下拉面板改为圆角 + 更宽松间距；demo 的 4-tab 底栏、桌面三列、15 秒倒计时、阈值预警一律不做。
+
+### ① 首页内联搜索（与搜索页并存）
+- 首页 `.search-bar` 由「假框跳页」改为真实输入框：`#homeSearchInput` 边输边给联想（180ms 防抖，取前 6 条，带缩略图/现价/涨跌箭头），点选直接 `openPriceMover` 进详情；无结果给兜底文案。
+- 保留搜索页：底部「查看全部 N 个结果」/ 回车 / 右侧「搜索」走 `showSearchWith(kw)` 带词进搜索页。
+- 联想与搜索页共用 `searchByIndex` 索引；未做拼音首字母（需引入拼音表，PWA 体积敏感）。
+
+### ② 四个筛选面板统一 + 已选回显
+- 四个下拉（时间/价格/分类/排序）统一加底部操作条：**重置 + 查看 N 件**（N 为实时预估，与列表渲染共用 `getHomeFilteredItems` 这一唯一真源，避免两处口径漂移）。
+- **分类改多选**（`homeCategoryFilter` 由字符串 `'all'` 改为**数组**），面板内每一项带件数、勾选打 ✓；空数组 = 全部类型。旧存档在 `applyHomeBrowseState` 里做兼容转换。
+- **价格**增加自定义区间（两个数字输入），一旦填写即覆盖快捷档，避免两套条件叠加。
+- 新增 `#homeFilterChips` 已选回显：每个条件可单独删除，两项以上出现「清空全部」（接上此前**无 UI 入口**的 `resetAllFilters()`）。
+
+### ③ 市场概览条 `#homeStatBar`
+- 列表上方显示：当前结果数 / 均价 / 上涨·下跌家数 / 行情方向词（普涨·普跌·持平）/ 数据更新时间，随筛选实时更新。均价与涨跌幅基于当前时间段字段（`bl`/`day_3_bl`/`day_7_bl`）统计。
+
+### ④ 列表卡片增强（首页 + 列表页共用 `renderItemRangeRow`）
+- 涨跌加 **▲▼ 箭头**（`.chg-arrow`），不再只靠颜色区分，色盲/黑白屏可读。
+- 新增区间行：**今日开盘**（`price_start`）+ **30 天前**（`day_30_price`）+ **当前分位条**（位置按真实价格锚点 min/max 计算）。
+- 补品类标签（单分类视图下视为冗余信息，不显示）。
+- 卡片点击行为**不变**：整卡仍进详情页并记最近浏览。
+
+### ★ 无「成交量」字段 — 明确不做
+上游 `item_price_all` + `metadata.json` 均**没有成交量/挂单量字段**（全仓库 grep 0 命中，demo 的「量 1.8k」是它自造的随机数）。
+卡片只用上游真实锚点，不臆造任何派生指标。
+
+### 其他
+- iOS 防聚焦缩放：新增的两个输入框 font-size 一律 16px。
+- 新增 `tools/home-ui-smoke.cjs`（Playwright + 系统 Chrome，离线注入假数据，40 项断言覆盖 ①②③④），需用 `NODE_PATH` 指向含 `playwright-core` 的目录。
+
+---
+
 ## 2026-08-29 — 安全加固（`v20260829q`，无前端产物变更）
 
 > 全项目安全审计后的整改；bundle 未变，版本号沿用。

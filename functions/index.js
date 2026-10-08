@@ -4,7 +4,7 @@
 // VERSION 由 scripts/build.js 在每次构建时自动更新
 // 依赖: 无 | 改动影响: 修改VERSION→强制所有客户端重新加载
 
-export const VERSION = 'v20261007s';
+export const VERSION = 'v20261008w-1fbe4791';
 
 export async function onRequest(context) {
   const url = new URL(context.request.url);

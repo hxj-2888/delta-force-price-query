@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -99,6 +99,53 @@ test('模块化: 部署白名单必须携带函数运行时模块（import 解�
   assert.match(deploy, /'lib'/, '暂存白名单缺少 lib/（lib/handlers 与 lib/rate-limit-d1 是函数 import 的模块）');
   assert.match(deploy, /scripts\/rate-limit\.cjs/, '暂存白名单缺少 scripts/rate-limit.cjs（lib 与函数都 import 它）');
 });
+
+test('部署: index.html 引用的每个站内资源都必须进暂存白名单', () => {
+  // 回归守卫（2026-10-08）：SITE_ENTRIES 曾漏掉 'css'。白名单是手工维护的，
+  // 漏一个目录部署照样成功，但线上 /css/*.css 会命中 Cloudflare Pages 的 SPA 兜底，
+  // 返回「200 + index.html(text/html)」——浏览器静默丢弃非 CSS 的样式表，
+  // 页面零样式而 JS 与 /api 照常工作，用户只看到「有数据但格式烂掉」。
+  // 这里按「index.html 真实引用」反推白名单，避免同类漏配再次静默上线。
+  const deploy = readFileSync(path.join(root, 'tools', 'deploy-pages.cjs'), 'utf8');
+  const block = deploy.slice(
+    deploy.indexOf('const SITE_ENTRIES'),
+    deploy.indexOf('const OPTIONAL_ENTRIES')
+  );
+  const entries = [...block.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+
+  const html = readFileSync(path.join(root, 'index.html'), 'utf8');
+  const refs = collectLocalRefs(html);
+  assert.ok(refs.has('css/layout.css'), '未解析到 css/layout.css（引用提取正则失效？）');
+  assert.ok(refs.has('js/bundle.js'), '未解析到 js/bundle.js（引用提取正则失效？）');
+
+  const covered = (p) => entries.some((e) => p === e || p.startsWith(e.replace(/\/$/, '') + '/'));
+  const missing = [...refs].filter((r) => !covered(r));
+  assert.deepEqual(missing, [], '以下资源被 index.html 引用但不在 SITE_ENTRIES 中，会被部署漏掉: ' + missing.join(', '));
+
+  // 反向确认：本地确实存在这些文件，避免测试只校验白名单而掩盖真实缺失
+  for (const r of refs) {
+    assert.ok(existsSync(path.join(root, r)), 'index.html 引用了本地不存在的资源: ' + r);
+  }
+});
+
+// 提取 index.html 里所有「站内」资源引用，统一去掉前导 / 与 ./。
+// ★ 必须同时覆盖相对路径：样式与脚本写的是 href="css/layout.css"（无前导 /），
+//   只有绝对路径 /xxx 的话 css/ 与 js/ 会被整体漏检——这正是本用例最初无效的原因。
+function collectLocalRefs(html) {
+  const refs = new Set();
+  for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
+    let ref = m[1].trim();
+    if (!ref || ref.startsWith('#')) continue;
+    if (/^(https?:)?\/\//i.test(ref)) continue;      // 外链（含协议相对）
+    if (/^(data:|mailto:|tel:|javascript:|blob:)/i.test(ref)) continue;
+    ref = ref.split(/[?#]/)[0];                        // 去查询串与 hash
+    if (!ref) continue;
+    ref = ref.replace(/^\.?\//, '');                   // '/css/a.css' 与 './css/a.css' 归一
+    if (!ref) continue;
+    refs.add(ref);
+  }
+  return refs;
+}
 
 test('数据面: CF 函数客户端限流完整（表/头/D1+内存双层）', () => {
   const cf = readFileSync(path.join(root, 'functions', 'api', '[[path]].js'), 'utf8');

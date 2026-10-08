@@ -34,7 +34,7 @@ echo [2/6] link manifest + resources...
 "%BT%\aapt2.exe" link -o "%OUT%\unsigned.apk" -I "%PLAT%" ^
   --manifest "%ROOT%AndroidManifest.xml" -R "%OUT%\res.zip" --auto-add-overlay ^
   --java "%OUT%\gen" --min-sdk-version 24 --target-sdk-version 34 ^
-  --version-code 2 --version-name 3.0 || goto :err
+  --version-code 3 --version-name 3.1 || goto :err
 
 echo [3/6] compile java...
 javac -encoding UTF-8 -source 1.8 -target 1.8 -classpath "%PLAT%" -d "%OUT%\classes" ^
