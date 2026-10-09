@@ -37,26 +37,12 @@ function renderDetail(item) {
   }
 
   var detailContent = document.getElementById('detailContent');
-  detailContent.innerHTML = '\n      <div class="detail-header">\n        <div class="detail-pic">\n          ' + picHtml + '\n        </div>\n        <div class="detail-basic">\n          <div class="detail-name">' + escapeHtml(item.name) + '</div>\n          <div class="detail-meta">\n            ' + metaHtml + '\n          </div>\n          ' + descHtml + '\n        </div>\n      </div>\n\n      <div class="price-card">\n        <div class="price-card-header">\n          <span class="price-card-title">当前价格</span>\n          <span class="price-card-time">更新于 ' + formatTime(item.is_get_time) + '</span>\n        </div>\n        <div class="price-main">\n          <span class="price-currency">\xA5</span>\n          <span class="price-value">' + formatPrice(price) + '</span>\n        </div>\n        <div class="price-sub">\n          <div class="sub-item">\n            <span class="sub-label">今日开盘</span>\n            <span class="sub-value">\xA5' + formatPrice(item.price_start || item.priceStart || 0) + '</span>\n          </div>\n          <div class="sub-item">\n            <span class="sub-label">今日涨跌</span>\n            <span class="sub-value ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n          </div>\n        </div>\n      </div>\n\n      <div class="section">\n        <div class="section-title">近30天价格趋势</div>\n        <div class="price-curve-box">\n          ' + generatePriceCurveSVG(pricePoints) + '\n          <div class="curve-legend">\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#888"></span>30天前 \xA5' + formatPrice(d30p) + ' <span class="' + getChangeClass(d30bl) + '" style="font-size:10px">' + formatChange(d30bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#667eea"></span>7天前 \xA5' + formatPrice(d7p) + ' <span class="' + getChangeClass(d7bl) + '" style="font-size:10px">' + formatChange(d7bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#4caf50"></span>3天前 \xA5' + formatPrice(d3p) + ' <span class="' + getChangeClass(d3bl) + '" style="font-size:10px">' + formatChange(d3bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#ffd700"></span>当前 \xA5' + formatPrice(price) + '</div>\n          </div>\n        </div>\n      </div>\n\n      ' + propsHtml + '\n\n      <div class="source-note">\n        <span>数据来源：三角洲数据帝 orzice.com 开放平台</span>\n        <span>禁止编造或篡改任何价格信息</span>\n      </div>\n    ';
+  detailContent.innerHTML = '\n      <div class="detail-header">\n        <div class="detail-pic">\n          ' + picHtml + '\n        </div>\n        <div class="detail-basic">\n          <div class="detail-name">' + escapeHtml(item.name) + '</div>\n          <div class="detail-meta">\n            ' + metaHtml + '\n          </div>\n          ' + descHtml + '\n        </div>\n      </div>\n\n      <div class="price-card">\n        <div class="price-card-header">\n          <span class="price-card-title">当前价格</span>\n          <span class="price-card-time">更新于 ' + formatTime(item.is_get_time) + '</span>\n        </div>\n        <div class="price-main">\n          <span class="price-currency">\xA5</span>\n          <span class="price-value">' + formatPrice(price) + '</span>\n        </div>\n        <div class="price-sub">\n          <div class="sub-item">\n            <span class="sub-label">今日开盘</span>\n            <span class="sub-value">\xA5' + formatPrice(item.price_start || item.priceStart || 0) + '</span>\n          </div>\n          <div class="sub-item">\n            <span class="sub-label">今日涨跌</span>\n            <span class="sub-value ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n          </div>\n        </div>\n      </div>\n\n      <div class="section">\n        <div class="section-title">近30天价格趋势</div>\n        <div class="price-curve-box">\n          ' + curvePlaceholderHTML() + '\n          <div class="curve-legend">\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#888"></span>30天前 \xA5' + formatPrice(d30p) + ' <span class="' + getChangeClass(d30bl) + '" style="font-size:10px">' + formatChange(d30bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#667eea"></span>7天前 \xA5' + formatPrice(d7p) + ' <span class="' + getChangeClass(d7bl) + '" style="font-size:10px">' + formatChange(d7bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#4caf50"></span>3天前 \xA5' + formatPrice(d3p) + ' <span class="' + getChangeClass(d3bl) + '" style="font-size:10px">' + formatChange(d3bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#ffd700"></span>当前 \xA5' + formatPrice(price) + '</div>\n          </div>\n        </div>\n      </div>\n\n      ' + propsHtml + '\n\n      <div class="source-note">\n        <span>数据来源：三角洲数据帝 orzice.com 开放平台</span>\n        <span>禁止编造或篡改任何价格信息</span>\n      </div>\n    ';
   updateFavoriteButton(item.id);
 
-  getOrFetchCloudSnapshots(item.id).then(function(cloudSnaps) {
-    if (!cloudSnaps || cloudSnaps.length === 0) return;
-    var cloudPricePoints = getMergedPriceData(item, cloudSnaps);
-    var svgContainer = document.querySelector('.price-curve-box');
-    if (!svgContainer || cloudPricePoints.length < 2) return;
-    if (pageStack[pageStack.length - 1] !== 'detail') return;
-    var newSvg = generatePriceCurveSVG(cloudPricePoints);
-    var oldSvg = svgContainer.querySelector('svg');
-    if (oldSvg) {
-      oldSvg.insertAdjacentHTML('afterend', newSvg);
-      oldSvg.remove();
-    } else {
-      svgContainer.insertAdjacentHTML('afterbegin', newSvg);
-    }
-  }).catch(function(e) {
-    console.log('[详情] 云端历史获取失败，使用本地数据');
-  });
+  /* 〔2026-10-09〕曲线改「预加载」：上面只渲染了骨架占位，这里等云端快照到位后一次性画出
+     最终曲线（3 秒未回则本地数据兜底），不再出现「先画 API 版、再被后端数据替换」的跳变。 */
+  paintPriceCurve(item, detailContent.querySelector('.price-curve-box'), pricePoints);
 }
 
 function updateDetailPrices(item) {
@@ -79,16 +65,11 @@ function updateDetailPrices(item) {
     subValues[1].className = 'sub-value ' + getChangeClass(bl);
   }
 
+  /* 〔2026-10-09〕曲线不在这里重画：价格刷新若把「API 版」曲线画回去，随后云端数据到达又会
+     再替换一次（正是要消除的跳变）。统一交给 paintPriceCurve —— 已画出最终态则跳过，
+     未完成则继续等云端快照。 */
   var pricePoints = getMergedPriceData(item);
-  var svgContainer = container.querySelector('.price-curve-box');
-  if (svgContainer && pricePoints.length >= 2) {
-    var newSvg = generatePriceCurveSVG(pricePoints);
-    var oldSvg = svgContainer.querySelector('svg');
-    if (oldSvg) {
-      oldSvg.insertAdjacentHTML('afterend', newSvg);
-      oldSvg.remove();
-    }
-  }
+  paintPriceCurve(item, container.querySelector('.price-curve-box'), pricePoints);
 
   var legendItems = container.querySelectorAll('.curve-legend-item');
   if (legendItems.length >= 4) {
@@ -102,20 +83,6 @@ function updateDetailPrices(item) {
       if (changeSpans[2]) { changeSpans[2].textContent = formatChange(d3bl); changeSpans[2].className = getChangeClass(d3bl); }
     }
   }
-
-  getOrFetchCloudSnapshots(item.id).then(function(cloudSnaps) {
-    if (!cloudSnaps || cloudSnaps.length === 0) return;
-    if (pageStack[pageStack.length - 1] !== 'detail') return;
-    var cloudPoints = getMergedPriceData(item, cloudSnaps);
-    var svgBox = container.querySelector('.price-curve-box');
-    if (!svgBox || cloudPoints.length < 2) return;
-    var svg = svgBox.querySelector('svg');
-    var newSvgHtml = generatePriceCurveSVG(cloudPoints);
-    if (svg) {
-      svg.insertAdjacentHTML('afterend', newSvgHtml);
-      svg.remove();
-    }
-  }).catch(function() {});
 }
 
 function updateFavoriteButton(itemId) {

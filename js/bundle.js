@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20261008w-1fbe4791 — 自动生成于 2026-10-08 14:07:02
+// v20261009j-d58fa707 — 自动生成于 2026-10-09 01:25:24
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -584,6 +584,47 @@ async function getOrFetchCloudSnapshots(itemId) {
     console.warn('[getOrFetchCloudSnapshots] 失败:', e.message);
     return [];
   }
+}
+
+// ===== 价格曲线：预加载渲染（2026-10-09） =====
+/* 旧行为：详情页先按 API 的 day_30/7/3 + 当前价画一版曲线，云端历史（Cloudflare 侧记录）
+   到达后**再替换一次** —— 用户看到曲线先跳一下再变样（先 API 数据、后后端数据）。
+   现改为：渲染时只放骨架占位，等云端快照到达（3 秒未回则本地数据兜底）后**一次性**画出
+   最终曲线，中途不出现「API 版」曲线。
+   依赖 render/charts.js 的 generatePriceCurveSVG（同一 bundle 作用域，函数调用时已可用）。 */
+function curvePlaceholderHTML() {
+  return '<div class="curve-loading" style="height:120px;display:flex;align-items:center;justify-content:center;color:#8a8aa0;font-size:12px">走势加载中…</div>';
+}
+
+function paintPriceCurve(item, box, fallbackPts) {
+  if (!box) return;
+  /* 已画出最终图 / 正在加载 ⇒ 不再重画：价格刷新（updateDetailPrices）也会调用本函数，
+     这里保证一个盒子只落一次最终态，杜绝第二次跳变。 */
+  if (box.getAttribute('data-curve-done') === '1' || box.getAttribute('data-curve-busy') === '1') return;
+  box.setAttribute('data-curve-busy', '1');
+
+  var paint = function (pts) {
+    if (!box || box.getAttribute('data-curve-done') === '1') return;
+    var svgHtml = '';
+    try { svgHtml = (pts && pts.length >= 2) ? generatePriceCurveSVG(pts) : ''; } catch (e) { svgHtml = ''; }
+    if (!svgHtml) { box.setAttribute('data-curve-busy', ''); return; }
+    var ph = box.querySelector('.curve-loading');
+    if (ph) { ph.insertAdjacentHTML('afterend', svgHtml); ph.remove(); }
+    else {
+      var oldSvg = box.querySelector('svg');
+      if (oldSvg) { oldSvg.insertAdjacentHTML('afterend', svgHtml); oldSvg.remove(); }
+      else box.insertAdjacentHTML('afterbegin', svgHtml);
+    }
+    box.setAttribute('data-curve-done', '1');
+    box.setAttribute('data-curve-busy', '');
+  };
+
+  var fb = fallbackPts || getMergedPriceData(item);
+  var timer = setTimeout(function () { paint(fb); }, 3000);   // 兜底：不能让用户一直看骨架
+  getOrFetchCloudSnapshots(item.id).then(function (snaps) {
+    clearTimeout(timer);
+    paint((snaps && snaps.length) ? getMergedPriceData(item, snaps) : fb);
+  }).catch(function () { clearTimeout(timer); paint(fb); });
 }
 
 // ===== 浏览状态 =====
@@ -2296,8 +2337,9 @@ function renderHomeStatBar(filtered, field) {
 
   set('hsCount', formatLargeNum(total));
   set('hsAvg', avg ? '\xA5' + formatPrice(avg) : '--');
-  set('hsUp', up);
-  set('hsDn', down);
+  /* 〔2026-10-09〕概览条的「上涨 / 下跌」家数格已按产品口径移除（DOM 在 index.html），
+     故这里不再写 hsUp / hsDn。⚠ up / down 的统计**必须保留**——下面「行情」（普涨/普跌/持平）
+     正是靠它判方向，删了会恒显示「持平」。 */
   var updEl = document.getElementById('hsUpd');
   if (updEl) {
     var ft = latestTs ? formatTime(latestTs) : '--';
@@ -2648,26 +2690,12 @@ function renderDetail(item) {
   }
 
   var detailContent = document.getElementById('detailContent');
-  detailContent.innerHTML = '\n      <div class="detail-header">\n        <div class="detail-pic">\n          ' + picHtml + '\n        </div>\n        <div class="detail-basic">\n          <div class="detail-name">' + escapeHtml(item.name) + '</div>\n          <div class="detail-meta">\n            ' + metaHtml + '\n          </div>\n          ' + descHtml + '\n        </div>\n      </div>\n\n      <div class="price-card">\n        <div class="price-card-header">\n          <span class="price-card-title">当前价格</span>\n          <span class="price-card-time">更新于 ' + formatTime(item.is_get_time) + '</span>\n        </div>\n        <div class="price-main">\n          <span class="price-currency">\xA5</span>\n          <span class="price-value">' + formatPrice(price) + '</span>\n        </div>\n        <div class="price-sub">\n          <div class="sub-item">\n            <span class="sub-label">今日开盘</span>\n            <span class="sub-value">\xA5' + formatPrice(item.price_start || item.priceStart || 0) + '</span>\n          </div>\n          <div class="sub-item">\n            <span class="sub-label">今日涨跌</span>\n            <span class="sub-value ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n          </div>\n        </div>\n      </div>\n\n      <div class="section">\n        <div class="section-title">近30天价格趋势</div>\n        <div class="price-curve-box">\n          ' + generatePriceCurveSVG(pricePoints) + '\n          <div class="curve-legend">\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#888"></span>30天前 \xA5' + formatPrice(d30p) + ' <span class="' + getChangeClass(d30bl) + '" style="font-size:10px">' + formatChange(d30bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#667eea"></span>7天前 \xA5' + formatPrice(d7p) + ' <span class="' + getChangeClass(d7bl) + '" style="font-size:10px">' + formatChange(d7bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#4caf50"></span>3天前 \xA5' + formatPrice(d3p) + ' <span class="' + getChangeClass(d3bl) + '" style="font-size:10px">' + formatChange(d3bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#ffd700"></span>当前 \xA5' + formatPrice(price) + '</div>\n          </div>\n        </div>\n      </div>\n\n      ' + propsHtml + '\n\n      <div class="source-note">\n        <span>数据来源：三角洲数据帝 orzice.com 开放平台</span>\n        <span>禁止编造或篡改任何价格信息</span>\n      </div>\n    ';
+  detailContent.innerHTML = '\n      <div class="detail-header">\n        <div class="detail-pic">\n          ' + picHtml + '\n        </div>\n        <div class="detail-basic">\n          <div class="detail-name">' + escapeHtml(item.name) + '</div>\n          <div class="detail-meta">\n            ' + metaHtml + '\n          </div>\n          ' + descHtml + '\n        </div>\n      </div>\n\n      <div class="price-card">\n        <div class="price-card-header">\n          <span class="price-card-title">当前价格</span>\n          <span class="price-card-time">更新于 ' + formatTime(item.is_get_time) + '</span>\n        </div>\n        <div class="price-main">\n          <span class="price-currency">\xA5</span>\n          <span class="price-value">' + formatPrice(price) + '</span>\n        </div>\n        <div class="price-sub">\n          <div class="sub-item">\n            <span class="sub-label">今日开盘</span>\n            <span class="sub-value">\xA5' + formatPrice(item.price_start || item.priceStart || 0) + '</span>\n          </div>\n          <div class="sub-item">\n            <span class="sub-label">今日涨跌</span>\n            <span class="sub-value ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n          </div>\n        </div>\n      </div>\n\n      <div class="section">\n        <div class="section-title">近30天价格趋势</div>\n        <div class="price-curve-box">\n          ' + curvePlaceholderHTML() + '\n          <div class="curve-legend">\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#888"></span>30天前 \xA5' + formatPrice(d30p) + ' <span class="' + getChangeClass(d30bl) + '" style="font-size:10px">' + formatChange(d30bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#667eea"></span>7天前 \xA5' + formatPrice(d7p) + ' <span class="' + getChangeClass(d7bl) + '" style="font-size:10px">' + formatChange(d7bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#4caf50"></span>3天前 \xA5' + formatPrice(d3p) + ' <span class="' + getChangeClass(d3bl) + '" style="font-size:10px">' + formatChange(d3bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#ffd700"></span>当前 \xA5' + formatPrice(price) + '</div>\n          </div>\n        </div>\n      </div>\n\n      ' + propsHtml + '\n\n      <div class="source-note">\n        <span>数据来源：三角洲数据帝 orzice.com 开放平台</span>\n        <span>禁止编造或篡改任何价格信息</span>\n      </div>\n    ';
   updateFavoriteButton(item.id);
 
-  getOrFetchCloudSnapshots(item.id).then(function(cloudSnaps) {
-    if (!cloudSnaps || cloudSnaps.length === 0) return;
-    var cloudPricePoints = getMergedPriceData(item, cloudSnaps);
-    var svgContainer = document.querySelector('.price-curve-box');
-    if (!svgContainer || cloudPricePoints.length < 2) return;
-    if (pageStack[pageStack.length - 1] !== 'detail') return;
-    var newSvg = generatePriceCurveSVG(cloudPricePoints);
-    var oldSvg = svgContainer.querySelector('svg');
-    if (oldSvg) {
-      oldSvg.insertAdjacentHTML('afterend', newSvg);
-      oldSvg.remove();
-    } else {
-      svgContainer.insertAdjacentHTML('afterbegin', newSvg);
-    }
-  }).catch(function(e) {
-    console.log('[详情] 云端历史获取失败，使用本地数据');
-  });
+  /* 〔2026-10-09〕曲线改「预加载」：上面只渲染了骨架占位，这里等云端快照到位后一次性画出
+     最终曲线（3 秒未回则本地数据兜底），不再出现「先画 API 版、再被后端数据替换」的跳变。 */
+  paintPriceCurve(item, detailContent.querySelector('.price-curve-box'), pricePoints);
 }
 
 function updateDetailPrices(item) {
@@ -2690,16 +2718,11 @@ function updateDetailPrices(item) {
     subValues[1].className = 'sub-value ' + getChangeClass(bl);
   }
 
+  /* 〔2026-10-09〕曲线不在这里重画：价格刷新若把「API 版」曲线画回去，随后云端数据到达又会
+     再替换一次（正是要消除的跳变）。统一交给 paintPriceCurve —— 已画出最终态则跳过，
+     未完成则继续等云端快照。 */
   var pricePoints = getMergedPriceData(item);
-  var svgContainer = container.querySelector('.price-curve-box');
-  if (svgContainer && pricePoints.length >= 2) {
-    var newSvg = generatePriceCurveSVG(pricePoints);
-    var oldSvg = svgContainer.querySelector('svg');
-    if (oldSvg) {
-      oldSvg.insertAdjacentHTML('afterend', newSvg);
-      oldSvg.remove();
-    }
-  }
+  paintPriceCurve(item, container.querySelector('.price-curve-box'), pricePoints);
 
   var legendItems = container.querySelectorAll('.curve-legend-item');
   if (legendItems.length >= 4) {
@@ -2713,20 +2736,6 @@ function updateDetailPrices(item) {
       if (changeSpans[2]) { changeSpans[2].textContent = formatChange(d3bl); changeSpans[2].className = getChangeClass(d3bl); }
     }
   }
-
-  getOrFetchCloudSnapshots(item.id).then(function(cloudSnaps) {
-    if (!cloudSnaps || cloudSnaps.length === 0) return;
-    if (pageStack[pageStack.length - 1] !== 'detail') return;
-    var cloudPoints = getMergedPriceData(item, cloudSnaps);
-    var svgBox = container.querySelector('.price-curve-box');
-    if (!svgBox || cloudPoints.length < 2) return;
-    var svg = svgBox.querySelector('svg');
-    var newSvgHtml = generatePriceCurveSVG(cloudPoints);
-    if (svg) {
-      svg.insertAdjacentHTML('afterend', newSvgHtml);
-      svg.remove();
-    }
-  }).catch(function() {});
 }
 
 function updateFavoriteButton(itemId) {

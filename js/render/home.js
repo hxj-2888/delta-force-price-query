@@ -238,8 +238,9 @@ function renderHomeStatBar(filtered, field) {
 
   set('hsCount', formatLargeNum(total));
   set('hsAvg', avg ? '\xA5' + formatPrice(avg) : '--');
-  set('hsUp', up);
-  set('hsDn', down);
+  /* 〔2026-10-09〕概览条的「上涨 / 下跌」家数格已按产品口径移除（DOM 在 index.html），
+     故这里不再写 hsUp / hsDn。⚠ up / down 的统计**必须保留**——下面「行情」（普涨/普跌/持平）
+     正是靠它判方向，删了会恒显示「持平」。 */
   var updEl = document.getElementById('hsUpd');
   if (updEl) {
     var ft = latestTs ? formatTime(latestTs) : '--';

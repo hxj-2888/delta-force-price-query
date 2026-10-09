@@ -298,6 +298,47 @@ async function getOrFetchCloudSnapshots(itemId) {
   }
 }
 
+// ===== 价格曲线：预加载渲染（2026-10-09） =====
+/* 旧行为：详情页先按 API 的 day_30/7/3 + 当前价画一版曲线，云端历史（Cloudflare 侧记录）
+   到达后**再替换一次** —— 用户看到曲线先跳一下再变样（先 API 数据、后后端数据）。
+   现改为：渲染时只放骨架占位，等云端快照到达（3 秒未回则本地数据兜底）后**一次性**画出
+   最终曲线，中途不出现「API 版」曲线。
+   依赖 render/charts.js 的 generatePriceCurveSVG（同一 bundle 作用域，函数调用时已可用）。 */
+function curvePlaceholderHTML() {
+  return '<div class="curve-loading" style="height:120px;display:flex;align-items:center;justify-content:center;color:#8a8aa0;font-size:12px">走势加载中…</div>';
+}
+
+function paintPriceCurve(item, box, fallbackPts) {
+  if (!box) return;
+  /* 已画出最终图 / 正在加载 ⇒ 不再重画：价格刷新（updateDetailPrices）也会调用本函数，
+     这里保证一个盒子只落一次最终态，杜绝第二次跳变。 */
+  if (box.getAttribute('data-curve-done') === '1' || box.getAttribute('data-curve-busy') === '1') return;
+  box.setAttribute('data-curve-busy', '1');
+
+  var paint = function (pts) {
+    if (!box || box.getAttribute('data-curve-done') === '1') return;
+    var svgHtml = '';
+    try { svgHtml = (pts && pts.length >= 2) ? generatePriceCurveSVG(pts) : ''; } catch (e) { svgHtml = ''; }
+    if (!svgHtml) { box.setAttribute('data-curve-busy', ''); return; }
+    var ph = box.querySelector('.curve-loading');
+    if (ph) { ph.insertAdjacentHTML('afterend', svgHtml); ph.remove(); }
+    else {
+      var oldSvg = box.querySelector('svg');
+      if (oldSvg) { oldSvg.insertAdjacentHTML('afterend', svgHtml); oldSvg.remove(); }
+      else box.insertAdjacentHTML('afterbegin', svgHtml);
+    }
+    box.setAttribute('data-curve-done', '1');
+    box.setAttribute('data-curve-busy', '');
+  };
+
+  var fb = fallbackPts || getMergedPriceData(item);
+  var timer = setTimeout(function () { paint(fb); }, 3000);   // 兜底：不能让用户一直看骨架
+  getOrFetchCloudSnapshots(item.id).then(function (snaps) {
+    clearTimeout(timer);
+    paint((snaps && snaps.length) ? getMergedPriceData(item, snaps) : fb);
+  }).catch(function () { clearTimeout(timer); paint(fb); });
+}
+
 // ===== 浏览状态 =====
 function saveBrowseState() {
   var state = {
