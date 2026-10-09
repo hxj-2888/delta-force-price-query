@@ -19,7 +19,7 @@ delta-force-portable.zip
 # 构建产物/生成目录（源文件全部纳入版本控制）
 installer/
 dist/
-miniprogram.zip
+weapp.zip
 
 # 系统垃圾
 .DS_Store

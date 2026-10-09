@@ -8,7 +8,7 @@
 \functions\
 \workers\
 \migrations\
-\miniprogram\
+\weapp\
 \.git\
 \.wrangler\
 \.vercel\

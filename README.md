@@ -68,7 +68,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy-pages.ps1
 
 1. **准备已备案域名**：将你的已备案域名（如 `api.example.com`）CNAME 到 Cloudflare Pages 项目，
    或用国内服务器/CDN 反向代理到 `/api/*`，保证该域名可正常 HTTPS 访问。
-2. **修改小程序 API 地址**：编辑 `miniprogram/utils/config.js`，把 `API_BASE` 改成你的域名。
+2. **修改小程序 API 地址**：编辑 `weapp/utils/config.js`，把 `API_BASE` 改成你的域名。
    （token 仍留在服务端代理中，不会暴露给客户端）
 3. **配置微信后台**：微信公众平台 → 开发 → 开发设置 → 服务器域名 → request 合法域名，
    添加你的域名，然后在微信开发者工具中上传代码（需把 `project.config.json` 中的 appid 换成你的 AppID）。
@@ -90,7 +90,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy-pages.ps1
 ├── workers/cron/       # Cloudflare Cron Worker（每日价格采集，独立部署，非 Pages 的一部分）
 ├── data/               # 静态元数据（metadata.json，约 426KB / 1350 件）
 ├── migrations/         # D1 数据库迁移
-├── miniprogram/        # 微信小程序源码
+├── weapp/        # 微信小程序源码
 ├── scripts/            # 构建与元数据生成脚本
 ├── tools/              # 前端 UI 冒烟脚本（home-ui-smoke.cjs，Playwright 驱动系统 Chrome）
 ├── android/            # 安卓 WebView 壳源码（release.keystore 不入库，也不随 Pages 部署）

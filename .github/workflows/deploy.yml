@@ -2,7 +2,7 @@
 # 触发: push 到 main（或手动 workflow_dispatch）
 # 效果: 自动部署 Cloudflare Pages 正式版（delta-force-v5）
 # ★ 部署源是白名单暂存目录（tools/deploy-pages.cjs 的 SITE_ENTRIES），
-#   绝不能 pages deploy . 整仓直推：会把 miniprogram/、test/、workers/ 等非站点内容
+#   绝不能 pages deploy . 整仓直推：会把 weapp/、test/、workers/ 等非站点内容
 #   一并公开（本地磁盘还有 .env / release.keystore，同理绝不直推）。
 # 依赖 GitHub Secrets（Settings → Secrets and variables → Actions）:
 #   CF_API_TOKEN     Cloudflare API Token（需含 Pages/Workers Scripts/D1/KV 的 Edit 权限）

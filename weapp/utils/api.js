@@ -53,7 +53,7 @@ function apiRequest(endpoint, params, retries, noCache) {
 
   return new Promise(function(resolve, reject) {
     if (!getApiBase()) {
-      reject(new Error('API_BASE 未配置：请修改 miniprogram/utils/config.js'));
+      reject(new Error('API_BASE 未配置：请修改 weapp/utils/config.js'));
       return;
     }
     if (!noCache && endpoint === 'item_price_all') {

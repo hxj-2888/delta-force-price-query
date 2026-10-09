@@ -3,7 +3,7 @@
  *
  * 为什么需要「白名单暂存」：`wrangler pages deploy` 会把目录内容整体上传，
  * 而 .assetsignore 对它无效（2026-08-29 实测）——仓库根还有 .env（签名密码）、
- * android/release.keystore（签名私钥）、miniprogram/、test/、workers/ 等
+ * android/release.keystore（签名私钥）、weapp/、test/、workers/ 等
  * 非站点内容。CI 的 checkout 里没有 gitignore 文件，但本地磁盘有；
  * 两边都只上传白名单内的文件，行为才一致。
  *
@@ -79,7 +79,7 @@ const walk = (dir, base, out) => {
 };
 const files = walk(stage, '', []);
 console.log('暂存目录: ' + stage);
-console.log('待上传文件数: ' + files.length + '（仅站点资源与限流模块，不含 miniprogram/test/workers/.env/keystore）');
+console.log('待上传文件数: ' + files.length + '（仅站点资源与限流模块，不含 weapp/test/workers/.env/keystore）');
 const total = files.reduce((s, f) => s + fs.statSync(path.join(stage, f)).size, 0);
 console.log('总体积: ' + (total / 1048576).toFixed(2) + ' MB');
 

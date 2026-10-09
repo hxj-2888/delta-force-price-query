@@ -1,4 +1,4 @@
-﻿$src = $PSScriptRoot | Split-Path
+$src = $PSScriptRoot | Split-Path
 $dst = Join-Path (Split-Path $src) "delta-force-deploy-code"
 
 # Clean destination
@@ -35,8 +35,8 @@ Get-ChildItem -Path $src -Recurse -File | ForEach-Object {
   elseif ($dir -match '\\(\.wrangler|\.vercel|\.git)($|\\)') {
     $skip = $true; $reason = "local-state"
   }
-  # Miniprogram images
-  elseif ($dir -like '*\miniprogram\images*') {
+  # weapp images
+  elseif ($dir -like '*\weapp\images*') {
     $skip = $true; $reason = "mp-image"
   }
 
