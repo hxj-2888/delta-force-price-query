@@ -35,7 +35,7 @@ function _renderTopMoverFromData(all) {
   if (!el) return;
   var candidates = [];
   all.forEach(function(item) {
-    if (!item.price || item.price < 20000) return;
+    if (!item.price || item.price < 20000) return; // ★ 降噪：≥2万 才入榜（低价标的百分比暴涨是噪声）
     var v = item.day_7_bl;
     var isDay7 = v != null && v > 0.01;
     if (!isDay7) { v = item.bl; }
@@ -50,29 +50,29 @@ function _renderTopMoverFromData(all) {
   candidates.sort(function(a, b) { return b.val - a.val; });
   var top2 = candidates.slice(0, 2);
   el.style.display = 'block';
-  el.innerHTML = '<div style="padding:8px 0">' +
+  /* 样式走 components.css 的 .topmover 体系；配色用语义 class（跟随红涨绿跌方案） */
+  el.innerHTML =
+    '<div class="tm-head">' +
+      '<span class="tm-title">🔥 涨幅前二</span>' +
+      '<span class="tm-sub">全市场 ≥2万</span>' +
+    '</div>' +
     top2.map(function(t, idx) {
       var item = t.item;
       var val = t.val;
-      var label = idx === 0 ? '涨幅第一' : '涨幅第二';
       var periodText = t.isDay7 ? '近7天' : '今日';
-      var freshness = _topMoverApiDone ? ' <span style="font-size:9px;color:#4fc3f7;font-weight:normal">●实时</span>' : '';
       var picHtml = item.pic
-        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:36px;height:36px;border-radius:6px;object-fit:contain;margin-right:10px" onerror="this.style.display=\'none\'">'
+        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:34px;height:34px;border-radius:8px;object-fit:contain" onerror="this.style.display=\'none\'">'
         : '';
-      return '<div class="tm-row" onclick="openTopMover(' + Number(item.id) + ')" style="display:flex;align-items:center;padding:6px 16px;cursor:pointer;transition:all 0.15s">' +
+      return '<div class="tm-row" onclick="openTopMover(' + Number(item.id) + ')">' +
+        '<span class="tm-rank">' + (idx + 1) + '</span>' +
         picHtml +
-        '<div style="flex:1;min-width:0">' +
-          '<div style="font-size:10px;color:#8890b0;line-height:1.3">' + periodText + ' ' + label + freshness + '</div>' +
-          '<div style="font-size:13px;font-weight:bold;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(item.name) + '</div>' +
-        '</div>' +
-        '<div style="text-align:right;margin-left:8px;flex-shrink:0">' +
-          '<div style="font-size:13px;color:#ffd700;font-weight:500">\xA5' + formatPrice(item.price) + '</div>' +
-          '<div style="font-size:12px;font-weight:bold;color:#4caf50">' + (val > 0 ? '+' : '') + val.toFixed(2) + '%</div>' +
-        '</div>' +
+        '<span class="tm-name">' + escapeHtml(item.name) +
+          '<small>' + periodText + ' · ' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + (item.grade && item._category !== 'gun' ? ' · ' + getGradeText(item.grade) : '') + '</small>' +
+        '</span>' +
+        '<span class="tm-px">¥' + formatPrice(item.price) + '</span>' +
+        '<span class="tm-chg ' + getChangeClass(val) + '">' + formatChangeArrow(val) + ' +' + val.toFixed(2) + '%</span>' +
       '</div>';
-    }).join('') +
-  '</div>';
+    }).join('');
 }
 
 // ===== 迷你折线图（首页物品卡片内） =====
@@ -95,10 +95,10 @@ function _renderMiniSparkline(item) {
   }).join(' ');
 
   var isUp = pts[pts.length - 1].price >= pts[0].price;
-  var color = isUp ? '#4caf50' : '#f44336';
+  var color = isUp ? 'var(--up)' : 'var(--down)'; // 跟随红涨绿跌/绿涨红跌方案
 
   return '<div class="item-mini-spark" style="margin-top:4px">' +
-    '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:60px;height:20px;display:block"><polyline points="' + ptsStr + '" fill="none" stroke="' + color + '" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:60px;height:20px;display:block"><polyline points="' + ptsStr + '" fill="none" style="stroke:' + color + '" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
   '</div>';
 }
 
@@ -219,28 +219,32 @@ function renderHomeMovers(resetPage) {
   listEl.innerHTML = html;
 }
 
-// ===== 市场概览条（结果数 / 均价 / 涨跌家数 / 更新时间） =====
+// ===== 市场宽度卡（2026-10-24：上涨/平盘/下跌家数 + 涨跌分布条，替代「均价」伪指标） =====
 function renderHomeStatBar(filtered, field) {
   var bar = document.getElementById('homeStatBar');
   if (!bar) return;
   var set = function(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; };
 
   var total = filtered.length;
-  var sum = 0, up = 0, down = 0, priced = 0, latestTs = 0;
+  var up = 0, down = 0, latestTs = 0;
   for (var i = 0; i < filtered.length; i++) {
     var it = filtered[i];
-    if (it.price > 0) { sum += it.price; priced++; }
     var v = getFieldByPeriod(it, field) || 0;
     if (v > 0) up++; else if (v < 0) down++;
     if (it.is_get_time > latestTs) latestTs = it.is_get_time;
   }
-  var avg = priced ? Math.round(sum / priced) : 0;
+  var flat = total - up - down;
 
+  set('hsUp', String(up));
+  set('hsFlat', String(flat));
+  set('hsDn', String(down));
   set('hsCount', formatLargeNum(total));
-  set('hsAvg', avg ? '\xA5' + formatPrice(avg) : '--');
-  /* 〔2026-10-09〕概览条的「上涨 / 下跌」家数格已按产品口径移除（DOM 在 index.html），
-     故这里不再写 hsUp / hsDn。⚠ up / down 的统计**必须保留**——下面「行情」（普涨/普跌/持平）
-     正是靠它判方向，删了会恒显示「持平」。 */
+
+  /* 涨跌分布条：红/灰/绿 占比宽度（跟随 data-scheme 令牌） */
+  var T = total || 1;
+  var bw = function(id, n) { var el = document.getElementById(id); if (el) el.style.width = (n / T * 100).toFixed(1) + '%'; };
+  bw('hsBUp', up); bw('hsBFlat', flat); bw('hsBDn', down);
+
   var updEl = document.getElementById('hsUpd');
   if (updEl) {
     var ft = latestTs ? formatTime(latestTs) : '--';
@@ -256,6 +260,61 @@ function renderHomeStatBar(filtered, field) {
     mood.textContent = up > down ? '普涨' : down > up ? '普跌' : '持平';
     mood.className = 'hs-mood ' + (up > down ? 'up' : down > up ? 'down' : 'flat');
   }
+
+  renderDashboard(filtered, field, up, flat, down);
+}
+
+// ===== 市场总览仪表盘（桌面双栏右栏默认视图；数据与宽度卡同源） =====
+function renderDashboard(filtered, field, up, flat, down) {
+  var grid = document.getElementById('dashSectorGrid');
+  if (!grid) return; // 移动端没有该页 DOM，直接跳过
+  var set = function(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; };
+  var T = filtered.length || 1;
+
+  set('dashUp', String(up)); set('dashFlat', String(flat)); set('dashDown', String(down));
+  var moodWord = up > down ? '普涨' : down > up ? '普跌' : '持平';
+  var netPct = ((up - down) / T * 100);
+  var moodEl = document.getElementById('dashMood');
+  if (moodEl) moodEl.innerHTML = '市场情绪 <b class="' + (netPct > 0 ? 'up' : netPct < 0 ? 'down' : 'flat') + '">' + moodWord +
+    '</b> · 净上涨 <b class="' + (netPct > 0 ? 'up' : netPct < 0 ? 'down' : 'flat') + '">' + (netPct > 0 ? '+' : '') + netPct.toFixed(1) + '%</b>';
+  ['dashBUp:up', 'dashBFlat:flat', 'dashBDn:down'].forEach(function(pair) {
+    var kv = pair.split(':');
+    var el = document.getElementById(kv[0]);
+    if (el) el.style.width = ((kv[1] === 'up' ? up : kv[1] === 'flat' ? flat : down) / T * 100).toFixed(1) + '%';
+  });
+  set('dashSecNote', '近' + ({ bl: '1', day_3_bl: '3', day_7_bl: '7' }[field] || '1') + '日均涨幅 · 点击进入板块');
+  set('dashFoot', '共 ' + formatLargeNum(filtered.length) + ' 件标的 · 数据更新 ' + (document.getElementById('hsUpd') ? document.getElementById('hsUpd').textContent : '--'));
+
+  // 板块表现磁贴：均涨幅（涨跌幅的算术平均，非价格均价）+ 上涨占比
+  grid.innerHTML = CATEGORIES.map(function(cat) {
+    var arr = filtered.filter(function(i) { return i._category === cat.key; });
+    if (!arr.length) return '';
+    var cUp = 0, sum = 0;
+    arr.forEach(function(i) { var v = getFieldByPeriod(i, field) || 0; if (v > 0) cUp++; sum += v; });
+    var avg = sum / arr.length;
+    var upRatio = cUp / arr.length * 100;
+    return '<button class="dash-tile" onclick="openCategory(\'' + cat.key + '\',\'' + cat.name + '\')">' +
+      '<span class="sn">' + cat.name + '</span>' +
+      '<span class="sv ' + getChangeClass(avg) + '" style="display:block">' + formatChangeArrow(avg) + ' ' + (avg > 0 ? '+' : '') + avg.toFixed(2) + '%</span>' +
+      '<span class="sb" style="display:flex"><i style="width:' + upRatio.toFixed(0) + '%;background:var(--up)"></i><i style="flex:1;background:var(--surface-3)"></i></span>' +
+      '<span class="sk" style="display:flex"><span>上涨 ' + cUp + '</span><span>共 ' + arr.length + ' 件</span></span>' +
+    '</button>';
+  }).join('');
+
+  // 涨跌幅榜 TOP5（真实排序，无过滤——降噪口径只约束「涨幅前二」卡）
+  var byField = filtered.slice().sort(function(a, b) { return (getFieldByPeriod(b, field) || 0) - (getFieldByPeriod(a, field) || 0); });
+  var rankRow = function(it, k) {
+    var v = getFieldByPeriod(it, field) || 0;
+    return '<div class="dash-rank-row" onclick="openPriceMover(' + Number(it.id) + ')">' +
+      '<span class="rk">' + (k + 1) + '</span>' +
+      '<span class="rn" title="' + escapeHtml(it.name) + '">' + escapeHtml(it.name) + '</span>' +
+      '<span class="rc num ' + getChangeClass(v) + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '%</span>' +
+    '</div>';
+  };
+  var rankUp = document.getElementById('dashRankUp');
+  var rankDn = document.getElementById('dashRankDown');
+  if (rankUp) rankUp.innerHTML = byField.slice(0, 5).map(rankRow).join('');
+  if (rankDn) rankDn.innerHTML = byField.slice(-5).reverse().map(rankRow).join('');
 }
 
 function renderHomeMoversWithData(items) {
@@ -315,7 +374,7 @@ function _renderPagination(totalPages, current, totalItems) {
   for (var i = 1; i <= totalPages; i++) {
     if (totalPages <= 7 || i === 1 || i === totalPages || (i >= current - 1 && i <= current + 1)) {
       if (i === current) {
-        html += '<button class="page-btn active" style="background:rgba(102,126,234,0.3);color:#aab8ff;font-weight:600">' + i + '</button>';
+        html += '<button class="page-btn active">' + i + '</button>';
       } else {
         html += '<button class="page-btn" onclick="goToHomePage(' + i + ')" style="font-size:12px">' + i + '</button>';
       }

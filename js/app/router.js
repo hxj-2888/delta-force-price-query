@@ -7,7 +7,7 @@
 
 // ===== 状态变量 =====
 var pages = {};
-['home', 'list', 'detail', 'search', 'favtab'].forEach(function(id) {
+['home', 'list', 'detail', 'search', 'favtab', 'dash'].forEach(function(id) {
   pages[id] = document.getElementById('page-' + id);
 });
 var pageStack = ['home'];
@@ -20,6 +20,29 @@ var sortDir = 'desc';
 var currentPage = 1;
 var searchTimer;
 
+// ===== 桌面双栏同步（2026-10-24） =====
+// ≥1024px 时首页常驻左栏（CSS 强制可见），右栏展示当前激活页；
+// 处于首页（或移动端误激活）时点亮/熄灭「市场总览」仪表盘作为右栏默认视图。
+var _desktopMq = window.matchMedia ? window.matchMedia('(min-width: 1024px)') : null;
+function _syncDashPane(activeName) {
+  if (!pages.dash) return;
+  if (_desktopMq && _desktopMq.matches && activeName === 'home') {
+    pages.dash.classList.add('active');
+  } else {
+    pages.dash.classList.remove('active');
+  }
+}
+// 跨宽度切换时同步：窄屏立即熄灭总览；回到宽屏且当前在首页则重新点亮
+if (_desktopMq && _desktopMq.addEventListener) {
+  _desktopMq.addEventListener('change', function(e) {
+    if (!e.matches) {
+      if (pages.dash) pages.dash.classList.remove('active');
+    } else {
+      _syncDashPane(pageStack[pageStack.length - 1]);
+    }
+  });
+}
+
 // ===== 页面导航 =====
 function showPage(name) {
   if (typeof hideHomeSugg === 'function') hideHomeSugg();
@@ -29,6 +52,7 @@ function showPage(name) {
     page.classList.add('active');
     if (name !== 'search') page.classList.add('fade-in');
   }
+  _syncDashPane(name);
   window.scrollTo(0, 0);
 }
 
@@ -132,6 +156,7 @@ function switchTab(tabName) {
   if (target) {
     target.classList.add('active');
     pageStack = [tabName];
+    _syncDashPane(tabName);
     if (tabName === 'home') {
       var saved = restoreBrowseState();
       if (saved && typeof applyHomeBrowseState === 'function') {
@@ -742,3 +767,6 @@ function refreshFavTab() {
     toast('刷新失败，显示已有数据');
   });
 }
+
+// 首屏双栏：桌面环境加载即点亮右栏「市场总览」（移动端无 dash DOM，空操作）
+_syncDashPane('home');

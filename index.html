@@ -1,5 +1,5 @@
 ﻿<!--
-index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261009j-d58fa707
+index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261024w-de573b74
 功能清单: 预取v3(item_price_all+metadata双请求合并) | 加载动画+进度条 | 首页(筛选/排序/分页/涨跌Top2)
 列表页(分类/排序/分页) | 详情页(价格图表/收藏) | 搜索页(实时搜索/历史/最近浏览/收藏) | 底部Tab导航
 依赖: js/bundle.js(合并所有JS模块) css/layout.css css/components.css
@@ -12,9 +12,14 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261009j
 ★ homeCategoryFilter 已由字符串改为数组(多选), 旧存档在 applyHomeBrowseState 里兼容转换
 -->
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="dark" data-scheme="cn">
 <head>
   <meta charset="UTF-8">
+  <script>
+    // ★ 涨跌配色方案：默认红涨绿跌（中国行情惯例）；localStorage 持久化，可切绿涨红跌。
+    //   必须在内联关键 CSS 之前执行，避免页面闪色。
+    (function () { try { var s = localStorage.getItem('df_scheme'); if (s === 'intl' || s === 'cn') document.documentElement.dataset.scheme = s; } catch (e) {} })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache">
   <meta http-equiv="Pragma" content="no-cache">
@@ -467,7 +472,7 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261009j
   <!-- ★ 关键 CSS 内联，消除渲染阻塞请求 -->
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    html{overscroll-behavior-y:contain}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#000;color:#e0e0e0;font-size:14px;min-height:100vh;overflow-x:hidden;overscroll-behavior-y:contain;touch-action:manipulation}
+    html{overscroll-behavior-y:contain}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Roboto,sans-serif;background:#090c12;color:#eef1f7;font-size:14px;min-height:100vh;overflow-x:hidden;overscroll-behavior-y:contain;touch-action:manipulation;font-variant-numeric:tabular-nums}
     .container{max-width:500px;margin:0 auto;min-height:100vh;padding-bottom:64px;touch-action:pan-y}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
@@ -475,29 +480,29 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261009j
     @keyframes progressShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     .fade-in{animation:fadeIn .3s ease}
     .loading-container{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 0}
-    .loading-spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.1);border-top-color:#667eea;border-radius:50%;animation:spin .8s linear infinite}
-    .loading-text{color:#888;font-size:13px;margin-top:16px}
+    .loading-spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.1);border-top-color:#f0b542;border-radius:50%;animation:spin .8s linear infinite}
+    .loading-text{color:#5d6678;font-size:13px;margin-top:16px}
     .loading-retry-wrap{display:flex;flex-direction:column;align-items:center;margin-top:8px}
-    .loading-error-text{color:#ff6b6b;font-size:13px;text-align:center}
-    .loading-retry-btn{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:20px;padding:8px 28px;font-size:13px;cursor:pointer;margin-top:10px}
+    .loading-error-text{color:#f0455c;font-size:13px;text-align:center}
+    .loading-retry-btn{background:linear-gradient(135deg,#f0b542,#e59a2a);color:#1a1408;border:none;border-radius:20px;padding:8px 28px;font-size:13px;font-weight:600;cursor:pointer;margin-top:10px}
     .loading-retry-btn:active{opacity:.8}
     .error-container{text-align:center;padding:80px 20px}
-    .error-text{color:#ff6b6b;font-size:14px;margin-bottom:20px}
-    .retry-btn{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:20px;padding:10px 36px;font-size:14px;cursor:pointer}
+    .error-text{color:#f0455c;font-size:14px;margin-bottom:20px}
+    .retry-btn{background:linear-gradient(135deg,#f0b542,#e59a2a);color:#1a1408;border:none;border-radius:20px;padding:10px 36px;font-size:14px;font-weight:600;cursor:pointer}
     .retry-btn:active{opacity:.8}
     .empty-container{text-align:center;padding:80px 20px}
     .empty-icon{font-size:48px;margin-bottom:12px;opacity:.3}
-    .empty-text{color:#666;font-size:14px}
+    .empty-text{color:#5d6678;font-size:14px}
     ::-webkit-scrollbar{width:0;height:0}
     button.dropdown-item{background:0;border:none;width:100%;text-align:left;font-family:inherit;outline:none;-webkit-tap-highlight-color:transparent}
-    button.dropdown-item:active{background:rgba(102,126,234,.2)}
+    button.dropdown-item:active{background:rgba(240,181,66,.12)}
     button.filter-cat-chip{-webkit-tap-highlight-color:transparent}
     button.toolbar-btn{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
   </style>
-  <link rel="preload" href="css/layout.css?v=v20261009j-d58fa707-06c4b403-06c4b403-1cd2fbbb" as="style">
-  <link rel="preload" href="css/components.css?v=v20261009j-d58fa707-5ca2fcaa-5ca2fcaa-5ca2fcaa" as="style">
-  <link rel="stylesheet" href="css/layout.css?v=v20261009j-d58fa707-06c4b403-06c4b403-1cd2fbbb">
-  <link rel="stylesheet" href="css/components.css?v=v20261009j-d58fa707-5ca2fcaa-5ca2fcaa-5ca2fcaa">
+  <link rel="preload" href="css/layout.css?v=v20261024w-de573b74-1a4f3325-a700adec-a700adec-a700adec-a700adec-a700adec-06c4b403-06c4b403-1cd2fbbb" as="style">
+  <link rel="preload" href="css/components.css?v=v20261024w-de573b74-509b70e0-509b70e0-509b70e0-30155ee6-73e729db-ae8464cc-5ca2fcaa-5ca2fcaa-5ca2fcaa" as="style">
+  <link rel="stylesheet" href="css/layout.css?v=v20261024w-de573b74-1a4f3325-a700adec-a700adec-a700adec-a700adec-a700adec-06c4b403-06c4b403-1cd2fbbb">
+  <link rel="stylesheet" href="css/components.css?v=v20261024w-de573b74-509b70e0-509b70e0-509b70e0-30155ee6-73e729db-ae8464cc-5ca2fcaa-5ca2fcaa-5ca2fcaa">
 </head>
 <body>
   <div class="loading-screen" id="loadingScreen">
@@ -525,7 +530,8 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261009j
         <div class="header-subtitle">变卖物实时价格查询</div>
         <div class="header-info">
           <span class="refresh-all" onclick="refreshAllData()">刷新全部</span>
-          <span id="autoRefreshTime" style="font-size:10px;color:#555;margin-left:8px"></span>
+          <span id="autoRefreshTime" style="font-size:10px;color:#5d6678;margin-left:8px"></span>
+          <button class="scheme-toggle" id="schemeToggle" onclick="toggleScheme()" title="切换涨跌配色（红涨绿跌 / 绿涨红跌）"><span class="sw"><i></i><i></i></span><span id="schemeLabel">红涨</span></button>
         </div>
       </div>
 
@@ -627,24 +633,62 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261009j
         <span class="search-go" onclick="event.stopPropagation();showSearchWith(document.getElementById('homeSearchInput').value)">搜索</span>
         <div class="home-sugg" id="homeSugg"></div>
       </div>
-      <div class="top-mover-card" id="topMover" style="display:none"></div>
+      <div class="topmover" id="topMover" style="display:none"></div>
       <div class="price-alert" id="priceAlert"></div>
       <div class="price-changed-section" id="priceChangedSection">
         <div class="price-changed-title">收藏价格提醒</div>
         <div id="priceChangedItems"></div>
       </div>
 
-      <!-- ★ 市场概览条：先看整体行情，再看单品 -->
+      <!-- ★ 市场宽度卡：上涨/平盘/下跌家数 + 涨跌分布条（2026-10-24 起替代「均价」伪指标） -->
       <div class="home-statbar" id="homeStatBar">
-        <div class="hs-cell"><span class="hs-k">当前结果</span><span class="hs-v" id="hsCount">--</span></div>
-        <div class="hs-cell"><span class="hs-k">均价</span><span class="hs-v hs-gold" id="hsAvg">--</span></div>
-        <div class="hs-cell hs-mood-cell"><span class="hs-k">行情</span><span class="hs-mood flat" id="hsMood">持平</span></div>
-        <div class="hs-cell"><span class="hs-k">数据更新</span><span class="hs-v" id="hsUpd">--</span></div>
+        <div class="hs-cells">
+          <div class="hs-cell"><span class="hs-k">上涨</span><span class="hs-v up" id="hsUp">--</span></div>
+          <div class="hs-cell"><span class="hs-k">平盘</span><span class="hs-v" id="hsFlat">--</span></div>
+          <div class="hs-cell"><span class="hs-k">下跌</span><span class="hs-v down" id="hsDn">--</span></div>
+          <div class="hs-cell"><span class="hs-k">行情</span><span class="hs-mood flat" id="hsMood">持平</span></div>
+        </div>
+        <div class="hs-breadth">
+          <div class="hs-b-up" id="hsBUp"></div>
+          <div class="hs-b-flat" id="hsBFlat"></div>
+          <div class="hs-b-down" id="hsBDn"></div>
+        </div>
+        <div class="hs-foot"><span>结果 <b id="hsCount">--</b> 件</span><span id="hsUpd">--</span></div>
       </div>
 
       <!-- ★ 首页物品列表 -->
       <div class="home-movers-section" id="homeMoversSection">
         <div id="homeMoversList"></div>
+      </div>
+    </div>
+
+    <!-- ===== 市场总览仪表盘（桌面 ≥1024px 双栏的右栏默认视图；移动端不展示） ===== -->
+    <div class="page" id="page-dash">
+      <div class="nav-bar">
+        <div class="nav-back" style="visibility:hidden">‹</div>
+        <div class="nav-title">市场总览</div>
+        <div class="nav-actions">
+          <span class="nav-action" onclick="refreshAllData()" title="刷新全部行情">刷新</span>
+        </div>
+      </div>
+      <div class="dash">
+        <div class="dash-nums">
+          <div class="dash-num"><span class="v up" id="dashUp">--</span><span class="k">上涨</span></div>
+          <div class="dash-num"><span class="v" id="dashFlat">--</span><span class="k">平盘</span></div>
+          <div class="dash-num"><span class="v down" id="dashDown">--</span><span class="k">下跌</span></div>
+        </div>
+        <div class="dash-mood" id="dashMood">--</div>
+        <div class="dash-breadth">
+          <div class="db-up" id="dashBUp"></div><div class="db-flat" id="dashBFlat"></div><div class="db-down" id="dashBDn"></div>
+        </div>
+        <div class="dash-sec">板块表现 <small id="dashSecNote">点击进入板块</small></div>
+        <div class="dash-sector-grid" id="dashSectorGrid"></div>
+        <div class="dash-sec">涨跌幅榜 <small id="dashRankNote">TOP 5</small></div>
+        <div class="dash-rank-cols">
+          <div class="dash-rank-card"><div class="drh"><span>涨幅榜</span><span class="up">TOP 5</span></div><div id="dashRankUp"></div></div>
+          <div class="dash-rank-card"><div class="drh"><span>跌幅榜</span><span class="down">TOP 5</span></div><div id="dashRankDown"></div></div>
+        </div>
+        <div class="dash-foot" id="dashFoot">--</div>
       </div>
     </div>
 
@@ -739,16 +783,23 @@ index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261009j
   <!-- ===== 底部导航 ===== -->
   <div class="bottom-nav" id="bottomNav">
     <div class="tab active" data-tab="home" onclick="switchTab('home')">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 4 6-8"/><path d="M14 7h4v4"/></svg>
       <span class="tab-label">首页</span>
     </div>
     <div class="tab" data-tab="favtab" onclick="switchTab('favtab')">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.7l5.4-.8z"/></svg>
       <span class="tab-label">我的收藏</span>
     </div>
   </div>
 
+  <!-- 涨跌配色按钮文案与已存方案同步（默认红涨） -->
+  <script>
+    (function () { var lb = document.getElementById('schemeLabel'); if (lb) lb.textContent = document.documentElement.dataset.scheme === 'intl' ? '绿涨' : '红涨'; })();
+  </script>
+
   <!-- Service Worker 注册（必须在 bundle 之前加载） -->
-  <script src="js/sw-register.js?v=v20261009j-d58fa707" defer></script>
+  <script src="js/sw-register.js?v=v20261024w-de573b74" defer></script>
   <!-- ★ 单文件 bundle：减少 HTTP 请求 6→1，defer 不阻塞解析 -->
-  <script src="js/bundle.js?v=v20261009j-d58fa707" defer></script>
+  <script src="js/bundle.js?v=v20261024w-de573b74" defer></script>
 </body>
 </html>

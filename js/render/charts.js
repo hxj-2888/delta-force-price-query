@@ -119,30 +119,36 @@ function generatePriceCurveSVG(pricePoints) {
     return { x: dp.x, y: dp.y, price: dp.price, day: dp.day, isCurrent: dp.day === 0, isHist: dp.hist, isCloud: dp.cloud };
   });
 
+  /* ★ 红涨绿跌（2026-10-24）：曲线/渐变/圆点颜色由「首日→当前」趋势决定，
+     与详情页涨跌方向严格同向；颜色经 CSS 令牌 var(--up/--down) 联动配色方案切换。
+     注意 SVG 属性里不能用 var()，统一走 style 内联样式。 */
+  var firstPrice = pts[0].price;                 // pts 已按 day 降序：首元素最旧
+  var lastPrice = pts[pts.length - 1].price;
+  var trendVar = lastPrice >= firstPrice ? 'var(--up)' : 'var(--down)';
+
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
     '<defs>' +
       '<linearGradient id="' + _gradId + '" x1="0" y1="0" x2="0" y2="1">' +
-        '<stop offset="0%" stop-color="#667eea" stop-opacity="0.28"/>' +
-        '<stop offset="100%" stop-color="#667eea" stop-opacity="0.03"/>' +
+        '<stop offset="0%" style="stop-color:' + trendVar + ';stop-opacity:0.22"/>' +
+        '<stop offset="100%" style="stop-color:' + trendVar + ';stop-opacity:0.02"/>' +
       '</linearGradient>' +
     '</defs>' +
     yTicks.map(function(tk) {
       return '<line x1="' + PAD.left + '" y1="' + tk.y.toFixed(1) + '" x2="' + (W - PAD.right) + '" y2="' + tk.y.toFixed(1) + '" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,4"/>' +
-        '<text x="' + (PAD.left - 6) + '" y="' + tk.y.toFixed(1) + '" text-anchor="end" fill="#888" font-size="9" dominant-baseline="middle">\xA5' + shortPrice(tk.price) + '</text>';
+        '<text x="' + (PAD.left - 6) + '" y="' + tk.y.toFixed(1) + '" text-anchor="end" fill="#7d8798" font-size="9" dominant-baseline="middle">\xA5' + shortPrice(tk.price) + '</text>';
     }).join('') +
     xTicks.map(function(d) {
       var xx = PAD.left + (1 - d / 30) * plotW;
       var label = xTickLabels[d] || '';
       return '<line x1="' + xx.toFixed(1) + '" y1="' + PAD.top + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH) + '" stroke="rgba(255,255,255,0.05)" stroke-dasharray="2,5"/>' +
         '<line x1="' + xx.toFixed(1) + '" y1="' + (PAD.top + plotH) + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH + 4) + '" stroke="rgba(255,255,255,0.3)"/>' +
-        '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="#888" font-size="8">' + label + '</text>';
+        '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="#7d8798" font-size="8">' + label + '</text>';
     }).join('') +
     '<path d="' + areaD + '" fill="url(#' + _gradId + ')"/>' +
-    '<path d="' + pathD + '" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="' + pathD + '" fill="none" style="stroke:' + trendVar + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
     markers.map(function(m) {
-      var dotColor = m.isCurrent ? '#ffd700' : '#667eea';
-      var r = m.isCurrent ? 2.5 : 1.5;
-      return '<circle cx="' + m.x.toFixed(1) + '" cy="' + m.y.toFixed(1) + '" r="' + r + '" fill="' + dotColor + '"/>';
+      var r = m.isCurrent ? 2.8 : 1.6;
+      return '<circle cx="' + m.x.toFixed(1) + '" cy="' + m.y.toFixed(1) + '" r="' + r + '" style="fill:' + trendVar + '"/>';
     }).join('') +
   '</svg>';
 }
@@ -167,7 +173,7 @@ function generateSparklineSVG(pricePoints) {
   var firstPrice = pricePoints[0].price;
   var lastPrice = pricePoints[pricePoints.length - 1].price;
   var isUp = lastPrice >= firstPrice;
-  var color = isUp ? '#4caf50' : '#f44336';
+  var color = isUp ? 'var(--up)' : 'var(--down)'; // 跟随红涨绿跌/绿涨红跌方案（style 内联，SVG 属性不支持 var()）
 
-  return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="item-sparkline-svg"><polyline points="' + ptsStr + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="item-sparkline-svg"><polyline points="' + ptsStr + '" fill="none" style="stroke:' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }

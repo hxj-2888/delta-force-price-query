@@ -532,3 +532,17 @@ function updateCategoryIcons(allItems) {
     }
   });
 }
+
+/* ================= 涨跌配色切换（2026-10-24） =================
+   默认红涨绿跌（中国行情惯例），可切绿涨红跌（国际惯例）。
+   方案挂在 <html data-scheme> 上由 CSS 令牌（css/base.css）解析，
+   SVG 线条/圆点用 style="stroke:var(--up)" 联动。localStorage('df_scheme') 持久化。 */
+function toggleScheme() {
+  var html = document.documentElement;
+  var to = html.dataset.scheme === 'intl' ? 'cn' : 'intl';
+  html.dataset.scheme = to;
+  try { localStorage.setItem('df_scheme', to); } catch (e) {}
+  var lb = document.getElementById('schemeLabel');
+  if (lb) lb.textContent = to === 'cn' ? '红涨' : '绿涨';
+  toast(to === 'cn' ? '已切换：红涨绿跌' : '已切换：绿涨红跌');
+}

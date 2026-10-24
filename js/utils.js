@@ -34,8 +34,10 @@ function getGradeText(g) {
 }
 
 function getGradeColor(g) {
-  const colors = ['', '#8b8b8b', '#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#f44336'];
-  return colors[g] || '#8b8b8b';
+  // 等级色板（2026-10-24 换装）：与涨跌色（红/绿）解耦——原四级紫/六级红与涨跌语义撞色；
+  // 六级=品牌金（顶配辨识度），整体降低饱和度贴合行情风暗色界面。
+  const colors = ['', '#7f8a9e', '#45b8a8', '#3d9bff', '#a78bfa', '#f08c4a', '#f0b542'];
+  return colors[g] || '#7f8a9e';
 }
 
 function toast(msg, duration) {

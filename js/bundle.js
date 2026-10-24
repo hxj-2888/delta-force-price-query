@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20261009j-d58fa707 — 自动生成于 2026-10-09 01:25:24
+// v20261024w-de573b74 — 自动生成于 2026-10-24 14:39:16
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -99,8 +99,10 @@ function getGradeText(g) {
 }
 
 function getGradeColor(g) {
-  const colors = ['', '#8b8b8b', '#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#f44336'];
-  return colors[g] || '#8b8b8b';
+  // 等级色板（2026-10-24 换装）：与涨跌色（红/绿）解耦——原四级紫/六级红与涨跌语义撞色；
+  // 六级=品牌金（顶配辨识度），整体降低饱和度贴合行情风暗色界面。
+  const colors = ['', '#7f8a9e', '#45b8a8', '#3d9bff', '#a78bfa', '#f08c4a', '#f0b542'];
+  return colors[g] || '#7f8a9e';
 }
 
 function toast(msg, duration) {
@@ -614,6 +616,18 @@ function paintPriceCurve(item, box, fallbackPts) {
       var oldSvg = box.querySelector('svg');
       if (oldSvg) { oldSvg.insertAdjacentHTML('afterend', svgHtml); oldSvg.remove(); }
       else box.insertAdjacentHTML('afterbegin', svgHtml);
+    }
+    /* ★ 数据源徽标（2026-10-24）：如实标注每个点来自哪里——云端每日记录 / 本地快照 / 真实锚点，
+       与「不臆造数据」红线一致。 */
+    var srcEl = document.getElementById('curveSrc');
+    if (srcEl && pts && pts.length) {
+      var cloudN = 0, histN = 0, anchorN = 0;
+      pts.forEach(function(p) { if (p.cloud) cloudN++; else if (p.hist) histN++; else anchorN++; });
+      var srcTxt;
+      if (cloudN > 0) srcTxt = '云端每日记录 <b>' + cloudN + '</b> 点 · 锚点 <b>' + anchorN + '</b>';
+      else if (histN > 0) srcTxt = '本地快照 <b>' + histN + '</b> 点 · 锚点 <b>' + anchorN + '</b>';
+      else srcTxt = '真实锚点连线<b>（云端暂无记录）</b>';
+      srcEl.innerHTML = '数据来源：' + srcTxt;
     }
     box.setAttribute('data-curve-done', '1');
     box.setAttribute('data-curve-busy', '');
@@ -1921,6 +1935,20 @@ function updateCategoryIcons(allItems) {
   });
 }
 
+/* ================= 涨跌配色切换（2026-10-24） =================
+   默认红涨绿跌（中国行情惯例），可切绿涨红跌（国际惯例）。
+   方案挂在 <html data-scheme> 上由 CSS 令牌（css/base.css）解析，
+   SVG 线条/圆点用 style="stroke:var(--up)" 联动。localStorage('df_scheme') 持久化。 */
+function toggleScheme() {
+  var html = document.documentElement;
+  var to = html.dataset.scheme === 'intl' ? 'cn' : 'intl';
+  html.dataset.scheme = to;
+  try { localStorage.setItem('df_scheme', to); } catch (e) {}
+  var lb = document.getElementById('schemeLabel');
+  if (lb) lb.textContent = to === 'cn' ? '红涨' : '绿涨';
+  toast(to === 'cn' ? '已切换：红涨绿跌' : '已切换：绿涨红跌');
+}
+
 // ===== render/charts.js =====
 // ===== render/charts.js — SVG 价格图表 =====
 // 功能清单: 详情页30天价格曲线SVG(带Catmull-Rom插值+Y轴刻度+渐变填充) | 列表页迷你折线SVG
@@ -2043,30 +2071,36 @@ function generatePriceCurveSVG(pricePoints) {
     return { x: dp.x, y: dp.y, price: dp.price, day: dp.day, isCurrent: dp.day === 0, isHist: dp.hist, isCloud: dp.cloud };
   });
 
+  /* ★ 红涨绿跌（2026-10-24）：曲线/渐变/圆点颜色由「首日→当前」趋势决定，
+     与详情页涨跌方向严格同向；颜色经 CSS 令牌 var(--up/--down) 联动配色方案切换。
+     注意 SVG 属性里不能用 var()，统一走 style 内联样式。 */
+  var firstPrice = pts[0].price;                 // pts 已按 day 降序：首元素最旧
+  var lastPrice = pts[pts.length - 1].price;
+  var trendVar = lastPrice >= firstPrice ? 'var(--up)' : 'var(--down)';
+
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
     '<defs>' +
       '<linearGradient id="' + _gradId + '" x1="0" y1="0" x2="0" y2="1">' +
-        '<stop offset="0%" stop-color="#667eea" stop-opacity="0.28"/>' +
-        '<stop offset="100%" stop-color="#667eea" stop-opacity="0.03"/>' +
+        '<stop offset="0%" style="stop-color:' + trendVar + ';stop-opacity:0.22"/>' +
+        '<stop offset="100%" style="stop-color:' + trendVar + ';stop-opacity:0.02"/>' +
       '</linearGradient>' +
     '</defs>' +
     yTicks.map(function(tk) {
       return '<line x1="' + PAD.left + '" y1="' + tk.y.toFixed(1) + '" x2="' + (W - PAD.right) + '" y2="' + tk.y.toFixed(1) + '" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,4"/>' +
-        '<text x="' + (PAD.left - 6) + '" y="' + tk.y.toFixed(1) + '" text-anchor="end" fill="#888" font-size="9" dominant-baseline="middle">\xA5' + shortPrice(tk.price) + '</text>';
+        '<text x="' + (PAD.left - 6) + '" y="' + tk.y.toFixed(1) + '" text-anchor="end" fill="#7d8798" font-size="9" dominant-baseline="middle">\xA5' + shortPrice(tk.price) + '</text>';
     }).join('') +
     xTicks.map(function(d) {
       var xx = PAD.left + (1 - d / 30) * plotW;
       var label = xTickLabels[d] || '';
       return '<line x1="' + xx.toFixed(1) + '" y1="' + PAD.top + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH) + '" stroke="rgba(255,255,255,0.05)" stroke-dasharray="2,5"/>' +
         '<line x1="' + xx.toFixed(1) + '" y1="' + (PAD.top + plotH) + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH + 4) + '" stroke="rgba(255,255,255,0.3)"/>' +
-        '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="#888" font-size="8">' + label + '</text>';
+        '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="#7d8798" font-size="8">' + label + '</text>';
     }).join('') +
     '<path d="' + areaD + '" fill="url(#' + _gradId + ')"/>' +
-    '<path d="' + pathD + '" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="' + pathD + '" fill="none" style="stroke:' + trendVar + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
     markers.map(function(m) {
-      var dotColor = m.isCurrent ? '#ffd700' : '#667eea';
-      var r = m.isCurrent ? 2.5 : 1.5;
-      return '<circle cx="' + m.x.toFixed(1) + '" cy="' + m.y.toFixed(1) + '" r="' + r + '" fill="' + dotColor + '"/>';
+      var r = m.isCurrent ? 2.8 : 1.6;
+      return '<circle cx="' + m.x.toFixed(1) + '" cy="' + m.y.toFixed(1) + '" r="' + r + '" style="fill:' + trendVar + '"/>';
     }).join('') +
   '</svg>';
 }
@@ -2091,9 +2125,9 @@ function generateSparklineSVG(pricePoints) {
   var firstPrice = pricePoints[0].price;
   var lastPrice = pricePoints[pricePoints.length - 1].price;
   var isUp = lastPrice >= firstPrice;
-  var color = isUp ? '#4caf50' : '#f44336';
+  var color = isUp ? 'var(--up)' : 'var(--down)'; // 跟随红涨绿跌/绿涨红跌方案（style 内联，SVG 属性不支持 var()）
 
-  return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="item-sparkline-svg"><polyline points="' + ptsStr + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="item-sparkline-svg"><polyline points="' + ptsStr + '" fill="none" style="stroke:' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
 
 // ===== render/home.js =====
@@ -2134,7 +2168,7 @@ function _renderTopMoverFromData(all) {
   if (!el) return;
   var candidates = [];
   all.forEach(function(item) {
-    if (!item.price || item.price < 20000) return;
+    if (!item.price || item.price < 20000) return; // ★ 降噪：≥2万 才入榜（低价标的百分比暴涨是噪声）
     var v = item.day_7_bl;
     var isDay7 = v != null && v > 0.01;
     if (!isDay7) { v = item.bl; }
@@ -2149,29 +2183,29 @@ function _renderTopMoverFromData(all) {
   candidates.sort(function(a, b) { return b.val - a.val; });
   var top2 = candidates.slice(0, 2);
   el.style.display = 'block';
-  el.innerHTML = '<div style="padding:8px 0">' +
+  /* 样式走 components.css 的 .topmover 体系；配色用语义 class（跟随红涨绿跌方案） */
+  el.innerHTML =
+    '<div class="tm-head">' +
+      '<span class="tm-title">🔥 涨幅前二</span>' +
+      '<span class="tm-sub">全市场 ≥2万</span>' +
+    '</div>' +
     top2.map(function(t, idx) {
       var item = t.item;
       var val = t.val;
-      var label = idx === 0 ? '涨幅第一' : '涨幅第二';
       var periodText = t.isDay7 ? '近7天' : '今日';
-      var freshness = _topMoverApiDone ? ' <span style="font-size:9px;color:#4fc3f7;font-weight:normal">●实时</span>' : '';
       var picHtml = item.pic
-        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:36px;height:36px;border-radius:6px;object-fit:contain;margin-right:10px" onerror="this.style.display=\'none\'">'
+        ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="eager" decoding="sync" fetchpriority="high" style="width:34px;height:34px;border-radius:8px;object-fit:contain" onerror="this.style.display=\'none\'">'
         : '';
-      return '<div class="tm-row" onclick="openTopMover(' + Number(item.id) + ')" style="display:flex;align-items:center;padding:6px 16px;cursor:pointer;transition:all 0.15s">' +
+      return '<div class="tm-row" onclick="openTopMover(' + Number(item.id) + ')">' +
+        '<span class="tm-rank">' + (idx + 1) + '</span>' +
         picHtml +
-        '<div style="flex:1;min-width:0">' +
-          '<div style="font-size:10px;color:#8890b0;line-height:1.3">' + periodText + ' ' + label + freshness + '</div>' +
-          '<div style="font-size:13px;font-weight:bold;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(item.name) + '</div>' +
-        '</div>' +
-        '<div style="text-align:right;margin-left:8px;flex-shrink:0">' +
-          '<div style="font-size:13px;color:#ffd700;font-weight:500">\xA5' + formatPrice(item.price) + '</div>' +
-          '<div style="font-size:12px;font-weight:bold;color:#4caf50">' + (val > 0 ? '+' : '') + val.toFixed(2) + '%</div>' +
-        '</div>' +
+        '<span class="tm-name">' + escapeHtml(item.name) +
+          '<small>' + periodText + ' · ' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + (item.grade && item._category !== 'gun' ? ' · ' + getGradeText(item.grade) : '') + '</small>' +
+        '</span>' +
+        '<span class="tm-px">¥' + formatPrice(item.price) + '</span>' +
+        '<span class="tm-chg ' + getChangeClass(val) + '">' + formatChangeArrow(val) + ' +' + val.toFixed(2) + '%</span>' +
       '</div>';
-    }).join('') +
-  '</div>';
+    }).join('');
 }
 
 // ===== 迷你折线图（首页物品卡片内） =====
@@ -2194,10 +2228,10 @@ function _renderMiniSparkline(item) {
   }).join(' ');
 
   var isUp = pts[pts.length - 1].price >= pts[0].price;
-  var color = isUp ? '#4caf50' : '#f44336';
+  var color = isUp ? 'var(--up)' : 'var(--down)'; // 跟随红涨绿跌/绿涨红跌方案
 
   return '<div class="item-mini-spark" style="margin-top:4px">' +
-    '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:60px;height:20px;display:block"><polyline points="' + ptsStr + '" fill="none" stroke="' + color + '" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:60px;height:20px;display:block"><polyline points="' + ptsStr + '" fill="none" style="stroke:' + color + '" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
   '</div>';
 }
 
@@ -2318,28 +2352,32 @@ function renderHomeMovers(resetPage) {
   listEl.innerHTML = html;
 }
 
-// ===== 市场概览条（结果数 / 均价 / 涨跌家数 / 更新时间） =====
+// ===== 市场宽度卡（2026-10-24：上涨/平盘/下跌家数 + 涨跌分布条，替代「均价」伪指标） =====
 function renderHomeStatBar(filtered, field) {
   var bar = document.getElementById('homeStatBar');
   if (!bar) return;
   var set = function(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; };
 
   var total = filtered.length;
-  var sum = 0, up = 0, down = 0, priced = 0, latestTs = 0;
+  var up = 0, down = 0, latestTs = 0;
   for (var i = 0; i < filtered.length; i++) {
     var it = filtered[i];
-    if (it.price > 0) { sum += it.price; priced++; }
     var v = getFieldByPeriod(it, field) || 0;
     if (v > 0) up++; else if (v < 0) down++;
     if (it.is_get_time > latestTs) latestTs = it.is_get_time;
   }
-  var avg = priced ? Math.round(sum / priced) : 0;
+  var flat = total - up - down;
 
+  set('hsUp', String(up));
+  set('hsFlat', String(flat));
+  set('hsDn', String(down));
   set('hsCount', formatLargeNum(total));
-  set('hsAvg', avg ? '\xA5' + formatPrice(avg) : '--');
-  /* 〔2026-10-09〕概览条的「上涨 / 下跌」家数格已按产品口径移除（DOM 在 index.html），
-     故这里不再写 hsUp / hsDn。⚠ up / down 的统计**必须保留**——下面「行情」（普涨/普跌/持平）
-     正是靠它判方向，删了会恒显示「持平」。 */
+
+  /* 涨跌分布条：红/灰/绿 占比宽度（跟随 data-scheme 令牌） */
+  var T = total || 1;
+  var bw = function(id, n) { var el = document.getElementById(id); if (el) el.style.width = (n / T * 100).toFixed(1) + '%'; };
+  bw('hsBUp', up); bw('hsBFlat', flat); bw('hsBDn', down);
+
   var updEl = document.getElementById('hsUpd');
   if (updEl) {
     var ft = latestTs ? formatTime(latestTs) : '--';
@@ -2355,6 +2393,61 @@ function renderHomeStatBar(filtered, field) {
     mood.textContent = up > down ? '普涨' : down > up ? '普跌' : '持平';
     mood.className = 'hs-mood ' + (up > down ? 'up' : down > up ? 'down' : 'flat');
   }
+
+  renderDashboard(filtered, field, up, flat, down);
+}
+
+// ===== 市场总览仪表盘（桌面双栏右栏默认视图；数据与宽度卡同源） =====
+function renderDashboard(filtered, field, up, flat, down) {
+  var grid = document.getElementById('dashSectorGrid');
+  if (!grid) return; // 移动端没有该页 DOM，直接跳过
+  var set = function(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; };
+  var T = filtered.length || 1;
+
+  set('dashUp', String(up)); set('dashFlat', String(flat)); set('dashDown', String(down));
+  var moodWord = up > down ? '普涨' : down > up ? '普跌' : '持平';
+  var netPct = ((up - down) / T * 100);
+  var moodEl = document.getElementById('dashMood');
+  if (moodEl) moodEl.innerHTML = '市场情绪 <b class="' + (netPct > 0 ? 'up' : netPct < 0 ? 'down' : 'flat') + '">' + moodWord +
+    '</b> · 净上涨 <b class="' + (netPct > 0 ? 'up' : netPct < 0 ? 'down' : 'flat') + '">' + (netPct > 0 ? '+' : '') + netPct.toFixed(1) + '%</b>';
+  ['dashBUp:up', 'dashBFlat:flat', 'dashBDn:down'].forEach(function(pair) {
+    var kv = pair.split(':');
+    var el = document.getElementById(kv[0]);
+    if (el) el.style.width = ((kv[1] === 'up' ? up : kv[1] === 'flat' ? flat : down) / T * 100).toFixed(1) + '%';
+  });
+  set('dashSecNote', '近' + ({ bl: '1', day_3_bl: '3', day_7_bl: '7' }[field] || '1') + '日均涨幅 · 点击进入板块');
+  set('dashFoot', '共 ' + formatLargeNum(filtered.length) + ' 件标的 · 数据更新 ' + (document.getElementById('hsUpd') ? document.getElementById('hsUpd').textContent : '--'));
+
+  // 板块表现磁贴：均涨幅（涨跌幅的算术平均，非价格均价）+ 上涨占比
+  grid.innerHTML = CATEGORIES.map(function(cat) {
+    var arr = filtered.filter(function(i) { return i._category === cat.key; });
+    if (!arr.length) return '';
+    var cUp = 0, sum = 0;
+    arr.forEach(function(i) { var v = getFieldByPeriod(i, field) || 0; if (v > 0) cUp++; sum += v; });
+    var avg = sum / arr.length;
+    var upRatio = cUp / arr.length * 100;
+    return '<button class="dash-tile" onclick="openCategory(\'' + cat.key + '\',\'' + cat.name + '\')">' +
+      '<span class="sn">' + cat.name + '</span>' +
+      '<span class="sv ' + getChangeClass(avg) + '" style="display:block">' + formatChangeArrow(avg) + ' ' + (avg > 0 ? '+' : '') + avg.toFixed(2) + '%</span>' +
+      '<span class="sb" style="display:flex"><i style="width:' + upRatio.toFixed(0) + '%;background:var(--up)"></i><i style="flex:1;background:var(--surface-3)"></i></span>' +
+      '<span class="sk" style="display:flex"><span>上涨 ' + cUp + '</span><span>共 ' + arr.length + ' 件</span></span>' +
+    '</button>';
+  }).join('');
+
+  // 涨跌幅榜 TOP5（真实排序，无过滤——降噪口径只约束「涨幅前二」卡）
+  var byField = filtered.slice().sort(function(a, b) { return (getFieldByPeriod(b, field) || 0) - (getFieldByPeriod(a, field) || 0); });
+  var rankRow = function(it, k) {
+    var v = getFieldByPeriod(it, field) || 0;
+    return '<div class="dash-rank-row" onclick="openPriceMover(' + Number(it.id) + ')">' +
+      '<span class="rk">' + (k + 1) + '</span>' +
+      '<span class="rn" title="' + escapeHtml(it.name) + '">' + escapeHtml(it.name) + '</span>' +
+      '<span class="rc num ' + getChangeClass(v) + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '%</span>' +
+    '</div>';
+  };
+  var rankUp = document.getElementById('dashRankUp');
+  var rankDn = document.getElementById('dashRankDown');
+  if (rankUp) rankUp.innerHTML = byField.slice(0, 5).map(rankRow).join('');
+  if (rankDn) rankDn.innerHTML = byField.slice(-5).reverse().map(rankRow).join('');
 }
 
 function renderHomeMoversWithData(items) {
@@ -2414,7 +2507,7 @@ function _renderPagination(totalPages, current, totalItems) {
   for (var i = 1; i <= totalPages; i++) {
     if (totalPages <= 7 || i === 1 || i === totalPages || (i >= current - 1 && i <= current + 1)) {
       if (i === current) {
-        html += '<button class="page-btn active" style="background:rgba(102,126,234,0.3);color:#aab8ff;font-weight:600">' + i + '</button>';
+        html += '<button class="page-btn active">' + i + '</button>';
       } else {
         html += '<button class="page-btn" onclick="goToHomePage(' + i + ')" style="font-size:12px">' + i + '</button>';
       }
@@ -2690,7 +2783,7 @@ function renderDetail(item) {
   }
 
   var detailContent = document.getElementById('detailContent');
-  detailContent.innerHTML = '\n      <div class="detail-header">\n        <div class="detail-pic">\n          ' + picHtml + '\n        </div>\n        <div class="detail-basic">\n          <div class="detail-name">' + escapeHtml(item.name) + '</div>\n          <div class="detail-meta">\n            ' + metaHtml + '\n          </div>\n          ' + descHtml + '\n        </div>\n      </div>\n\n      <div class="price-card">\n        <div class="price-card-header">\n          <span class="price-card-title">当前价格</span>\n          <span class="price-card-time">更新于 ' + formatTime(item.is_get_time) + '</span>\n        </div>\n        <div class="price-main">\n          <span class="price-currency">\xA5</span>\n          <span class="price-value">' + formatPrice(price) + '</span>\n        </div>\n        <div class="price-sub">\n          <div class="sub-item">\n            <span class="sub-label">今日开盘</span>\n            <span class="sub-value">\xA5' + formatPrice(item.price_start || item.priceStart || 0) + '</span>\n          </div>\n          <div class="sub-item">\n            <span class="sub-label">今日涨跌</span>\n            <span class="sub-value ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n          </div>\n        </div>\n      </div>\n\n      <div class="section">\n        <div class="section-title">近30天价格趋势</div>\n        <div class="price-curve-box">\n          ' + curvePlaceholderHTML() + '\n          <div class="curve-legend">\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#888"></span>30天前 \xA5' + formatPrice(d30p) + ' <span class="' + getChangeClass(d30bl) + '" style="font-size:10px">' + formatChange(d30bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#667eea"></span>7天前 \xA5' + formatPrice(d7p) + ' <span class="' + getChangeClass(d7bl) + '" style="font-size:10px">' + formatChange(d7bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#4caf50"></span>3天前 \xA5' + formatPrice(d3p) + ' <span class="' + getChangeClass(d3bl) + '" style="font-size:10px">' + formatChange(d3bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#ffd700"></span>当前 \xA5' + formatPrice(price) + '</div>\n          </div>\n        </div>\n      </div>\n\n      ' + propsHtml + '\n\n      <div class="source-note">\n        <span>数据来源：三角洲数据帝 orzice.com 开放平台</span>\n        <span>禁止编造或篡改任何价格信息</span>\n      </div>\n    ';
+  detailContent.innerHTML = '\n      <div class="detail-header">\n        <div class="detail-pic">\n          ' + picHtml + '\n        </div>\n        <div class="detail-basic">\n          <div class="detail-name">' + escapeHtml(item.name) + '</div>\n          <div class="detail-meta">\n            ' + metaHtml + '\n          </div>\n          ' + descHtml + '\n        </div>\n      </div>\n\n      <div class="price-card">\n        <div class="price-card-header">\n          <span class="price-card-title">当前价格</span>\n          <span class="price-card-time">更新于 ' + formatTime(item.is_get_time) + '</span>\n        </div>\n        <div class="price-main">\n          <span class="price-currency ' + getChangeClass(bl) + '">\xA5</span>\n          <span class="price-value ' + getChangeClass(bl) + '">' + formatPrice(price) + '</span>\n        </div>\n        <div class="price-sub">\n          <div class="sub-item">\n            <span class="sub-label">今日开盘</span>\n            <span class="sub-value">\xA5' + formatPrice(item.price_start || item.priceStart || 0) + '</span>\n          </div>\n          <div class="sub-item">\n            <span class="sub-label">今日涨跌</span>\n            <span class="sub-value ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n          </div>\n        </div>\n      </div>\n\n      <div class="section">\n        <div class="section-title">近30天价格趋势</div>\n        <div class="price-curve-box">\n          ' + curvePlaceholderHTML() + '\n          <div class="curve-src" id="curveSrc"></div>\n          <div class="curve-legend">\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#7f8a9e"></span>30天前 \xA5' + formatPrice(d30p) + ' <span class="' + getChangeClass(d30bl) + '" style="font-size:10px">' + formatChange(d30bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#5d6678"></span>7天前 \xA5' + formatPrice(d7p) + ' <span class="' + getChangeClass(d7bl) + '" style="font-size:10px">' + formatChange(d7bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:#96a0b4"></span>3天前 \xA5' + formatPrice(d3p) + ' <span class="' + getChangeClass(d3bl) + '" style="font-size:10px">' + formatChange(d3bl) + '</span></div>\n            <div class="curve-legend-item"><span class="curve-legend-dot" style="background:var(--brand)"></span>当前 \xA5' + formatPrice(price) + '</div>\n          </div>\n        </div>\n      </div>\n\n      ' + propsHtml + '\n\n      <div class="source-note">\n        <span>数据来源：三角洲数据帝 orzice.com 开放平台</span>\n        <span>禁止编造或篡改任何价格信息</span>\n      </div>\n    ';
   updateFavoriteButton(item.id);
 
   /* 〔2026-10-09〕曲线改「预加载」：上面只渲染了骨架占位，这里等云端快照到位后一次性画出
@@ -2706,7 +2799,12 @@ function updateDetailPrices(item) {
   var bl = item.bl || 0;
 
   var priceVal = container.querySelector('.price-value');
-  if (priceVal) priceVal.textContent = formatPrice(price);
+  if (priceVal) {
+    priceVal.textContent = formatPrice(price);
+    priceVal.className = 'price-value ' + getChangeClass(bl); // 大价格跟随趋势着色，与曲线同源
+  }
+  var priceCur = container.querySelector('.price-currency');
+  if (priceCur) priceCur.className = 'price-currency ' + getChangeClass(bl);
 
   var priceTime = container.querySelector('.price-card-time');
   if (priceTime) priceTime.textContent = '更新于 ' + formatTime(item.is_get_time);
@@ -2919,7 +3017,7 @@ function checkFavoritePriceChanges() {
 
 // ===== 状态变量 =====
 var pages = {};
-['home', 'list', 'detail', 'search', 'favtab'].forEach(function(id) {
+['home', 'list', 'detail', 'search', 'favtab', 'dash'].forEach(function(id) {
   pages[id] = document.getElementById('page-' + id);
 });
 var pageStack = ['home'];
@@ -2932,6 +3030,29 @@ var sortDir = 'desc';
 var currentPage = 1;
 var searchTimer;
 
+// ===== 桌面双栏同步（2026-10-24） =====
+// ≥1024px 时首页常驻左栏（CSS 强制可见），右栏展示当前激活页；
+// 处于首页（或移动端误激活）时点亮/熄灭「市场总览」仪表盘作为右栏默认视图。
+var _desktopMq = window.matchMedia ? window.matchMedia('(min-width: 1024px)') : null;
+function _syncDashPane(activeName) {
+  if (!pages.dash) return;
+  if (_desktopMq && _desktopMq.matches && activeName === 'home') {
+    pages.dash.classList.add('active');
+  } else {
+    pages.dash.classList.remove('active');
+  }
+}
+// 跨宽度切换时同步：窄屏立即熄灭总览；回到宽屏且当前在首页则重新点亮
+if (_desktopMq && _desktopMq.addEventListener) {
+  _desktopMq.addEventListener('change', function(e) {
+    if (!e.matches) {
+      if (pages.dash) pages.dash.classList.remove('active');
+    } else {
+      _syncDashPane(pageStack[pageStack.length - 1]);
+    }
+  });
+}
+
 // ===== 页面导航 =====
 function showPage(name) {
   if (typeof hideHomeSugg === 'function') hideHomeSugg();
@@ -2941,6 +3062,7 @@ function showPage(name) {
     page.classList.add('active');
     if (name !== 'search') page.classList.add('fade-in');
   }
+  _syncDashPane(name);
   window.scrollTo(0, 0);
 }
 
@@ -3044,6 +3166,7 @@ function switchTab(tabName) {
   if (target) {
     target.classList.add('active');
     pageStack = [tabName];
+    _syncDashPane(tabName);
     if (tabName === 'home') {
       var saved = restoreBrowseState();
       if (saved && typeof applyHomeBrowseState === 'function') {
@@ -3654,6 +3777,9 @@ function refreshFavTab() {
     toast('刷新失败，显示已有数据');
   });
 }
+
+// 首屏双栏：桌面环境加载即点亮右栏「市场总览」（移动端无 dash DOM，空操作）
+_syncDashPane('home');
 
 // ===== app/init.js =====
 // ===== app/init.js — 初始化 + 定时器 + 事件绑定 + 滚动条 =====

@@ -30,3 +30,7 @@ android/release.keystore
 android/release.keystore.old-*
 android/*.idsig
 android/DeltaForce.apk
+
+# 设计评审产物（demo）的生成数据文件，可由 design/gen-demo-data.cjs 重新生成
+design/demo-data.js
+design/real-prices.json

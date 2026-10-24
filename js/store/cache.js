@@ -327,6 +327,18 @@ function paintPriceCurve(item, box, fallbackPts) {
       if (oldSvg) { oldSvg.insertAdjacentHTML('afterend', svgHtml); oldSvg.remove(); }
       else box.insertAdjacentHTML('afterbegin', svgHtml);
     }
+    /* ★ 数据源徽标（2026-10-24）：如实标注每个点来自哪里——云端每日记录 / 本地快照 / 真实锚点，
+       与「不臆造数据」红线一致。 */
+    var srcEl = document.getElementById('curveSrc');
+    if (srcEl && pts && pts.length) {
+      var cloudN = 0, histN = 0, anchorN = 0;
+      pts.forEach(function(p) { if (p.cloud) cloudN++; else if (p.hist) histN++; else anchorN++; });
+      var srcTxt;
+      if (cloudN > 0) srcTxt = '云端每日记录 <b>' + cloudN + '</b> 点 · 锚点 <b>' + anchorN + '</b>';
+      else if (histN > 0) srcTxt = '本地快照 <b>' + histN + '</b> 点 · 锚点 <b>' + anchorN + '</b>';
+      else srcTxt = '真实锚点连线<b>（云端暂无记录）</b>';
+      srcEl.innerHTML = '数据来源：' + srcTxt;
+    }
     box.setAttribute('data-curve-done', '1');
     box.setAttribute('data-curve-busy', '');
   };

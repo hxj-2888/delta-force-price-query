@@ -77,21 +77,27 @@ function check(name, ok, extra) {
   }, MOCK);
   await page.waitForTimeout(500);
 
-  // ---------- ③ 市场概览条 ----------
+  // ---------- ③ 市场宽度卡（2026-10-24 起：上涨/平盘/下跌家数 + 涨跌分布条，替代均价） ----------
   const stat = await page.evaluate(() => ({
     visible: !!document.querySelector('#homeStatBar') &&
       document.querySelector('#homeStatBar').getBoundingClientRect().height > 0,
     count: (document.getElementById('hsCount') || {}).textContent,
-    avg: (document.getElementById('hsAvg') || {}).textContent,
+    flat: (document.getElementById('hsFlat') || {}).textContent,
     up: (document.getElementById('hsUp') || {}).textContent,
     dn: (document.getElementById('hsDn') || {}).textContent,
     mood: (document.getElementById('hsMood') || {}).textContent,
-    upd: (document.getElementById('hsUpd') || {}).textContent
+    upd: (document.getElementById('hsUpd') || {}).textContent,
+    barSum: (function () {
+      var ids = ['hsBUp', 'hsBFlat', 'hsBDn'];
+      var s = 0;
+      ids.forEach(function (id) { var el = document.getElementById(id); if (el) s += parseFloat(el.style.width) || 0; });
+      return s;
+    })()
   }));
-  check('③ 概览条可见', stat.visible);
+  check('③ 宽度卡可见', stat.visible);
   check('③ 结果数 = 120', stat.count === '120', 'got ' + stat.count);
-  check('③ 均价非空', /¥[\d,]+/.test(stat.avg || ''), stat.avg);
-  check('③ 涨跌家数有值', /^\d+$/.test(stat.up || '') && /^\d+$/.test(stat.dn || ''), stat.up + '/' + stat.dn);
+  check('③ 上涨/平盘/下跌家数有值', /^\d+$/.test(stat.up || '') && /^\d+$/.test(stat.flat || '') && /^\d+$/.test(stat.dn || ''), stat.up + '/' + stat.flat + '/' + stat.dn);
+  check('③ 涨跌分布条占比和≈100%', stat.barSum > 99 && stat.barSum < 101, String(stat.barSum));
   check('③ 行情方向词', ['普涨', '普跌', '持平'].indexOf(stat.mood) >= 0, stat.mood);
   check('③ 更新时间非空', (stat.upd || '--') !== '--', stat.upd);
 

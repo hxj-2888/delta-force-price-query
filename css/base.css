@@ -1,18 +1,43 @@
-﻿/* ========== 全局重置 ========== */
+﻿/* ========== 设计令牌（2026-10-24 理财行情风换装） ==========
+   涨跌色默认「红涨绿跌」（中国行情惯例，html[data-scheme="intl"] 可切回绿涨红跌）。
+   品牌色取自 Logo 橙金，替代旧版紫蓝渐变；等级色在 utils.js getGradeColor 与涨跌色解耦。 */
+:root {
+  --bg: #090c12;
+  --surface: #10141d;
+  --surface-2: #161b27;
+  --surface-3: #1c2230;
+  --line: rgba(255,255,255,.07);
+  --line-2: rgba(255,255,255,.12);
+  --text: #eef1f7;
+  --text-2: #96a0b4;
+  --text-3: #5d6678;
+  --up: #f0455c;  --up-bg: rgba(240,69,92,.12);
+  --down: #1ebf77; --down-bg: rgba(30,191,119,.12);
+  --brand: #f0b542; --brand-2: #e59a2a;
+  --brand-bg: rgba(240,181,66,.12);
+  --r-s: 8px; --r-m: 12px; --r-l: 16px;
+  --shadow: 0 12px 32px rgba(0,0,0,.55);
+}
+/* 国际配色：绿涨红跌 */
+html[data-scheme="intl"] {
+  --up: #1ebf77;  --up-bg: rgba(30,191,119,.12);
+  --down: #f0455c; --down-bg: rgba(240,69,92,.12);
+}
+
+/* ========== 全局重置 ========== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #000000;
-  color: #e0e0e0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
   font-size: 14px;
   min-height: 100vh;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
   touch-action: manipulation;
+  font-variant-numeric: tabular-nums; /* 行情数字等宽对齐 */
 }
-html {
-  overscroll-behavior-y: contain;
-}
+html { overscroll-behavior-y: contain; }
 .container { max-width: 500px; margin: 0 auto; min-height: 100vh; padding-bottom: 64px; }
 
 /* ========== 动画 ========== */
@@ -25,19 +50,22 @@ html {
 }
 .fade-in { animation: fadeIn 0.3s ease; }
 
+/* ========== 涨跌语义色（红涨绿跌默认，class 语义不变） ========== */
+.item-change.up, .change-up, .up { color: var(--up); }
+.item-change.down, .change-down, .down { color: var(--down); }
+.item-change.flat, .change-flat, .flat { color: var(--text-3); }
+
 /* ========== 加载 / 错误 / 空状态 ========== */
 .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px 0; }
-.loading-spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; }
-.loading-text { color: #888; font-size: 13px; margin-top: 16px; }
+.loading-spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,.1); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.loading-text { color: var(--text-3); font-size: 13px; margin-top: 16px; }
 .error-container { text-align: center; padding: 80px 20px; }
-.error-text { color: #ff6b6b; font-size: 14px; margin-bottom: 20px; }
-.retry-btn { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 20px; padding: 10px 36px; font-size: 14px; cursor: pointer; }
+.error-text { color: #f0455c; font-size: 14px; margin-bottom: 20px; }
+.retry-btn { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #1a1408; border: none; border-radius: 20px; padding: 10px 36px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .retry-btn:active { opacity: 0.8; }
 .empty-container { text-align: center; padding: 80px 20px; }
 .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
-.empty-text { color: #666; font-size: 14px; }
+.empty-text { color: var(--text-3); font-size: 14px; }
 
 /* ========== 滚动条 ========== */
 ::-webkit-scrollbar { width: 0; height: 0; }
-
-/* ========== 亮点主题 ========== */

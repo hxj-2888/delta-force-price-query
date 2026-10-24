@@ -1,6 +1,6 @@
 # AGENTS.md — 落幕查
 
-> **当前版本**：v20261008w（bundle）· 安卓 `versionName` 3.1 / `versionCode` 3 · 最后更新：2026-10-18
+> **当前版本**：v20261024v（bundle）· 安卓 `versionName` 3.1 / `versionCode` 3 · 最后更新：2026-10-24（理财行情风换装：设计令牌/红涨绿跌可切/市场宽度卡，详见 CHANGELOG；`design/` 为评审产物不入构建）
 > **一句话**：三角洲行动变卖物实时价格查询工具（网页 PWA / Windows 安装包 / 安卓 APK / 微信小程序四端同源）。
 > **接手入口**：[`README.md`](README.md) → [`DEPLOY.md`](DEPLOY.md) → [`CHANGELOG.md`](CHANGELOG.md) → 本文。
 
