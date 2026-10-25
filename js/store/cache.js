@@ -367,7 +367,11 @@ function saveBrowseState() {
     homeSortDir: typeof homeSortDir !== 'undefined' ? homeSortDir : 'desc',
     homeCurrentPage: typeof homeCurrentPage !== 'undefined' ? homeCurrentPage : 1,
     homeScrollTop: (function() {
-      try { return window.pageYOffset || document.documentElement.scrollTop || 0; } catch(e) { return 0; }
+      try {
+        // 桌面双栏下 .page 是滚动容器、window 不滚动，优先取容器 scrollTop
+        if (typeof window.__dfGetScrollTop === 'function') return window.__dfGetScrollTop();
+        return window.pageYOffset || document.documentElement.scrollTop || 0;
+      } catch(e) { return 0; }
     })()
   };
   localStorage.setItem(BROWSE_STATE_KEY, JSON.stringify(state));

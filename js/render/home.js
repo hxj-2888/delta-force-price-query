@@ -358,7 +358,13 @@ function goToHomePage(n) {
   }).join('');
   html += _renderPagination(totalPages, n, _homeAllFiltered.length);
   listEl.innerHTML = html;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // 翻页后回到列表顶部：桌面双栏下滚动容器是 #page-home，window 不滚动
+  var pane = document.getElementById('page-home');
+  if (pane && pane.scrollHeight > pane.clientHeight + 1) {
+    pane.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 function _renderPagination(totalPages, current, totalItems) {

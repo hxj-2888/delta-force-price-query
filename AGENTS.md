@@ -24,8 +24,9 @@
 | **bundle 与版本一致性** | `npm run check`（`scripts/build.js --check`） |
 | 重建 bundle | `npm run build` |
 | 抓取元数据 | `npm run generate-metadata` |
-| 部署（唯一正确姿势） | `.\deploy-pages.ps1` |
+| 部署（唯一正确姿势） | `node tools/deploy-pages.cjs` |
 | 首页 UI 冒烟 | `node tools/home-ui-smoke.cjs` |
+| 滚动条冒烟（桌面双栏/窄屏/移动端） | `node tools/scrollbar-smoke.cjs` |
 | 文档死链 | `node tools/check-docs.cjs` |
 
 ### 什么算"绿"
@@ -41,7 +42,7 @@
 
 1. **绝不整目录直推 Pages。** `.assetsignore` 对 `wrangler pages deploy` **无效**
    （那是 Workers static assets 的特性），整目录直推会把 `.env`（真实 API Token）与
-   `android/release.keystore`（签名私钥）**公开**。部署只走 `deploy-pages.ps1` 的白名单暂存。
+   `android/release.keystore`（签名私钥）**公开**。部署只走 `tools/deploy-pages.cjs` 的白名单暂存。
 2. **上游没有的字段不许造。** `item_price_all` 与 `metadata.json` 没有成交量/挂单量字段
    （全仓 grep 0 命中）。任何"量 XXX"的展示都是臆造，明确不做。
 3. **版本号是推导出来的，不是手写的。** 版本号来自 `scripts/build.js` 的 `makeVersion()`
@@ -56,6 +57,10 @@
    它只挡跨站浏览器，挡不住 `curl`。不要把它当访问控制来宣称安全。
 8. **密钥永不入库、永不发布。** `.env` 与 `*.keystore` 只在本地；`.gitignore` 之外还必须在
    部署白名单里被排除（见红线 1）。
+9. **桌面 ≥1024px 下 window 不滚动，`.page` 才是滚动容器。** 双栏布局里左右两栏各自
+   `overflow-y:auto`，`document.documentElement.scrollTop` 恒为 0。任何"回到顶部/记录滚动位置/
+   滚动条"逻辑都必须按容器写（`el.scrollTop`），不能只写 `window.scrollTo`。
+   滚动位置读写统一走 `window.__dfGetScrollTop()` / `window.__dfRestoreScrollTop(y)`。
 
 ---
 
@@ -73,7 +78,7 @@
 | `migrations/` | D1 表结构 |
 | `sw.js` · `manifest.json` | PWA 离线与安装 |
 | `android/` | APK 构建（**含 keystore，禁止发布**） |
-| `deploy-pages.ps1` | **唯一允许的部署脚本**（白名单暂存） |
+| `tools/deploy-pages.cjs` | **唯一允许的部署脚本**（白名单暂存） |
 
 ---
 
@@ -88,7 +93,7 @@
 
 ## 六、提交前自检
 
-- [ ] 部署用的是 `deploy-pages.ps1`，不是 `wrangler pages deploy .`？
+- [ ] 部署用的是 `tools/deploy-pages.cjs`，不是 `wrangler pages deploy .`？
 - [ ] `.env` / keystore 有没有进过发布目录？
 - [ ] `npm run check` 过了吗（bundle 与三处版本号一致）？
 - [ ] 新增的展示字段，上游真的有吗？

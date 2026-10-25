@@ -12,6 +12,8 @@
     "test": "node --test",
     "lint": "node scripts/lint.js",
     "generate-metadata": "node scripts/generate-metadata.js",
+    "smoke:home": "node tools/home-ui-smoke.cjs",
+    "smoke:scrollbar": "node tools/scrollbar-smoke.cjs",
     "predeploy": "node scripts/build.js"
   },
   "keywords": ["落幕查", "价格查询", "变卖物"],

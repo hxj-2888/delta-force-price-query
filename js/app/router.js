@@ -53,6 +53,8 @@ function showPage(name) {
     if (name !== 'search') page.classList.add('fade-in');
   }
   _syncDashPane(name);
+  // 切页后回到顶部：桌面双栏下每个 .page 各自滚动，window 不滚动
+  if (page && page.scrollHeight > page.clientHeight + 1) page.scrollTop = 0;
   window.scrollTo(0, 0);
 }
 
@@ -70,7 +72,11 @@ function goBack() {
       renderHomeTopMover();
       renderHomeMovers(false);
       if (saved && saved.homeScrollTop) {
-        setTimeout(function() { window.scrollTo(0, saved.homeScrollTop); }, 100);
+        setTimeout(function() {
+          // 桌面双栏下 window 不滚动，需还原 .page 容器自身的 scrollTop
+          if (typeof window.__dfRestoreScrollTop === 'function') window.__dfRestoreScrollTop(saved.homeScrollTop);
+          else window.scrollTo(0, saved.homeScrollTop);
+        }, 100);
       }
     } else if (prev === 'list') {
       var cached = getCache();
@@ -166,7 +172,10 @@ function switchTab(tabName) {
       renderHomeTopMover();
       renderHomeMovers(false);
       if (saved && saved.homeScrollTop) {
-        setTimeout(function() { window.scrollTo(0, saved.homeScrollTop); }, 100);
+        setTimeout(function() {
+          if (typeof window.__dfRestoreScrollTop === 'function') window.__dfRestoreScrollTop(saved.homeScrollTop);
+          else window.scrollTo(0, saved.homeScrollTop);
+        }, 100);
       }
       setTimeout(function() { preWarmFavTab(); }, 300);
       return;
@@ -187,6 +196,7 @@ function switchTab(tabName) {
       }
     }
   }
+  if (target && target.scrollHeight > target.clientHeight + 1) target.scrollTop = 0;
   window.scrollTo(0, 0);
 }
 

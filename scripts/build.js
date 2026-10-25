@@ -145,22 +145,31 @@ html = html.replace(/sw-register\.js\?v=[a-z0-9]+(?:-[a-f0-9]+)?/g, 'sw-register
 html = html.replace(/\| build: v[a-z0-9]+(?:-[a-f0-9]+)?/g, '| build: ' + version);
 
 // ★ CSS 仅在实际内容变化时更新版本号，避免不必要的缓存失效
+//   2026-10-25 修：原正则 `[a-z0-9]+(?:-([a-f0-9]+))?` 只能吞掉「版本号」的第一个 -hash 段，
+//   从第二个段起留在原地，于是每构建一次就再追加一段 —— 实测已膨胀成
+//   `?v=v20261024w-de573b74-1a4f3325-a700adec-a700adec-…`（十几段）。同时因取到的
+//   oldHash 是版本号里的 hash 而非 CSS 内容 hash，判定永远"已变更"。
+//   现改为用 `[^"'\s>]+` 整段吞掉整个 query 值，并显式解析出末尾的 CSS 内容 hash。
 const cssDir = path.join(__dirname, '..', 'css');
 const crypto = require('crypto');
 ['layout', 'components'].forEach(function(name) {
   var cssPath = path.join(cssDir, name + '.css');
-  if (fs.existsSync(cssPath)) {
-    var cssContent = fs.readFileSync(cssPath, 'utf8');
-    var newHash = crypto.createHash('md5').update(cssContent).digest('hex').substring(0, 8);
-    // 从当前 HTML 中提取已有的 hash
-    var existingMatch = html.match(new RegExp(name + '\\.css\\?v=[a-z0-9]+(?:-([a-f0-9]+))?'));
-    var oldHash = existingMatch ? (existingMatch[1] || '') : '';
-    if (oldHash !== newHash) {
-      console.log('  CSS: ' + name + '.css 内容已变更，更新版本号');
-      html = html.replace(new RegExp(name + '\\.css\\?v=[a-z0-9]+(?:-[a-f0-9]+)?', 'g'), name + '.css?v=' + version + '-' + newHash);
-    } else {
-      console.log('  CSS: ' + name + '.css 内容未变更，保留原有版本号');
-    }
+  if (!fs.existsSync(cssPath)) return;
+  var cssContent = fs.readFileSync(cssPath, 'utf8');
+  var newHash = crypto.createHash('md5').update(cssContent).digest('hex').substring(0, 8);
+  var refRe = new RegExp(name + '\\.css\\?v=([^"\'\\s>]+)', 'g');
+  var m = refRe.exec(html);
+  // 旧值形如 <version>-<cssHash>，末段即 CSS 内容 hash；无该段说明从未记录过
+  var oldHash = '';
+  if (m) {
+    var parts = m[1].split('-');
+    if (parts.length >= 2) oldHash = parts[parts.length - 1];
+  }
+  if (oldHash !== newHash) {
+    console.log('  CSS: ' + name + '.css 内容已变更，更新版本号');
+    html = html.replace(new RegExp(name + '\\.css\\?v=[^"\'\\s>]+', 'g'), name + '.css?v=' + version + '-' + newHash);
+  } else {
+    console.log('  CSS: ' + name + '.css 内容未变更，保留原有版本号');
   }
 });
 fs.writeFileSync(indexPath, html, 'utf8');

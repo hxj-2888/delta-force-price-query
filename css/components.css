@@ -1,4 +1,4 @@
-﻿/* ========== 物品卡片 ========== */
+/* ========== 物品卡片 ========== */
 .item-card { display: flex; align-items: center; padding: 14px; margin: 6px 10px; background: var(--surface); border-radius: var(--r-m); border: 1px solid var(--line); cursor: pointer; transition: all 0.2s; }
 .item-card:hover { background: var(--surface-2); }
 .item-card:active { background: var(--surface-2); border-color: var(--line-2); }
@@ -181,11 +181,28 @@ html[data-scheme="intl"] .home-statbar .hs-b-down { background: linear-gradient(
 .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(13,17,25,.92); color: var(--text); padding: 12px 24px; border-radius: 8px; font-size: 14px; border: 1px solid var(--line-2); z-index: 999; display: none; }
 .toast.show { display: block; animation: fadeIn 0.2s ease; }
 
-/* ========== 自定义滚动条 ========== */
-.custom-scrollbar { position: fixed; right: 2px; top: 10%; width: 8px; height: 80%; z-index: 999; pointer-events: none; }
-.custom-scrollbar .cs-track { width: 100%; height: 100%; background: var(--line); border-radius: 4px; position: relative; pointer-events: auto; }
-.custom-scrollbar .cs-thumb { position: absolute; left: 0; width: 100%; min-height: 28px; border-radius: 4px; background: var(--brand); box-shadow: 0 0 6px rgba(240,181,66,.5); cursor: pointer; transition: background 0.15s; }
-.custom-scrollbar .cs-thumb:active { background: var(--brand-2); box-shadow: 0 0 10px rgba(240,181,66,.7); }
+/* ========== 自定义滚动条（仅鼠标设备；位置/高度由 init.js 按滚动容器逐个写入） ========== */
+/* 2026-10-25：桌面双栏下 document 本身不滚动（左右两栏各自滚动），
+   滚动条必须由 JS 绑定到真实滚动容器，CSS 不再写死 top/height。 */
+.custom-scrollbar { position: fixed; width: 10px; z-index: 999; pointer-events: none; }
+.custom-scrollbar .cs-track {
+  position: relative; width: 100%; height: 100%;
+  background: rgba(255,255,255,.045); border-radius: 5px;
+  pointer-events: auto; cursor: pointer;
+  transition: background .18s;
+}
+.custom-scrollbar .cs-track:hover { background: rgba(255,255,255,.08); }
+.custom-scrollbar .cs-thumb {
+  position: absolute; left: 0; width: 100%; min-height: 32px;
+  border-radius: 5px;
+  background: rgba(240,181,66,.62);
+  box-shadow: 0 0 6px rgba(240,181,66,.35);
+  cursor: grab;
+  transition: background .15s, box-shadow .15s;
+}
+.custom-scrollbar .cs-thumb:hover { background: var(--brand); box-shadow: 0 0 10px rgba(240,181,66,.55); }
+.custom-scrollbar.cs-dragging .cs-thumb,
+.custom-scrollbar .cs-thumb:active { background: var(--brand-2); box-shadow: 0 0 12px rgba(240,181,66,.7); cursor: grabbing; }
 @media (pointer: coarse) { .custom-scrollbar { display: none !important; } }
 
 /* ========== 启动加载层 ========== */

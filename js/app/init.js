@@ -359,105 +359,245 @@ var LOADING_TIMEOUT = 40000;
   startGlobalDailyRecord();
 })();
 
-// ===== 自定义滚动条（桌面端） =====
+// ===== 自定义滚动条（仅鼠标设备） =====
+// 2026-10-25 重写：原实现只绑定 window/document 的滚动高度。桌面 ≥1024px 双栏布局下
+// document 本身不滚动（左右两栏各自 overflow-y:auto），于是 getScrollHeight() 恒等于
+// window.innerHeight → sh <= vh → 滑钮被判定"无需滚动"而 display:none，全站滑钮消失。
+// 新实现：为每个真实滚动容器各挂一条滚动条，按容器自身的 scrollTop/scrollHeight/clientHeight
+// 计算；容器不可滚动或不可见时自动隐藏。移动端（pointer: coarse）整块不初始化，交给系统滑动。
 (function initCustomScrollbar() {
-  // PC 滚动条适配: 只要主指针是鼠标就显示（触屏笔记本接鼠标也能看到滑钮），
-  // 纯触屏设备（手机/平板/触屏模式）交给系统滚动条
   if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) {
     return;
   }
-  var body = document.body;
-  var html = document.documentElement;
 
-  var bar = document.createElement('div');
-  bar.className = 'custom-scrollbar';
-  bar.innerHTML = '<div class="cs-track"><div class="cs-thumb" id="csThumb"></div></div>';
-  body.appendChild(bar);
+  var MIN_THUMB = 32;
+  var GUTTER = 12;          // 滚动条距容器右边缘的距离
+  var EDGE_PAD = 8;         // 上下留白
+  var instances = [];
+  var pending = false;
 
-  var track = bar.querySelector('.cs-track');
-  var thumb = document.getElementById('csThumb');
-  var dragging = false;
-  var startY = 0;
-  var startTop = 0;
+  // 桌面双栏下每个 .page 各自滚动；窄屏下整页滚动（scroller 为 null 时代表 document）
+  var PANE_IDS = ['page-home', 'page-dash', 'page-list', 'page-detail', 'page-search', 'page-favtab'];
 
-  function getScrollHeight() { return Math.max(body.scrollHeight, html.scrollHeight); }
-  function getViewHeight() { return window.innerHeight; }
-  function getTrackHeight() { return track.clientHeight; }
-
-  function updateThumb() {
-    var sh = getScrollHeight();
-    var vh = getViewHeight();
-    var th = getTrackHeight();
-    if (sh <= vh) { thumb.style.display = 'none'; return; }
-    thumb.style.display = 'block';
-    var ratio = Math.min(vh / sh, 1);
-    var thumbH = Math.max(ratio * th, 28);
-    thumb.style.height = thumbH + 'px';
-    if (dragging) return;
-    var maxScroll = sh - vh;
-    var scrollY = window.pageYOffset || html.scrollTop;
-    var maxTop = th - thumbH;
-    var top = maxScroll > 0 ? (scrollY / maxScroll) * maxTop : 0;
-    thumb.style.top = top + 'px';
+  function docScroller() {
+    return {
+      scrollTop: function() { return window.pageYOffset || document.documentElement.scrollTop || 0; },
+      scrollHeight: function() { return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight); },
+      clientHeight: function() { return window.innerHeight; },
+      scrollTo: function(y) { window.scrollTo(0, y); }
+    };
   }
 
-  window.addEventListener('scroll', updateThumb, { passive: true });
-  window.addEventListener('resize', updateThumb);
-  var observer = new MutationObserver(updateThumb);
-  observer.observe(body, { childList: true, subtree: true });
-
-  thumb.addEventListener('mousedown', onStart);
-  thumb.addEventListener('touchstart', onStart, { passive: false });
-  function onStart(e) {
-    e.preventDefault();
-    dragging = true;
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    thumb.style.background = '#ffaa00';
-    thumb.style.boxShadow = '0 0 10px rgba(255,170,0,0.7)';
-    var ev = e.touches ? e.touches[0] : e;
-    startY = ev.clientY;
-    startTop = parseFloat(thumb.style.top) || 0;
-  }
-  function onMove(e) {
-    if (!dragging) return;
-    e.preventDefault();
-    var ev = e.touches ? e.touches[0] : e;
-    var dy = ev.clientY - startY;
-    var newTop = startTop + dy;
-    var th = getTrackHeight();
-    var thumbH = parseFloat(thumb.style.height) || 28;
-    newTop = Math.max(0, Math.min(newTop, th - thumbH));
-    thumb.style.top = newTop + 'px';
-    var sh = getScrollHeight();
-    var vh = getViewHeight();
-    var maxScroll = sh - vh;
-    var maxTop = th - thumbH;
-    var scrollY = maxTop > 0 ? (newTop / maxTop) * maxScroll : 0;
-    window.scrollTo(0, scrollY);
+  function elScroller(el) {
+    return {
+      scrollTop: function() { return el.scrollTop; },
+      scrollHeight: function() { return el.scrollHeight; },
+      clientHeight: function() { return el.clientHeight; },
+      scrollTo: function(y) { el.scrollTop = y; }
+    };
   }
 
-  document.addEventListener('mouseup', onEnd);
-  document.addEventListener('touchend', onEnd);
-  function onEnd() {
-    if (!dragging) return;
-    dragging = false;
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('touchmove', onMove);
-    thumb.style.background = '#ffd700';
-    thumb.style.boxShadow = '0 0 6px rgba(255,215,0,0.5)';
+  function createInstance(getScroller, anchorEl) {
+    var bar = document.createElement('div');
+    bar.className = 'custom-scrollbar';
+    bar.innerHTML = '<div class="cs-track"><div class="cs-thumb"></div></div>';
+    document.body.appendChild(bar);
+
+    var track = bar.querySelector('.cs-track');
+    var thumb = bar.querySelector('.cs-thumb');
+    var dragging = false;
+    var startY = 0;
+    var startTop = 0;
+
+    var inst = {
+      bar: bar,
+      track: track,
+      thumb: thumb,
+      getScroller: getScroller,
+      anchorEl: anchorEl,
+      update: update
+    };
+
+    // ★ 必须先让 bar 可见再量 track.clientHeight：隐藏元素的 clientHeight 为 0，
+    //   否则会"量不到 → 隐藏 → 更量不到"死锁。
+    function metrics() {
+      var sc = getScroller();
+      var sh = sc.scrollHeight();
+      var ch = sc.clientHeight();
+      if (!sh || !ch || sh <= ch + 1) return null;      // 容器本身不可滚动
+      var trackH = track.clientHeight;
+      if (trackH <= 0) return null;
+      var thumbH = Math.max((ch / sh) * trackH, MIN_THUMB);
+      if (thumbH >= trackH) return null;
+      return { sc: sc, ch: ch, trackH: trackH, thumbH: thumbH,
+               maxScroll: sh - ch, maxTop: trackH - thumbH };
+    }
+
+    function update() {
+      bar.style.display = 'block';
+      var m = metrics();
+      if (!m) { bar.style.display = 'none'; return; }
+      thumb.style.display = 'block';
+      thumb.style.height = m.thumbH + 'px';
+      if (dragging) return;
+      var top = m.maxScroll > 0 ? (m.sc.scrollTop() / m.maxScroll) * m.maxTop : 0;
+      thumb.style.top = Math.max(0, Math.min(top, m.maxTop)) + 'px';
+    }
+
+    function onStart(e) {
+      var m = metrics();
+      if (!m) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      bar.classList.add('cs-dragging');
+      startY = e.touches ? e.touches[0].clientY : e.clientY;
+      startTop = parseFloat(thumb.style.top) || 0;
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('mouseup', onEnd);
+      document.addEventListener('touchend', onEnd);
+    }
+
+    function onMove(e) {
+      if (!dragging) return;
+      var m = metrics();
+      if (!m) return;
+      e.preventDefault();
+      var y = e.touches ? e.touches[0].clientY : e.clientY;
+      var newTop = Math.max(0, Math.min(startTop + (y - startY), m.maxTop));
+      thumb.style.top = newTop + 'px';
+      m.sc.scrollTo(m.maxTop > 0 ? (newTop / m.maxTop) * m.maxScroll : 0);
+    }
+
+    function onEnd() {
+      if (!dragging) return;
+      dragging = false;
+      bar.classList.remove('cs-dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchend', onEnd);
+    }
+
+    thumb.addEventListener('mousedown', onStart);
+    thumb.addEventListener('touchstart', onStart, { passive: false });
+
+    // 点轨道空白处 → 按一屏翻页（不直接跳到鼠标处，避免误触丢失阅读位置）
+    track.addEventListener('mousedown', function(e) {
+      if (e.target === thumb) return;
+      var m = metrics();
+      if (!m) return;
+      e.preventDefault();
+      var rect = track.getBoundingClientRect();
+      var clickY = e.clientY - rect.top;
+      var thumbTop = parseFloat(thumb.style.top) || 0;
+      var page = m.ch * 0.9;
+      var target = m.sc.scrollTop() + (clickY < thumbTop ? -page : page);
+      m.sc.scrollTo(Math.max(0, Math.min(target, m.maxScroll)));
+      update();
+    });
+
+    instances.push(inst);
+    return inst;
   }
 
-  track.addEventListener('mousedown', function(e) {
-    if (e.target === thumb) return;
-    var th = getTrackHeight();
-    var thumbH = parseFloat(thumb.style.height) || 28;
-    var clickRatio = e.offsetY / th;
-    var sh = getScrollHeight();
-    var vh = getViewHeight();
-    var maxScroll = sh - vh;
-    window.scrollTo(0, clickRatio * maxScroll);
+  // 文档级（窄屏单列整页滚动）
+  createInstance(docScroller, null);
+  // 每个页面容器各一条
+  PANE_IDS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) createInstance(function() { return elScroller(el); }, el);
   });
 
-  updateThumb();
+  // ===== 定位：贴容器可视区右边缘内侧，竖直范围与容器可视高度对齐 =====
+  function layout() {
+    var vh = window.innerHeight;
+    var docW = document.documentElement.clientWidth;
+    // 底部导航可见时，滚动条不要压到它上面
+    var nav = document.getElementById('bottomNav');
+    var navH = 0;
+    if (nav && getComputedStyle(nav).display !== 'none') {
+      var nr = nav.getBoundingClientRect();
+      if (nr.height > 0 && nr.top < vh) navH = vh - nr.top;
+    }
+    instances.forEach(function(inst) {
+      var rect;
+      if (inst.anchorEl) {
+        var r = inst.anchorEl.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) { inst.bar.style.display = 'none'; return; }
+        rect = r;
+      } else {
+        rect = { top: 0, left: 0, width: docW, height: vh };
+      }
+      var barTop = Math.max(rect.top, 0) + EDGE_PAD;
+      var barBottom = Math.min(rect.top + rect.height, vh - navH) - EDGE_PAD;
+      var barH = barBottom - barTop;
+      if (barH < 80) { inst.bar.style.display = 'none'; return; }
+      inst.bar.style.top = barTop + 'px';
+      inst.bar.style.height = barH + 'px';
+      inst.bar.style.left = (rect.left + rect.width - GUTTER) + 'px';
+      inst.bar.style.right = 'auto';
+      inst.update();
+    });
+  }
+
+  function refresh() {
+    if (pending) return;
+    pending = true;
+    var raf = window.requestAnimationFrame || function(fn) { return setTimeout(fn, 16); };
+    raf(function() { pending = false; layout(); });
+  }
+
+  // ===== 滚动位置持久化：桌面双栏下 .page 是滚动容器，原 window.scrollTo 失效 =====
+  // 原实现 saveBrowseState 存 window.pageYOffset（双栏下恒为 0），返回首页时滚动位置丢失。
+  // 这里把当前可见 pane 的 scrollTop 补记进去，并支持按容器还原。
+  function activePaneEl() {
+    for (var i = 0; i < PANE_IDS.length; i++) {
+      var el = document.getElementById(PANE_IDS[i]);
+      if (el && el.classList.contains('active')) {
+        var r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return el;
+      }
+    }
+    return null;
+  }
+
+  window.__dfGetScrollTop = function() {
+    var el = activePaneEl();
+    if (el && el.scrollHeight > el.clientHeight + 1) return el.scrollTop;
+    return window.pageYOffset || document.documentElement.scrollTop || 0;
+  };
+
+  window.__dfRestoreScrollTop = function(y) {
+    if (!y) return;
+    var el = activePaneEl();
+    if (el && el.scrollHeight > el.clientHeight + 1) {
+      el.scrollTop = y;
+    } else {
+      window.scrollTo(0, y);
+    }
+    refresh();
+  };
+
+  // 各容器滚动事件不冒泡到 window，用 capture 统一收集
+  window.addEventListener('scroll', refresh, { passive: true, capture: true });
+  window.addEventListener('resize', refresh);
+  window.addEventListener('load', refresh);
+
+  // 容器显隐（切页）/ 内容高度变化 → 重算
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(refresh);
+    instances.forEach(function(inst) { if (inst.anchorEl) ro.observe(inst.anchorEl); });
+    ro.observe(document.body);
+  }
+  // 列表重渲染 / 筛选面板展开 → 重算
+  if (window.MutationObserver) {
+    var mo = new MutationObserver(refresh);
+    mo.observe(document.body, { childList: true, subtree: true });
+  }
+
+  layout();
+  setTimeout(refresh, 300);
+  setTimeout(refresh, 1200);
 })();

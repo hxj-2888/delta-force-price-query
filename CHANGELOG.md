@@ -4,6 +4,72 @@
 
 ---
 
+## 2026-10-25 — 桌面滑钮全部消失：滚动条改绑真实滚动容器（v20261025n）
+
+### 滑钮-1：桌面端自定义滚动条完全不显示
+
+- **现象**：电脑浏览器（≥1024px 双栏）打开后，右侧金色滑钮消失，只能靠鼠标滚轮翻长列表；
+  窄窗口（<1024px 单列）下滑钮正常。移动端无滑钮（预期行为，交给系统惯性滑动）。
+- **根因**：`initCustomScrollbar` 用 `document.body/html.scrollHeight` 与 `window.innerHeight`
+  判断是否可滚动。但上一轮（v20261024w 换装-8）引入的双栏布局把滚动主体换成了
+  `#page-home` / `#page-dash` 等 `.page` 容器（各自 `overflow-y:auto`，`height:100vh`），
+  **document 本身不再滚动** → `scrollHeight === innerHeight` → `sh <= vh` 命中
+  `thumb.style.display = 'none'` 分支 → 滑钮恒隐藏。CSS 与 DOM 都在，只是被判定"无需滚动"。
+  实测桌面 1440：`docScrollHeight=900`、`innerHeight=900`，而 `homeScrollHeight=5463`。
+- **改动**：
+  1. `js/app/init.js` 滚动条模块重写——每个滚动容器（6 个 `.page` + document 兜底）各建一条
+     滚动条，按容器自身的 `scrollTop/scrollHeight/clientHeight` 计算；容器不可滚动或不可见
+     （`display:none`、宽高为 0）时自动隐藏。位置由 `getBoundingClientRect()` 动态贴到容器
+     可视区右缘内侧，竖直范围随容器高度对齐，底部导航可见时自动避让。
+  2. 修掉"隐藏元素量不到高度"死锁：先 `display:block` 再读 `track.clientHeight`。
+  3. 滚动事件用 `capture` 收集（容器滚动不冒泡到 window）；`ResizeObserver` + `MutationObserver`
+     覆盖切页/列表重渲染/筛选面板展开。
+  4. 滑钮点击轨道改「按屏翻页」而非跳转到鼠标处，避免误触丢失阅读位置。
+  5. 滚动位置持久化同步修正：`saveBrowseState` 改走 `window.__dfGetScrollTop()`，
+     返回首页改走 `window.__dfRestoreScrollTop()`；`showPage` / `switchTab` / 首页翻页
+     的「回到顶部」改为按容器 `scrollTop = 0`（原 `window.scrollTo` 在双栏下是空操作）。
+  6. `css/components.css` 滚动条样式改由 JS 写位置/高度；滑钮加宽至 10px、常态半透明、
+     hover/拖拽高亮，轨道 hover 有反馈。
+- **验证**（`node tools/scrollbar-smoke.cjs`，14/14 通过）：
+
+  ```
+  桌面 1440x900  左栏滑钮 h=146 w=10；拖动 0→1236，右栏未被误滚 0
+  桌面 1440x900  右栏列表滑钮 h=298；双栏同时两条滑钮
+  桌面 1440x900  详情页滑钮 h=827
+  窄屏 900x1000  恰好一条滑钮（整页滚动）
+  手机 390x844   滑钮 DOM 数 0；总览隐藏；首页 390/390 满宽；底栏可见
+  ```
+
+  另：`tools/home-ui-smoke.cjs` 40/40、`npm run lint` 63 文件、`npm test` 18/18、
+  `npm run check` 通过。
+
+### 构建-1：CSS 版本号无限膨胀（scripts/build.js）
+
+- **现象**：`index.html` 的 CSS 引用变成
+  `css/layout.css?v=v20261024w-de573b74-1a4f3325-a700adec-a700adec-…`（十余段 hash）。
+- **根因**：更新 CSS 版本号的正则 `[a-z0-9]+(?:-([a-f0-9]+))?` 只能吞掉版本号的第一个
+  `-hash` 段，第二段起原样残留，于是每构建一次就再追加一段；同时取到的 `oldHash` 是版本号
+  里的 hash 而非 CSS 内容 hash，导致"内容未变"的判定永不成立。
+- **改动**：改用 `[^"'\s>]+` 整段吞掉整个 query 值，并显式解析末尾段作为 CSS 内容 hash。
+- **验证**：清理后连续构建两次，第二次输出「CSS 内容未变更，保留原有版本号」，
+  引用稳定为 `?v=v20261025n-d7ebf4c8-1a4f3325` / `…-297b5ef3`（幂等）。
+
+### 移动端确认（本轮未改动布局，仅回归验证）
+
+- 移动端本就未启用双栏：`@media (min-width:1024px)` 之外 `.page` 不设 `height/overflow`，
+  整页单列滚动；`#page-dash` 在 `max-width:1023px` 下 `display:none !important`；
+  滑钮在 `pointer: coarse` 下整块不初始化。实测 390×844 与截图一致：单列、点击物品进详情页
+  展开，物品与详情不并行。
+
+### 已知遗留（按优先级）
+
+1. 小程序端（weapp）视觉未同步换装，与 Web 端出现视觉分叉。
+2. `index.html` 内联关键 CSS 为硬编码色值（令牌在 layout.css 加载后接管），闪色窗口极小但非零。
+3. `css/base.css` 仍是未被引用的孤儿文件（内容已并入 layout.css），待后续清理删除。
+4. 桌面双栏下左右两栏各自独立滚动，无联动；如需"整页同步滚动"需另设计。
+
+---
+
 ## 2026-10-24 — 理财行情风换装：设计令牌 + 红涨绿跌 + 市场宽度（v20261024v）
 
 > 本轮把 `design/finance-demo.html` 评审通过的「理财行情风」移植进正式版。只动视觉层与统计口径，
