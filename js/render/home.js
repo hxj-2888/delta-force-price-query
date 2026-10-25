@@ -105,7 +105,12 @@ function _renderMiniSparkline(item) {
 // ===== 首页物品卡片 =====
 function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
   var bl = getFieldByPeriod(item, field) || 0;
-  var gradeBg = (item._category !== 'gun' && item.grade) ? 'background:' + getGradeColor(item.grade) + '15;border-color:' + getGradeColor(item.grade) + '30;' : '';
+  // ★ 等级色调必须「叠」在白卡面上，不能直接覆盖 background：
+  //   浅色底下直接写 background:<color>15 会把 var(--surface) 顶掉，卡片透出页面底色。
+  //   用 gradient 层叠（下白上色）保留卡面，再调 border。
+  var gradeBg = (item._category !== 'gun' && item.grade)
+    ? 'background:linear-gradient(0deg,' + getGradeColor(item.grade) + '14,' + getGradeColor(item.grade) + '14),var(--surface);border-color:' + getGradeColor(item.grade) + '33;'
+    : '';
   var gradeDiamond = (item._category !== 'gun' && item.grade) ? '<div class="grade-diamond" style="background:' + getGradeColor(item.grade) + '"></div>' : '';
   var loadingAttr = isEager ? 'loading="eager" decoding="sync"' : 'loading="lazy" decoding="async"';
   var picHtml = item.pic ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" ' + loadingAttr + ' onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">' : '<span class="pic-placeholder">-</span>';

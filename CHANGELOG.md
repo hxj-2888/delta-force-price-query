@@ -4,6 +4,68 @@
 
 ---
 
+## 2026-10-25 — 明暗双主题 + 背景色切换按钮（v20261025p）
+
+### 主题-1：全站由深底改为浅底
+
+- **现象**：用户要求「把本项目从黑底改为白底」。
+- **根因**：原配色是单一深色令牌（`--bg:#090c12` 等），且大量颜色写死在 CSS/JS 里，
+  不是换一个变量就能翻面。
+- **改动**：`css/layout.css` 重建令牌层为浅色默认；`--line` 由「白透明」改「黑透明」；
+  涨跌色按白底重新校色（红 `#c81e2f` / 绿 `#067a4b`）；品牌金压深到 `#a86f08` 保证白底可读。
+  `index.html` 内联关键 CSS、`manifest.json`、`theme-color` 同步。
+- **验证**：见主题-3 的四组合对比度断言。
+
+### 主题-2：加背景色切换按钮（浅色 / 深色）
+
+- **改动**：
+  1. 令牌层改为**双主题**：`html[data-theme="light"|"dark"]` 两套完整令牌
+     （表面色阶/文本三级/涨跌色/品牌色/图表网格/导航栏/toast/滚动条轨道/`color-scheme`）。
+  2. 头部 `header-info` 新增 `#themeToggle`（太阳/月亮图标随主题互换 + 文案「浅色/深色」），
+     与既有「红涨/绿涨」按钮并列，两者互不干扰。
+  3. `js/render/shared.js` 新增 `toggleTheme()` / `syncThemeLabel()` / `syncThemeColorMeta()` /
+     `repaintChartsForTheme()` / `getChartTheme()`；`localStorage(df_theme)` 持久化。
+  4. 首屏防闪色：`index.html` 内联脚本在关键 CSS 之前写 `data-theme`——**未选过时跟随
+     `prefers-color-scheme`**，选过则用存档；内联关键 CSS 同步改为两套最小令牌
+     （原来写死 `#f5f7fa`，深色主题下会先闪一帧白屏）。
+  5. `getGradeColor()` 随主题切换两套等级色板（浅底压深、深底用亮色），两套都避开纯红/纯绿。
+  6. 图表网格/轴标签改由 `getChartTheme()` 读令牌——SVG 属性不支持 `var()`，
+     且切换主题后必须重绘，否则残留上一套的线条色。
+- **验证**：`tools/theme-smoke.cjs` 51/51 通过（4 组合对比度 + 按钮交互 + 持久化 + 正交性 + 无浅色残留）。
+
+### 主题-3：涨跌色与半透明色统一走令牌（双色适配）
+
+- **根因**：涨跌分布条/品牌金描边等原写死 `rgba(240,69,92,.6)` 这类字面色值，
+  换主题后不会跟随；`html[data-scheme="intl"]` 还专门写了 4 条覆盖规则来硬掰颜色。
+- **改动**：全部改为 `color-mix(in srgb, var(--up) 55%, transparent)` 形式，
+  随主题与涨跌轴自动解析；**删掉 4 条 intl 覆盖规则**（不再需要）。
+  涨跌轴补 `html[data-theme="dark"][data-scheme="intl"]` 组合，保证 4 组合都有值。
+- **验证**：`grep -c 'rgba(' css/components.css` = 0；四组合下涨跌语义方向与对比度均正确
+  （light/cn 涨色 5.70、跌色 5.39；dark/cn 涨 5.57、跌 8.41；intl 两组合镜像）。
+
+### 门禁
+
+```
+npm run build   ✅ v20261025p-8e307264
+npm run lint    ✅ 65 个 JS 文件
+npm test        ✅ 18/18
+npm run check   ✅ bundle/版本号一致
+tools/theme-smoke.cjs     ✅ 51/51
+tools/scrollbar-smoke.cjs ✅ 14/14
+tools/home-ui-smoke.cjs   ✅ 40/40
+文档死链 0
+```
+
+### 已知遗留（按优先级）
+
+1. 小程序端（weapp）视觉未同步换装，与 Web 端出现视觉分叉。
+2. `css/base.css` 仍是未被引用的孤儿文件（内容已并入 layout.css），待后续清理删除。
+3. 桌面双栏下左右两栏各自独立滚动，无联动；如需"整页同步滚动"需另设计。
+4. 深色主题下卡面与页面底对比度约 1.15（浅色 1.07），主要靠 1px 描边分隔；
+   若后续觉得"闷"，可把 `--surface` 再提亮一档。
+
+---
+
 ## 2026-10-25 — 桌面滑钮全部消失：滚动条改绑真实滚动容器（v20261025n）
 
 ### 滑钮-1：桌面端自定义滚动条完全不显示

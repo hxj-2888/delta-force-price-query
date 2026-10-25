@@ -305,7 +305,7 @@ async function getOrFetchCloudSnapshots(itemId) {
    最终曲线，中途不出现「API 版」曲线。
    依赖 render/charts.js 的 generatePriceCurveSVG（同一 bundle 作用域，函数调用时已可用）。 */
 function curvePlaceholderHTML() {
-  return '<div class="curve-loading" style="height:120px;display:flex;align-items:center;justify-content:center;color:#8a8aa0;font-size:12px">走势加载中…</div>';
+  return '<div class="curve-loading" style="height:120px;display:flex;align-items:center;justify-content:center;color:#8a93a3;font-size:12px">走势加载中…</div>';
 }
 
 function paintPriceCurve(item, box, fallbackPts) {

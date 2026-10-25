@@ -68,21 +68,19 @@
 .home-statbar .hs-mood.flat { color: var(--text-3); background: var(--surface-3); }
 /* 涨跌分布条 */
 .home-statbar .hs-breadth { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-3); gap: 2px; margin-top: 10px; }
-.home-statbar .hs-b-up { background: linear-gradient(90deg, var(--up), rgba(240,69,92,.6)); transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.home-statbar .hs-b-up { background: linear-gradient(90deg, var(--up), color-mix(in srgb, var(--up) 55%, transparent)); transition: width .6s cubic-bezier(.2,.8,.2,1); }
 .home-statbar .hs-b-flat { background: var(--text-3); opacity: .3; transition: width .6s; }
-.home-statbar .hs-b-down { background: linear-gradient(90deg, rgba(30,191,119,.6), var(--down)); transition: width .6s cubic-bezier(.2,.8,.2,1); }
-html[data-scheme="intl"] .home-statbar .hs-b-up { background: linear-gradient(90deg, var(--up), rgba(30,191,119,.6)); }
-html[data-scheme="intl"] .home-statbar .hs-b-down { background: linear-gradient(90deg, rgba(240,69,92,.6), var(--down)); }
+.home-statbar .hs-b-down { background: linear-gradient(90deg, color-mix(in srgb, var(--down) 55%, transparent), var(--down)); transition: width .6s cubic-bezier(.2,.8,.2,1); }
 .home-statbar .hs-foot { display: flex; justify-content: space-between; margin-top: 7px; font-size: 10px; color: var(--text-3); }
 .home-statbar .hs-foot b { font-weight: 600; color: var(--text-2); }
 
 /* ========== 涨幅前二（≥2万 入榜；样式换装 2026-10-24） ========== */
-.topmover { margin: 0 12px 6px; background: linear-gradient(135deg, var(--brand-bg), rgba(240,181,66,.03)); border: 1px solid rgba(240,181,66,.28); border-radius: var(--r-l); overflow: hidden; }
-.topmover .tm-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid rgba(240,181,66,.15); }
+.topmover { margin: 0 12px 6px; background: linear-gradient(135deg, var(--brand-bg), color-mix(in srgb, var(--brand) 4%, transparent)); border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent); border-radius: var(--r-l); overflow: hidden; }
+.topmover .tm-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid color-mix(in srgb, var(--brand) 15%, transparent); }
 .topmover .tm-title { font-size: 12px; font-weight: 700; color: var(--brand); letter-spacing: 1px; }
 .topmover .tm-sub { font-size: 10px; color: var(--text-3); }
 .topmover .tm-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; transition: background 0.15s; }
-.topmover .tm-row:hover { background: rgba(240,181,66,.07); }
+.topmover .tm-row:hover { background: color-mix(in srgb, var(--brand) 7%, transparent); }
 .topmover .tm-row + .tm-row { border-top: 1px solid var(--line); }
 .topmover .tm-rank { width: 18px; height: 18px; border-radius: 6px; background: var(--brand-bg); color: var(--brand); font-size: 10.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .topmover .tm-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -91,7 +89,7 @@ html[data-scheme="intl"] .home-statbar .hs-b-down { background: linear-gradient(
 .topmover .tm-chg { display: block; font-size: 11px; font-weight: 700; text-align: right; margin-top: 2px; }
 
 /* ========== 价格提醒 ========== */
-.price-alert { margin: 0 12px 10px; padding: 10px 14px; background: var(--brand-bg); border: 1px solid rgba(240,181,66,.25); border-radius: var(--r-m); font-size: 12px; line-height: 1.6; color: var(--brand); display: none; }
+.price-alert { margin: 0 12px 10px; padding: 10px 14px; background: var(--brand-bg); border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent); border-radius: var(--r-m); font-size: 12px; line-height: 1.6; color: var(--brand); display: none; }
 .price-alert.show { display: block; }
 .price-alert-item { display: inline; }
 .price-alert-item.up { color: var(--up); }
@@ -121,7 +119,7 @@ html[data-scheme="intl"] .home-statbar .hs-b-down { background: linear-gradient(
 .detail-meta { display: flex; gap: 8px; }
 .meta-tag { font-size: 11px; padding: 3px 10px; border-radius: 12px; background: var(--surface-3); color: var(--text-2); }
 
-.price-card { margin: 0 12px 12px; padding: 22px; background: radial-gradient(120% 140% at 85% -20%, var(--brand-bg), transparent 55%), var(--surface); border: 1px solid rgba(240,181,66,.25); border-radius: var(--r-l); }
+.price-card { margin: 0 12px 12px; padding: 22px; background: radial-gradient(120% 140% at 85% -20%, var(--brand-bg), transparent 55%), var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent); border-radius: var(--r-l); }
 .price-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .price-card-title { font-size: 12px; color: var(--text-2); }
 .price-card-time { font-size: 11px; color: var(--text-3); }
@@ -173,12 +171,12 @@ html[data-scheme="intl"] .home-statbar .hs-b-down { background: linear-gradient(
 .history-clear { color: var(--down); font-size: 11px; cursor: pointer; }
 .history-tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .history-tag { font-size: 12px; padding: 6px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; color: var(--text-2); cursor: pointer; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; transition: all 0.2s; }
-.history-tag:active { background: var(--brand-bg); border-color: rgba(240,181,66,.4); color: var(--brand); }
+.history-tag:active { background: var(--brand-bg); border-color: color-mix(in srgb, var(--brand) 40%, transparent); color: var(--brand); }
 .recent-items { padding: 0 12px; }
 .recent-items .result-item { margin: 3px 0; }
 
 /* ========== Toast ========== */
-.toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(13,17,25,.92); color: var(--text); padding: 12px 24px; border-radius: 8px; font-size: 14px; border: 1px solid var(--line-2); z-index: 999; display: none; }
+.toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--toast-bg); color: var(--toast-fg); padding: 12px 24px; border-radius: 8px; font-size: 14px; border: 1px solid var(--line-2); z-index: 999; display: none; }
 .toast.show { display: block; animation: fadeIn 0.2s ease; }
 
 /* ========== 自定义滚动条（仅鼠标设备；位置/高度由 init.js 按滚动容器逐个写入） ========== */
@@ -187,22 +185,22 @@ html[data-scheme="intl"] .home-statbar .hs-b-down { background: linear-gradient(
 .custom-scrollbar { position: fixed; width: 10px; z-index: 999; pointer-events: none; }
 .custom-scrollbar .cs-track {
   position: relative; width: 100%; height: 100%;
-  background: rgba(255,255,255,.045); border-radius: 5px;
+  background: var(--scroll-track); border-radius: 5px;
   pointer-events: auto; cursor: pointer;
   transition: background .18s;
 }
-.custom-scrollbar .cs-track:hover { background: rgba(255,255,255,.08); }
+.custom-scrollbar .cs-track:hover { background: var(--scroll-track-hover); }
 .custom-scrollbar .cs-thumb {
   position: absolute; left: 0; width: 100%; min-height: 32px;
   border-radius: 5px;
-  background: rgba(240,181,66,.62);
-  box-shadow: 0 0 6px rgba(240,181,66,.35);
+  background: color-mix(in srgb, var(--brand) 55%, transparent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--brand) 28%, transparent);
   cursor: grab;
   transition: background .15s, box-shadow .15s;
 }
-.custom-scrollbar .cs-thumb:hover { background: var(--brand); box-shadow: 0 0 10px rgba(240,181,66,.55); }
+.custom-scrollbar .cs-thumb:hover { background: var(--brand); box-shadow: 0 0 8px color-mix(in srgb, var(--brand) 45%, transparent); }
 .custom-scrollbar.cs-dragging .cs-thumb,
-.custom-scrollbar .cs-thumb:active { background: var(--brand-2); box-shadow: 0 0 12px rgba(240,181,66,.7); cursor: grabbing; }
+.custom-scrollbar .cs-thumb:active { background: var(--brand-2); box-shadow: 0 0 10px color-mix(in srgb, var(--brand) 55%, transparent); cursor: grabbing; }
 @media (pointer: coarse) { .custom-scrollbar { display: none !important; } }
 
 /* ========== 启动加载层 ========== */
@@ -216,7 +214,7 @@ html[data-scheme="intl"] .home-statbar .hs-b-down { background: linear-gradient(
 .loading-screen.removed { display: none; }
 .loading-logo-wrap { position: relative; width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; }
 .loading-logo-img { width: 140px; height: 140px; object-fit: contain; filter: blur(20px); transition: filter 0.35s ease-out; will-change: filter; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; backface-visibility: hidden; transform: translateZ(0); }
-.loading-logo-glow { position: absolute; width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, rgba(240,181,66,0.18) 0%, transparent 70%); opacity: 0; transition: opacity 0.4s ease; }
+.loading-logo-glow { position: absolute; width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--brand) 18%, transparent) 0%, transparent 70%); opacity: 0; transition: opacity 0.4s ease; }
 .loading-progress-wrap { width: 220px; margin-top: 40px; }
 .loading-progress-track { width: 100%; height: 3px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .loading-progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--brand), var(--brand-2)); background-size: 200% 100%; animation: progressShimmer 2s ease infinite; border-radius: 3px; transition: width 0.4s ease; }
@@ -234,11 +232,9 @@ html[data-scheme="intl"] .home-statbar .hs-b-down { background: linear-gradient(
 .dash-mood { text-align: center; font-size: 12px; color: var(--text-2); margin: 8px 0 10px; }
 .dash-mood b { font-weight: 700; }
 .dash-breadth { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-3); gap: 2px; }
-.dash-breadth .db-up { background: linear-gradient(90deg, var(--up), rgba(240,69,92,.6)); transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.dash-breadth .db-up { background: linear-gradient(90deg, var(--up), color-mix(in srgb, var(--up) 55%, transparent)); transition: width .6s cubic-bezier(.2,.8,.2,1); }
 .dash-breadth .db-flat { background: var(--text-3); opacity: .3; transition: width .6s; }
-.dash-breadth .db-down { background: linear-gradient(90deg, rgba(30,191,119,.6), var(--down)); transition: width .6s cubic-bezier(.2,.8,.2,1); }
-html[data-scheme="intl"] .dash-breadth .db-up { background: linear-gradient(90deg, var(--up), rgba(30,191,119,.6)); }
-html[data-scheme="intl"] .dash-breadth .db-down { background: linear-gradient(90deg, rgba(240,69,92,.6), var(--down)); }
+.dash-breadth .db-down { background: linear-gradient(90deg, color-mix(in srgb, var(--down) 55%, transparent), var(--down)); transition: width .6s cubic-bezier(.2,.8,.2,1); }
 .dash-sec { font-size: 12px; color: var(--text-2); font-weight: 600; letter-spacing: 1px; margin: 22px 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
 .dash-sec small { font-size: 10px; color: var(--text-3); font-weight: 400; letter-spacing: 0; }
 .dash-sector-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }

@@ -535,7 +535,7 @@ function updateCategoryIcons(allItems) {
 
 /* ================= 涨跌配色切换（2026-10-24） =================
    默认红涨绿跌（中国行情惯例），可切绿涨红跌（国际惯例）。
-   方案挂在 <html data-scheme> 上由 CSS 令牌（css/base.css）解析，
+   方案挂在 <html data-scheme> 上由 CSS 令牌（css/layout.css）解析，
    SVG 线条/圆点用 style="stroke:var(--up)" 联动。localStorage('df_scheme') 持久化。 */
 function toggleScheme() {
   var html = document.documentElement;
@@ -545,4 +545,51 @@ function toggleScheme() {
   var lb = document.getElementById('schemeLabel');
   if (lb) lb.textContent = to === 'cn' ? '红涨' : '绿涨';
   toast(to === 'cn' ? '已切换：红涨绿跌' : '已切换：绿涨红跌');
+}
+
+/* ================= 背景色切换（2026-10-25） =================
+   浅色 / 深色双主题，挂在 <html data-theme> 上，由 layout.css 的两套令牌解析。
+   与涨跌配色是两根正交的轴（df_theme / df_scheme 各自独立持久化）。
+   ★ 切换后必须重绘图表：SVG 的网格/轴标签颜色是 JS 写入的固定值（SVG 属性不支持 var()），
+     不重绘就会残留上一套主题的深色/浅色线条。 */
+function toggleTheme() {
+  var html = document.documentElement;
+  var to = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  html.dataset.theme = to;
+  try { localStorage.setItem('df_theme', to); } catch (e) {}
+  syncThemeLabel();
+  syncThemeColorMeta(to);
+  repaintChartsForTheme();
+  toast(to === 'dark' ? '已切换：深色背景' : '已切换：浅色背景');
+}
+
+function syncThemeLabel() {
+  var lb = document.getElementById('themeLabel');
+  if (lb) lb.textContent = document.documentElement.dataset.theme === 'dark' ? '深色' : '浅色';
+}
+
+/* 移动端地址栏/状态栏配色跟随主题 */
+function syncThemeColorMeta(theme) {
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', theme === 'dark' ? '#090c12' : '#f5f7fa');
+}
+
+/* 主题切换后重绘价格曲线（若详情页正处于展示态） */
+function repaintChartsForTheme() {
+  try {
+    if (typeof currentItem !== 'undefined' && currentItem && typeof paintPriceCurve === 'function') {
+      var box = document.querySelector('.price-curve-box');
+      if (box && box.querySelector('svg')) paintPriceCurve(currentItem.id);
+    }
+  } catch (e) {}
+}
+
+/* 读取当前主题下的图表配色（供 charts.js 写入 SVG 属性） */
+function getChartTheme() {
+  var cs = getComputedStyle(document.documentElement);
+  return {
+    grid: (cs.getPropertyValue('--chart-grid') || '').trim() || 'rgba(17,24,39,.10)',
+    axis: (cs.getPropertyValue('--chart-axis') || '').trim() || 'rgba(17,24,39,.26)',
+    label: (cs.getPropertyValue('--chart-label') || '').trim() || '#6b7280'
+  };
 }

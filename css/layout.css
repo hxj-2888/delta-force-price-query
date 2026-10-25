@@ -1,29 +1,81 @@
-﻿/* ========== 设计令牌（2026-10-24 理财行情风换装） ==========
+/* ========== 设计令牌（2026-10-25 明暗双主题） ==========
    ★ 必须放在实际被 index.html 引用的样式表里：base.css 是历史遗留文件、从未被 <link>，
      令牌放那边等于没定义（线上表现为颜色全部回落默认值）。版本随构建走。
-   涨跌色默认「红涨绿跌」（中国行情惯例，html[data-scheme="intl"] 可切回绿涨红跌）。
-   品牌色取自 Logo 橙金，替代旧版紫蓝渐变；等级色在 utils.js getGradeColor 与涨跌色解耦。 */
-:root {
-  --bg: #090c12;
-  --surface: #10141d;
-  --surface-2: #161b27;
-  --surface-3: #1c2230;
+
+   主题轴 data-theme = light | dark（默认 light，`toggleTheme()` 切换，localStorage df_theme 持久化）
+   涨跌轴 data-scheme = cn（红涨绿跌，默认）| intl（绿涨红跌）
+   两根轴正交，共 4 种组合，全部显式给值 —— 不做「深色=浅色反色」的自动推导，
+   因为红/绿在两种底色上的可用亮度不同，必须各自校色。
+
+   ★ 对比度基线（WCAG AA）：正文/价格 ≥ 7:1，次要小字 ≥ 4.5:1，涨跌色 ≥ 4.5:1。
+     `tools/theme-smoke.cjs` 会把 4 种组合逐一断言，改色后先跑它。 */
+
+/* ---------- 浅色（默认） ---------- */
+:root, html[data-theme="light"] {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-2: #f2f4f8;
+  --surface-3: #e8ecf2;
+  --line: rgba(17,24,39,.09);
+  --line-2: rgba(17,24,39,.16);
+  --text: #111827;
+  --text-2: #4b5563;
+  --text-3: #6b7280;
+  --up: #c81e2f;  --up-bg: rgba(200,30,47,.08);
+  --down: #067a4b; --down-bg: rgba(6,122,75,.09);
+  --brand: #a86f08; --brand-2: #8a5a05;
+  --brand-bg: rgba(201,138,18,.10);
+  --on-brand: #ffffff;
+  --chart-grid: rgba(17,24,39,.10);
+  --chart-axis: rgba(17,24,39,.26);
+  --chart-label: #6b7280;
+  --r-s: 8px; --r-m: 12px; --r-l: 16px;
+  --shadow: 0 10px 28px rgba(17,24,39,.12);
+  --nav-bg: rgba(255,255,255,.94);
+  --toast-bg: rgba(17,24,39,.92);
+  --toast-fg: #ffffff;
+  --scroll-track: rgba(17,24,39,.05);
+  --scroll-track-hover: rgba(17,24,39,.09);
+  color-scheme: light;
+}
+
+/* ---------- 深色 ---------- */
+html[data-theme="dark"] {
+  --bg: #0a0e15;
+  --surface: #171d2a;
+  --surface-2: #1f2635;
+  --surface-3: #293140;
   --line: rgba(255,255,255,.07);
   --line-2: rgba(255,255,255,.12);
   --text: #eef1f7;
-  --text-2: #96a0b4;
-  --text-3: #5d6678;
-  --up: #f0455c;  --up-bg: rgba(240,69,92,.12);
-  --down: #1ebf77; --down-bg: rgba(30,191,119,.12);
+  --text-2: #a8b2c4;
+  --text-3: #8b95a8;
+  --up: #ff5a6e;  --up-bg: rgba(255,90,110,.14);
+  --down: #26d08a; --down-bg: rgba(38,208,138,.13);
   --brand: #f0b542; --brand-2: #e59a2a;
   --brand-bg: rgba(240,181,66,.12);
+  --on-brand: #1a1408;
+  --chart-grid: rgba(255,255,255,.09);
+  --chart-axis: rgba(255,255,255,.28);
+  --chart-label: #8b95a8;
   --r-s: 8px; --r-m: 12px; --r-l: 16px;
   --shadow: 0 12px 32px rgba(0,0,0,.55);
+  --nav-bg: rgba(13,17,25,.92);
+  --toast-bg: rgba(13,17,25,.94);
+  --toast-fg: #eef1f7;
+  --scroll-track: rgba(255,255,255,.05);
+  --scroll-track-hover: rgba(255,255,255,.09);
+  color-scheme: dark;
 }
-/* 国际配色：绿涨红跌 */
+
+/* ---------- 涨跌轴：国际配色（绿涨红跌） ---------- */
 html[data-scheme="intl"] {
-  --up: #1ebf77;  --up-bg: rgba(30,191,119,.12);
-  --down: #f0455c; --down-bg: rgba(240,69,92,.12);
+  --up: #067a4b;  --up-bg: rgba(6,122,75,.09);
+  --down: #c81e2f; --down-bg: rgba(200,30,47,.08);
+}
+html[data-theme="dark"][data-scheme="intl"] {
+  --up: #26d08a;  --up-bg: rgba(38,208,138,.13);
+  --down: #ff5a6e; --down-bg: rgba(255,90,110,.14);
 }
 
 /* ========== 涨跌语义色（红涨绿跌默认；▲▼ 箭头另由渲染层提供，色盲可读） ========== */
@@ -38,15 +90,30 @@ html[data-scheme="intl"] {
 
 /* ========== 首页头部 ========== */
 .header { padding: 28px 12px 16px; text-align: center; background: radial-gradient(120% 140% at 85% -20%, var(--brand-bg), transparent 55%), var(--surface); border-bottom: 1px solid var(--line); }
-.header-logo { width: 84px; height: 84px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 2px 8px rgba(0,0,0,.4)); image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+.header-logo { width: 84px; height: 84px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 2px 8px var(--shadow)); image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
 .header-title { font-size: 24px; font-weight: bold; color: var(--text); letter-spacing: 2px; margin-bottom: 4px; }
 .header-subtitle { font-size: 13px; color: var(--text-2); margin-bottom: 6px; }
-.header-info { font-size: 11px; color: var(--text-3); margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.header-info { font-size: 11px; color: var(--text-3); margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .scheme-toggle { padding: 3px 10px; border-radius: 14px; background: var(--surface-3); border: 1px solid var(--line-2); color: var(--text-2); font-size: 10.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
 .scheme-toggle .sw { display: inline-flex; gap: 3px; }
 .scheme-toggle .sw i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .scheme-toggle .sw i:first-child { background: var(--up); }
 .scheme-toggle .sw i:last-child { background: var(--down); }
+/* 背景色切换按钮（明/暗）：与涨跌配色按钮并列，两者互不干扰 */
+.theme-toggle {
+  padding: 3px 10px; border-radius: 14px;
+  background: var(--surface-3); border: 1px solid var(--line-2);
+  color: var(--text-2); font-size: 10.5px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.theme-toggle:hover { border-color: color-mix(in srgb, var(--brand) 45%, transparent); color: var(--brand); }
+.theme-toggle:active { transform: scale(.96); }
+.theme-toggle .ti { width: 11px; height: 11px; display: block; flex-shrink: 0; }
+/* 浅色主题下显示月亮（点它切到深色），深色主题下显示太阳 */
+.theme-toggle .ti-sun { display: none; }
+html[data-theme="dark"] .theme-toggle .ti-sun { display: block; }
+html[data-theme="dark"] .theme-toggle .ti-moon { display: none; }
 
 /* ========== 搜索栏（首页内联输入 + 联想） ========== */
 .search-bar {
@@ -55,7 +122,7 @@ html[data-scheme="intl"] {
   background: var(--surface-2); border-radius: var(--r-m);
   border: 1px solid var(--line); transition: all 0.15s;
 }
-.search-bar:focus-within { border-color: rgba(240,181,66,.5); background: var(--surface-3); }
+.search-bar:focus-within { border-color: color-mix(in srgb, var(--brand) 55%, transparent); background: var(--surface-3); }
 .search-bar .search-icon { flex-shrink: 0; }
 .search-bar input {
   flex: 1; min-width: 0; height: 100%;
@@ -91,7 +158,7 @@ html[data-scheme="intl"] {
 .home-chips .fchip {
   display: inline-flex; align-items: center; gap: 5px;
   height: 26px; padding: 0 6px 0 10px; border-radius: 13px;
-  background: var(--brand-bg); border: 1px solid rgba(240,181,66,.35);
+  background: var(--brand-bg); border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent);
   color: var(--brand); font-size: 11px;
 }
 .home-chips .fchip b { font-weight: 500; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -130,7 +197,7 @@ html[data-scheme="intl"] {
 /* 面板底部操作条：重置 + 查看 N 件（四个面板统一） */
 .dd-foot {
   display: flex; gap: 8px; padding: 10px;
-  border-top: 1px solid var(--line); background: rgba(0,0,0,.2);
+  border-top: 1px solid var(--line); background: var(--surface-2);
 }
 .dd-btn {
   flex: 1; height: 34px; border-radius: var(--r-s);
@@ -139,7 +206,7 @@ html[data-scheme="intl"] {
 }
 .dd-btn:active { transform: scale(0.97); }
 .dd-btn.primary {
-  background: var(--brand-bg); border-color: rgba(240,181,66,.45);
+  background: var(--brand-bg); border-color: color-mix(in srgb, var(--brand) 45%, transparent);
   color: var(--brand); font-weight: 500;
 }
 /* 面板内自定义输入区 */
@@ -149,11 +216,11 @@ html[data-scheme="intl"] {
 .dd-range { display: flex; align-items: center; gap: 8px; }
 .dd-range input {
   flex: 1; min-width: 0; height: 36px; padding: 0 10px;
-  background: rgba(0,0,0,.3); border: 1px solid var(--line-2);
+  background: var(--surface); border: 1px solid var(--line-2);
   /* 16px：防 iOS 聚焦缩放 */
   border-radius: var(--r-s); color: var(--text); font-size: 16px; outline: none;
 }
-.dd-range input:focus { border-color: rgba(240,181,66,.5); }
+.dd-range input:focus { border-color: color-mix(in srgb, var(--brand) 55%, transparent); }
 .dd-range-sep { color: var(--text-3); font-size: 12px; }
 
 /* 分类纵列（小号紧凑，带件数，可多选） */
@@ -188,13 +255,13 @@ html[data-scheme="intl"] {
 .sort-bar { display: flex; gap: 8px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .sort-btn { font-size: 11px; padding: 6px 14px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text-3); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
 .sort-btn:active { transform: scale(0.95); }
-.sort-btn.active { background: var(--brand-bg); border-color: rgba(240,181,66,.45); color: var(--brand); }
+.sort-btn.active { background: var(--brand-bg); border-color: color-mix(in srgb, var(--brand) 45%, transparent); color: var(--brand); }
 
 /* ========== 分页 ========== */
 .pagination { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 16px 12px; flex-wrap: wrap; }
 .page-btn { width: 34px; height: 34px; border-radius: var(--r-s); background: var(--surface-2); border: 1px solid var(--line); color: var(--text-2); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; user-select: none; }
 .page-btn:active { background: var(--surface-3); border-color: var(--line-2); color: var(--text); }
-.page-btn.active { background: var(--brand-bg); border-color: rgba(240,181,66,.5); color: var(--brand); font-weight: bold; }
+.page-btn.active { background: var(--brand-bg); border-color: color-mix(in srgb, var(--brand) 55%, transparent); color: var(--brand); font-weight: bold; }
 .page-btn.disabled { opacity: 0.25; pointer-events: none; }
 .page-btn.arrow { font-size: 16px; }
 .page-info { font-size: 11px; color: var(--text-3); text-align: center; padding: 4px 12px; }
@@ -215,7 +282,7 @@ html[data-scheme="intl"] {
 .bottom-nav {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 500px; display: flex;
-  background: rgba(13,17,25,.92); backdrop-filter: blur(16px);
+  background: var(--nav-bg); backdrop-filter: blur(16px);
   border-top: 1px solid var(--line); padding: 8px 0 10px; z-index: 100;
 }
 .bottom-nav .tab { flex: 1; text-align: center; cursor: pointer; user-select: none; color: var(--text-3); transition: all 0.2s; padding: 4px 0; }

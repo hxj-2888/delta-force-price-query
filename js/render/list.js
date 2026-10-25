@@ -44,7 +44,7 @@ function renderList(items, showCategory) {
     statsHtml += ' <span style="font-size:10px;color:#888">(已加载 ' + formatLargeNum(loadedCount) + ')</span>';
   }
   if (isLoadingMore) {
-    statsHtml += ' <span style="font-size:10px;color:#6366f1">加载中...</span>';
+    statsHtml += ' <span style="font-size:10px;color:#a86f08">加载中...</span>';
   }
   statsHtml += ' · 第 ' + currentPage + '/' + totalPages + ' 页</span>';
   if (sorted.length > 0) {
@@ -64,7 +64,10 @@ function renderList(items, showCategory) {
     var d30bl = item.day_30_bl || 0;
     var d30p = item.day_30_price || 0;
     var catName = CATEGORY_MAP[item._category] || escapeHtml(item.secondClassCN || '');
-    var gradeBg = (item._category !== 'gun' && item.grade) ? 'background:' + getGradeColor(item.grade) + '15;border-color:' + getGradeColor(item.grade) + '30;' : '';
+    // ★ 同 home.js：等级色调叠在白卡面上，不覆盖 var(--surface)（浅色底要求）
+    var gradeBg = (item._category !== 'gun' && item.grade)
+      ? 'background:linear-gradient(0deg,' + getGradeColor(item.grade) + '14,' + getGradeColor(item.grade) + '14),var(--surface);border-color:' + getGradeColor(item.grade) + '33;'
+      : '';
     var gradeDiamond = (item._category !== 'gun' && item.grade) ? '<div class="grade-diamond" style="background:' + getGradeColor(item.grade) + '"></div>' : '';
     var picHtml = item.pic
       ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">'

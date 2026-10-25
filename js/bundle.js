@@ -1,5 +1,5 @@
 // 三角洲行动 — JS Bundle (all modules combined)
-// v20261025n-d7ebf4c8 — 自动生成于 2026-10-25 05:27:30
+// v20261025q-8e307264 — 自动生成于 2026-10-25 08:01:55
 
 // ===== config.js =====
 // ===== config.js — 应用常量 =====
@@ -99,10 +99,14 @@ function getGradeText(g) {
 }
 
 function getGradeColor(g) {
-  // 等级色板（2026-10-24 换装）：与涨跌色（红/绿）解耦——原四级紫/六级红与涨跌语义撞色；
-  // 六级=品牌金（顶配辨识度），整体降低饱和度贴合行情风暗色界面。
-  const colors = ['', '#7f8a9e', '#45b8a8', '#3d9bff', '#a78bfa', '#f08c4a', '#f0b542'];
-  return colors[g] || '#7f8a9e';
+  // 等级色板：与涨跌色（红/绿）解耦——原四级紫/六级红与涨跌语义撞色；六级=品牌金（顶配辨识度）。
+  // ★ 2026-10-25 双主题：浅色底需要压深饱和度（原暗色板在白底发飘、对比度不足）；
+  //   深色底沿用亮色板。两套都避开纯红/纯绿，防止和涨跌语义混淆。
+  var isDark = document.documentElement.dataset.theme === 'dark';
+  var colors = isDark
+    ? ['', '#7f8a9e', '#45b8a8', '#3d9bff', '#a78bfa', '#f08c4a', '#f0b542']
+    : ['', '#6b7280', '#0f766e', '#1d4ed8', '#7c3aed', '#c2410c', '#b45309'];
+  return colors[g] || colors[1];
 }
 
 function toast(msg, duration) {
@@ -595,7 +599,7 @@ async function getOrFetchCloudSnapshots(itemId) {
    最终曲线，中途不出现「API 版」曲线。
    依赖 render/charts.js 的 generatePriceCurveSVG（同一 bundle 作用域，函数调用时已可用）。 */
 function curvePlaceholderHTML() {
-  return '<div class="curve-loading" style="height:120px;display:flex;align-items:center;justify-content:center;color:#8a8aa0;font-size:12px">走势加载中…</div>';
+  return '<div class="curve-loading" style="height:120px;display:flex;align-items:center;justify-content:center;color:#8a93a3;font-size:12px">走势加载中…</div>';
 }
 
 function paintPriceCurve(item, box, fallbackPts) {
@@ -1941,7 +1945,7 @@ function updateCategoryIcons(allItems) {
 
 /* ================= 涨跌配色切换（2026-10-24） =================
    默认红涨绿跌（中国行情惯例），可切绿涨红跌（国际惯例）。
-   方案挂在 <html data-scheme> 上由 CSS 令牌（css/base.css）解析，
+   方案挂在 <html data-scheme> 上由 CSS 令牌（css/layout.css）解析，
    SVG 线条/圆点用 style="stroke:var(--up)" 联动。localStorage('df_scheme') 持久化。 */
 function toggleScheme() {
   var html = document.documentElement;
@@ -1951,6 +1955,53 @@ function toggleScheme() {
   var lb = document.getElementById('schemeLabel');
   if (lb) lb.textContent = to === 'cn' ? '红涨' : '绿涨';
   toast(to === 'cn' ? '已切换：红涨绿跌' : '已切换：绿涨红跌');
+}
+
+/* ================= 背景色切换（2026-10-25） =================
+   浅色 / 深色双主题，挂在 <html data-theme> 上，由 layout.css 的两套令牌解析。
+   与涨跌配色是两根正交的轴（df_theme / df_scheme 各自独立持久化）。
+   ★ 切换后必须重绘图表：SVG 的网格/轴标签颜色是 JS 写入的固定值（SVG 属性不支持 var()），
+     不重绘就会残留上一套主题的深色/浅色线条。 */
+function toggleTheme() {
+  var html = document.documentElement;
+  var to = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  html.dataset.theme = to;
+  try { localStorage.setItem('df_theme', to); } catch (e) {}
+  syncThemeLabel();
+  syncThemeColorMeta(to);
+  repaintChartsForTheme();
+  toast(to === 'dark' ? '已切换：深色背景' : '已切换：浅色背景');
+}
+
+function syncThemeLabel() {
+  var lb = document.getElementById('themeLabel');
+  if (lb) lb.textContent = document.documentElement.dataset.theme === 'dark' ? '深色' : '浅色';
+}
+
+/* 移动端地址栏/状态栏配色跟随主题 */
+function syncThemeColorMeta(theme) {
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', theme === 'dark' ? '#090c12' : '#f5f7fa');
+}
+
+/* 主题切换后重绘价格曲线（若详情页正处于展示态） */
+function repaintChartsForTheme() {
+  try {
+    if (typeof currentItem !== 'undefined' && currentItem && typeof paintPriceCurve === 'function') {
+      var box = document.querySelector('.price-curve-box');
+      if (box && box.querySelector('svg')) paintPriceCurve(currentItem.id);
+    }
+  } catch (e) {}
+}
+
+/* 读取当前主题下的图表配色（供 charts.js 写入 SVG 属性） */
+function getChartTheme() {
+  var cs = getComputedStyle(document.documentElement);
+  return {
+    grid: (cs.getPropertyValue('--chart-grid') || '').trim() || 'rgba(17,24,39,.10)',
+    axis: (cs.getPropertyValue('--chart-axis') || '').trim() || 'rgba(17,24,39,.26)',
+    label: (cs.getPropertyValue('--chart-label') || '').trim() || '#6b7280'
+  };
 }
 
 // ===== render/charts.js =====
@@ -2081,6 +2132,10 @@ function generatePriceCurveSVG(pricePoints) {
   var firstPrice = pts[0].price;                 // pts 已按 day 降序：首元素最旧
   var lastPrice = pts[pts.length - 1].price;
   var trendVar = lastPrice >= firstPrice ? 'var(--up)' : 'var(--down)';
+  // ★ 网格/轴标签色必须跟随主题：SVG 属性不支持 var()，只能读令牌再写成字面值。
+  //   深色主题下若仍写浅色网格，白线在深底上会糊成一片；反之亦然。
+  var ct = (typeof getChartTheme === 'function') ? getChartTheme()
+    : { grid: 'rgba(17,24,39,.10)', axis: 'rgba(17,24,39,.26)', label: '#6b7280' };
 
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
     '<defs>' +
@@ -2090,15 +2145,15 @@ function generatePriceCurveSVG(pricePoints) {
       '</linearGradient>' +
     '</defs>' +
     yTicks.map(function(tk) {
-      return '<line x1="' + PAD.left + '" y1="' + tk.y.toFixed(1) + '" x2="' + (W - PAD.right) + '" y2="' + tk.y.toFixed(1) + '" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,4"/>' +
-        '<text x="' + (PAD.left - 6) + '" y="' + tk.y.toFixed(1) + '" text-anchor="end" fill="#7d8798" font-size="9" dominant-baseline="middle">\xA5' + shortPrice(tk.price) + '</text>';
+      return '<line x1="' + PAD.left + '" y1="' + tk.y.toFixed(1) + '" x2="' + (W - PAD.right) + '" y2="' + tk.y.toFixed(1) + '" stroke="' + ct.grid + '" stroke-dasharray="3,4"/>' +
+        '<text x="' + (PAD.left - 6) + '" y="' + tk.y.toFixed(1) + '" text-anchor="end" fill="' + ct.label + '" font-size="9" dominant-baseline="middle">\xA5' + shortPrice(tk.price) + '</text>';
     }).join('') +
     xTicks.map(function(d) {
       var xx = PAD.left + (1 - d / 30) * plotW;
       var label = xTickLabels[d] || '';
-      return '<line x1="' + xx.toFixed(1) + '" y1="' + PAD.top + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH) + '" stroke="rgba(255,255,255,0.05)" stroke-dasharray="2,5"/>' +
-        '<line x1="' + xx.toFixed(1) + '" y1="' + (PAD.top + plotH) + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH + 4) + '" stroke="rgba(255,255,255,0.3)"/>' +
-        '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="#7d8798" font-size="8">' + label + '</text>';
+      return '<line x1="' + xx.toFixed(1) + '" y1="' + PAD.top + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH) + '" stroke="' + ct.grid + '" stroke-dasharray="2,5"/>' +
+        '<line x1="' + xx.toFixed(1) + '" y1="' + (PAD.top + plotH) + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH + 4) + '" stroke="' + ct.axis + '"/>' +
+        '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="' + ct.label + '" font-size="8">' + label + '</text>';
     }).join('') +
     '<path d="' + areaD + '" fill="url(#' + _gradId + ')"/>' +
     '<path d="' + pathD + '" fill="none" style="stroke:' + trendVar + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
@@ -2242,7 +2297,12 @@ function _renderMiniSparkline(item) {
 // ===== 首页物品卡片 =====
 function _renderHomeItemCard(item, field, maxAbsBl, isEager) {
   var bl = getFieldByPeriod(item, field) || 0;
-  var gradeBg = (item._category !== 'gun' && item.grade) ? 'background:' + getGradeColor(item.grade) + '15;border-color:' + getGradeColor(item.grade) + '30;' : '';
+  // ★ 等级色调必须「叠」在白卡面上，不能直接覆盖 background：
+  //   浅色底下直接写 background:<color>15 会把 var(--surface) 顶掉，卡片透出页面底色。
+  //   用 gradient 层叠（下白上色）保留卡面，再调 border。
+  var gradeBg = (item._category !== 'gun' && item.grade)
+    ? 'background:linear-gradient(0deg,' + getGradeColor(item.grade) + '14,' + getGradeColor(item.grade) + '14),var(--surface);border-color:' + getGradeColor(item.grade) + '33;'
+    : '';
   var gradeDiamond = (item._category !== 'gun' && item.grade) ? '<div class="grade-diamond" style="background:' + getGradeColor(item.grade) + '"></div>' : '';
   var loadingAttr = isEager ? 'loading="eager" decoding="sync"' : 'loading="lazy" decoding="async"';
   var picHtml = item.pic ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" ' + loadingAttr + ' onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">' : '<span class="pic-placeholder">-</span>';
@@ -2681,7 +2741,7 @@ function renderList(items, showCategory) {
     statsHtml += ' <span style="font-size:10px;color:#888">(已加载 ' + formatLargeNum(loadedCount) + ')</span>';
   }
   if (isLoadingMore) {
-    statsHtml += ' <span style="font-size:10px;color:#6366f1">加载中...</span>';
+    statsHtml += ' <span style="font-size:10px;color:#a86f08">加载中...</span>';
   }
   statsHtml += ' · 第 ' + currentPage + '/' + totalPages + ' 页</span>';
   if (sorted.length > 0) {
@@ -2701,7 +2761,10 @@ function renderList(items, showCategory) {
     var d30bl = item.day_30_bl || 0;
     var d30p = item.day_30_price || 0;
     var catName = CATEGORY_MAP[item._category] || escapeHtml(item.secondClassCN || '');
-    var gradeBg = (item._category !== 'gun' && item.grade) ? 'background:' + getGradeColor(item.grade) + '15;border-color:' + getGradeColor(item.grade) + '30;' : '';
+    // ★ 同 home.js：等级色调叠在白卡面上，不覆盖 var(--surface)（浅色底要求）
+    var gradeBg = (item._category !== 'gun' && item.grade)
+      ? 'background:linear-gradient(0deg,' + getGradeColor(item.grade) + '14,' + getGradeColor(item.grade) + '14),var(--surface);border-color:' + getGradeColor(item.grade) + '33;'
+      : '';
     var gradeDiamond = (item._category !== 'gun' && item.grade) ? '<div class="grade-diamond" style="background:' + getGradeColor(item.grade) + '"></div>' : '';
     var picHtml = item.pic
       ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">'
@@ -2891,7 +2954,7 @@ function renderRecentViews() {
     var picHtml = item.pic
       ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
       : '<span class="pic-placeholder" style="font-size:20px">-</span>';
-    return '\n        <div class="result-item fade-in" onclick="openDetailFromRecent(' + Number(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
+    return '\n        <div class="result-item fade-in" onclick="openDetailFromRecent(' + Number(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#a86f08;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
   }).join('');
 }
 
@@ -2909,7 +2972,7 @@ function renderFavorites() {
     var picHtml = item.pic
       ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
       : '<span class="pic-placeholder" style="font-size:20px">-</span>';
-    return '\n        <div class="result-item fade-in" onclick="openDetailFromFavorite(' + Number(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
+    return '\n        <div class="result-item fade-in" onclick="openDetailFromFavorite(' + Number(item.id) + ')">\n          <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#a86f08;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
   }).join('');
 }
 
@@ -2925,7 +2988,7 @@ function renderSearchResults(results, keyword) {
       var picHtml = item.pic
         ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder style=font-size:20px>-</span>\'">'
         : '<span class="pic-placeholder" style="font-size:20px">-</span>';
-      return '\n          <div class="result-item fade-in" onclick="openDetailFromSearch(' + Number(item.id) + ')">\n            <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n              ' + picHtml + '\n            </div>\n            <div class="item-info">\n              <div class="item-name-row">\n                <span class="item-name">' + escapeHtml(item.name) + '</span>\n                <span class="item-grade" style="background:rgba(102,126,234,0.15);color:#667eea;font-size:10px;padding:2px 8px;border-radius:8px;margin-left:8px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n              </div>\n              <div class="item-price-row">\n                <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n                <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n              </div>\n            </div>\n            <span class="item-arrow">›</span>\n          </div>';
+      return '\n          <div class="result-item fade-in" onclick="openDetailFromSearch(' + Number(item.id) + ')">\n            <div class="item-pic" style="width:40px;height:40px;margin-right:10px">\n              ' + picHtml + '\n            </div>\n            <div class="item-info">\n              <div class="item-name-row">\n                <span class="item-name">' + escapeHtml(item.name) + '</span>\n                <span class="item-grade" style="background:rgba(201,138,18,.12);color:#a86f08;font-size:10px;padding:2px 8px;border-radius:8px;margin-left:8px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n              </div>\n              <div class="item-price-row">\n                <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n                <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n              </div>\n            </div>\n            <span class="item-arrow">›</span>\n          </div>';
     }).join('');
 }
 
@@ -2948,12 +3011,12 @@ function renderFavTab() {
     var full = allItems.find(function(i) { return i.id === fav.id; });
     return full ? Object.assign({}, fav, full) : fav;
   });
-  content.innerHTML = '\n      <div class="list-stats">\n        <span>共 ' + items.length + ' 件收藏</span>\n        <span class="history-clear" onclick="clearFavorites(); renderFavTab();" style="color:#f44336;cursor:pointer">清空收藏</span>\n      </div>\n      ' + items.map(function(item) {
+  content.innerHTML = '\n      <div class="list-stats">\n        <span>共 ' + items.length + ' 件收藏</span>\n        <span class="history-clear" onclick="clearFavorites(); renderFavTab();" style="color:#d92b3f;cursor:pointer">清空收藏</span>\n      </div>\n      ' + items.map(function(item) {
         var bl = item.bl || 0;
         var picHtml = item.pic
           ? '<img src="' + sanitizeUrl(smallPicUrl(item.pic, 144)) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.innerHTML=\'<span class=pic-placeholder>-</span>\'">'
           : '<span class="pic-placeholder">-</span>';
-        return '\n        <div class="item-card fade-in" onclick="openPriceMover(' + Number(item.id) + ')" style="position:relative">\n          <div class="item-pic">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#667eea;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
+        return '\n        <div class="item-card fade-in" onclick="openPriceMover(' + Number(item.id) + ')" style="position:relative">\n          <div class="item-pic">\n            ' + picHtml + '\n          </div>\n          <div class="item-info">\n            <div class="item-name-row">\n              <span class="item-name">' + escapeHtml(item.name) + '</span>\n              <span style="font-size:10px;color:#a86f08;margin-left:6px">' + escapeHtml(CATEGORY_MAP[item._category] || item.secondClassCN || '') + '</span>\n            </div>\n            <div class="item-price-row">\n              <span class="item-price">\xA5' + formatPrice(item.price) + '</span>\n              <span class="item-change ' + getChangeClass(bl) + '">' + formatChange(bl) + '</span>\n            </div>\n          </div>\n          <span class="item-arrow">›</span>\n        </div>';
       }).join('');
 }
 
@@ -3878,6 +3941,14 @@ function stopGlobalDailyRecord() {
 // ===== DOMContentLoaded 事件绑定 =====
 document.addEventListener('DOMContentLoaded', function() {
   if (typeof moveDropdownsToBody === 'function') moveDropdownsToBody();
+
+  // 首屏同步两个切换按钮的文案（内联脚本已先写好 data-theme/data-scheme，这里只补标签）
+  if (typeof syncThemeLabel === 'function') syncThemeLabel();
+  if (typeof syncThemeColorMeta === 'function') syncThemeColorMeta(document.documentElement.dataset.theme);
+  (function () {
+    var lb = document.getElementById('schemeLabel');
+    if (lb) lb.textContent = document.documentElement.dataset.scheme === 'intl' ? '绿涨' : '红涨';
+  })();
 
   document.getElementById('searchInput').addEventListener('input', function(e) {
     var kw = e.target.value;

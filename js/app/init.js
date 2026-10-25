@@ -75,6 +75,14 @@ function stopGlobalDailyRecord() {
 document.addEventListener('DOMContentLoaded', function() {
   if (typeof moveDropdownsToBody === 'function') moveDropdownsToBody();
 
+  // 首屏同步两个切换按钮的文案（内联脚本已先写好 data-theme/data-scheme，这里只补标签）
+  if (typeof syncThemeLabel === 'function') syncThemeLabel();
+  if (typeof syncThemeColorMeta === 'function') syncThemeColorMeta(document.documentElement.dataset.theme);
+  (function () {
+    var lb = document.getElementById('schemeLabel');
+    if (lb) lb.textContent = document.documentElement.dataset.scheme === 'intl' ? '绿涨' : '红涨';
+  })();
+
   document.getElementById('searchInput').addEventListener('input', function(e) {
     var kw = e.target.value;
     var clearBtn = document.getElementById('searchClear');

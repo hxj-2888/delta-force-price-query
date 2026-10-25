@@ -34,10 +34,14 @@ function getGradeText(g) {
 }
 
 function getGradeColor(g) {
-  // 等级色板（2026-10-24 换装）：与涨跌色（红/绿）解耦——原四级紫/六级红与涨跌语义撞色；
-  // 六级=品牌金（顶配辨识度），整体降低饱和度贴合行情风暗色界面。
-  const colors = ['', '#7f8a9e', '#45b8a8', '#3d9bff', '#a78bfa', '#f08c4a', '#f0b542'];
-  return colors[g] || '#7f8a9e';
+  // 等级色板：与涨跌色（红/绿）解耦——原四级紫/六级红与涨跌语义撞色；六级=品牌金（顶配辨识度）。
+  // ★ 2026-10-25 双主题：浅色底需要压深饱和度（原暗色板在白底发飘、对比度不足）；
+  //   深色底沿用亮色板。两套都避开纯红/纯绿，防止和涨跌语义混淆。
+  var isDark = document.documentElement.dataset.theme === 'dark';
+  var colors = isDark
+    ? ['', '#7f8a9e', '#45b8a8', '#3d9bff', '#a78bfa', '#f08c4a', '#f0b542']
+    : ['', '#6b7280', '#0f766e', '#1d4ed8', '#7c3aed', '#c2410c', '#b45309'];
+  return colors[g] || colors[1];
 }
 
 function toast(msg, duration) {

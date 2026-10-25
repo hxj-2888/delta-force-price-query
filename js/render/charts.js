@@ -125,6 +125,10 @@ function generatePriceCurveSVG(pricePoints) {
   var firstPrice = pts[0].price;                 // pts 已按 day 降序：首元素最旧
   var lastPrice = pts[pts.length - 1].price;
   var trendVar = lastPrice >= firstPrice ? 'var(--up)' : 'var(--down)';
+  // ★ 网格/轴标签色必须跟随主题：SVG 属性不支持 var()，只能读令牌再写成字面值。
+  //   深色主题下若仍写浅色网格，白线在深底上会糊成一片；反之亦然。
+  var ct = (typeof getChartTheme === 'function') ? getChartTheme()
+    : { grid: 'rgba(17,24,39,.10)', axis: 'rgba(17,24,39,.26)', label: '#6b7280' };
 
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
     '<defs>' +
@@ -134,15 +138,15 @@ function generatePriceCurveSVG(pricePoints) {
       '</linearGradient>' +
     '</defs>' +
     yTicks.map(function(tk) {
-      return '<line x1="' + PAD.left + '" y1="' + tk.y.toFixed(1) + '" x2="' + (W - PAD.right) + '" y2="' + tk.y.toFixed(1) + '" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,4"/>' +
-        '<text x="' + (PAD.left - 6) + '" y="' + tk.y.toFixed(1) + '" text-anchor="end" fill="#7d8798" font-size="9" dominant-baseline="middle">\xA5' + shortPrice(tk.price) + '</text>';
+      return '<line x1="' + PAD.left + '" y1="' + tk.y.toFixed(1) + '" x2="' + (W - PAD.right) + '" y2="' + tk.y.toFixed(1) + '" stroke="' + ct.grid + '" stroke-dasharray="3,4"/>' +
+        '<text x="' + (PAD.left - 6) + '" y="' + tk.y.toFixed(1) + '" text-anchor="end" fill="' + ct.label + '" font-size="9" dominant-baseline="middle">\xA5' + shortPrice(tk.price) + '</text>';
     }).join('') +
     xTicks.map(function(d) {
       var xx = PAD.left + (1 - d / 30) * plotW;
       var label = xTickLabels[d] || '';
-      return '<line x1="' + xx.toFixed(1) + '" y1="' + PAD.top + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH) + '" stroke="rgba(255,255,255,0.05)" stroke-dasharray="2,5"/>' +
-        '<line x1="' + xx.toFixed(1) + '" y1="' + (PAD.top + plotH) + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH + 4) + '" stroke="rgba(255,255,255,0.3)"/>' +
-        '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="#7d8798" font-size="8">' + label + '</text>';
+      return '<line x1="' + xx.toFixed(1) + '" y1="' + PAD.top + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH) + '" stroke="' + ct.grid + '" stroke-dasharray="2,5"/>' +
+        '<line x1="' + xx.toFixed(1) + '" y1="' + (PAD.top + plotH) + '" x2="' + xx.toFixed(1) + '" y2="' + (PAD.top + plotH + 4) + '" stroke="' + ct.axis + '"/>' +
+        '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="' + ct.label + '" font-size="8">' + label + '</text>';
     }).join('') +
     '<path d="' + areaD + '" fill="url(#' + _gradId + ')"/>' +
     '<path d="' + pathD + '" fill="none" style="stroke:' + trendVar + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +

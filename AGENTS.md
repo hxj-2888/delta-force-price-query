@@ -27,6 +27,7 @@
 | 部署（唯一正确姿势） | `node tools/deploy-pages.cjs` |
 | 首页 UI 冒烟 | `node tools/home-ui-smoke.cjs` |
 | 滚动条冒烟（桌面双栏/窄屏/移动端） | `node tools/scrollbar-smoke.cjs` |
+| 主题冒烟（明暗 × 红涨绿涨 四组合对比度） | `node tools/theme-smoke.cjs` |
 | 文档死链 | `node tools/check-docs.cjs` |
 
 ### 什么算"绿"
@@ -61,6 +62,13 @@
    `overflow-y:auto`，`document.documentElement.scrollTop` 恒为 0。任何"回到顶部/记录滚动位置/
    滚动条"逻辑都必须按容器写（`el.scrollTop`），不能只写 `window.scrollTo`。
    滚动位置读写统一走 `window.__dfGetScrollTop()` / `window.__dfRestoreScrollTop(y)`。
+10. **颜色只许走令牌，且两根轴都要给值。** 主题 `data-theme`（light/dark）与涨跌
+   `data-scheme`（cn/intl）是正交的两根轴，共 4 种组合，`css/layout.css` 里逐一显式声明。
+   禁止在 CSS/JS 里写死具体色值（`rgba(240,181,66,…)` 这类），要半透明就用
+   `color-mix(in srgb, var(--brand) 40%, transparent)`。改色后必须跑 `tools/theme-smoke.cjs`
+   ——它会对 4 种组合逐一断言对比度（正文 ≥7:1、小字/涨跌 ≥4.5:1）。
+   SVG 属性不支持 `var()`，图表颜色必须经 `getChartTheme()` 读令牌后写成字面值，
+   并在主题切换时重绘（`repaintChartsForTheme()`）。
 
 ---
 
