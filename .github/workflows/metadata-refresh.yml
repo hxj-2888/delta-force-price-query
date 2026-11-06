@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: write
+  # deploy.yml 的失败通知 job 申请了 issues: write；可复用工作流不能申请调用方未授予的权限
+  issues: write
 
 jobs:
   refresh:
