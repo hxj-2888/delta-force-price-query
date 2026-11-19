@@ -1,0 +1,833 @@
+<!--
+index.html — 落幕查 变卖物价格查询 PWA 主入口 | build: v20261025q-8e307264
+功能清单: 预取v3(item_price_all+metadata双请求合并) | 加载动画+进度条 | 首页(筛选/排序/分页/涨跌Top2)
+列表页(分类/排序/分页) | 详情页(价格图表/收藏) | 搜索页(实时搜索/历史/最近浏览/收藏) | 底部Tab导航
+依赖: js/bundle.js(合并所有JS模块) css/layout.css css/components.css
+改动影响: 修改预取逻辑→影响加载速度和数据完整性; 修改DOM结构→影响render.js的innerHTML选择器
+修复(v20260730m): Tab切回首页不重渲染(保持滚动+分页) | 收藏页不触发loadAllItems | 图表数据点日历对齐
+改造(v20261008): ①首页内联搜索+联想(homeSugg, 与搜索页并存) | ②四个筛选面板统一(分类多选带件数/
+价格快捷档+自定义区间/面板内「重置+查看N件」/已选chips回显可单删可清空) | ③市场概览条homeStatBar
+(结果数·均价·涨跌家数·行情·更新时间) | ④列表卡片增强(▲▼箭头/今日开盘·30天前/当前分位/品类标签)
+★ 无「成交量」字段: 上游 item_price_all+metadata 均无成交量, 卡片只用真实锚点(price_start/day_*_price), 不臆造
+★ homeCategoryFilter 已由字符串改为数组(多选), 旧存档在 applyHomeBrowseState 里兼容转换
+-->
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-scheme="cn">
+<head>
+  <meta charset="UTF-8">
+  <script>
+    // ★ 主题与涨跌配色：两根轴独立，都靠 localStorage 持久化。
+    //   必须在内联关键 CSS 之前执行，避免首屏闪色（先闪深色再变浅色最刺眼）。
+    //   df_theme  : light | dark    （默认 light）
+    //   df_scheme : cn（红涨绿跌，默认）| intl（绿涨红跌）
+    (function () {
+      var d = document.documentElement;
+      try {
+        var t = localStorage.getItem('df_theme');
+        if (t !== 'light' && t !== 'dark') {
+          // 未显式选过：跟随系统偏好；系统也不支持时用浅色
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        d.dataset.theme = t;
+      } catch (e) { d.dataset.theme = 'light'; }
+      try {
+        var s = localStorage.getItem('df_scheme');
+        if (s === 'intl' || s === 'cn') d.dataset.scheme = s;
+      } catch (e) {}
+    })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>落幕查 - 变卖物价格查询</title>
+  <!-- favicon：ico 兼容性最好（Safari/旧浏览器不支持 webp 图标），webp 作为现代浏览器备选 -->
+  <link rel="icon" href="/icon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/webp" href="/delta-force-logo.webp?v=2">
+  <!-- iOS「添加到主屏幕」图标；缺失时 iOS 会拿页面截图充当 -->
+  <link rel="apple-touch-icon" href="/icon-192.png?v=2">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <!-- 浅色底：状态栏用 default（black-translucent 是为深色底设计的，浅色下会压出黑条） -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f5f7fa">
+  <meta name="apple-mobile-web-app-title" content="落幕查">
+  <!-- ★ 预连接上游 API 域名，减少 TLS 握手延迟 -->
+  <link rel="preconnect" href="https://orzice.com" crossorigin>
+  <link rel="dns-prefetch" href="https://orzice.com">
+  <link rel="preload" href="/delta-force-logo.webp?v=2" as="image" fetchpriority="high">
+  <script>
+    // ★ 同源：使用部署站点自带的 /api 代理（Cloudflare Pages Functions）
+    window.__WORKER_BASE = '';
+  </script>
+  <script>
+    // ★ 预取 v3：metadata.json（静态元数据）+ item_price_all（实时价格）→ 客户端合并
+    // 2 请求替代 143 请求，~2s 拿到全量 1350 件，排序/筛选纯本地
+    window.__prefetch = (function() {
+      var CATS = ['gun','ammo','acc','helmet','armor','chest','bag','key','collection','consume'];
+      var proxyUrl = window.__WORKER_BASE + '/api/proxy';
+      var running = {};
+
+      var _allMerged = [];
+      var _allResolve, _allReject;
+      var _allReady = new Promise(function(res, rej) { _allResolve = res; _allReject = rej; });
+      var _dataReady = false;
+      var _totalArrived = 0;
+      var _onArriveCallbacks = [];
+
+      // 物品显著性评分：|涨跌幅| × 价格档位
+      function _significanceScore(item) {
+        var bl = Math.abs(item.bl || item.day_3_bl || item.day_7_bl || 0);
+        var price = item.price || 0;
+        if (price <= 0) return bl;
+        var priceFactor = price >= 1000000 ? 4 : price >= 100000 ? 3 : price >= 10000 ? 2 : 1;
+        return bl * priceFactor;
+      }
+
+      function _notifyArrive(items) {
+        _totalArrived += items.length;
+        running._totalArrived = _totalArrived;
+        for (var i = 0; i < _onArriveCallbacks.length; i++) {
+          try { _onArriveCallbacks[i](items, _totalArrived); } catch(e) {}
+        }
+      }
+
+      // 初始化分类对象（保持与 v2 兼容）
+      CATS.forEach(function(cat) {
+        var quickResolve, quickReject;
+        var obj = {
+          _resolvedData: [],
+          _totalCount: 0,
+          _complete: false,
+          _loadingMore: true,
+          _hasPage1: false,
+          _onComplete: null,
+          _quick: new Promise(function(res, rej) { quickResolve = res; quickReject = rej; })
+        };
+        obj._qr = quickResolve;
+        obj._qj = quickReject;
+        running[cat] = obj;
+      });
+
+      // ★ 检查 localStorage 是否有缓存（用于加速加载动画）
+      var _hasCache = false;
+      try {
+        var _raw = localStorage.getItem('deltaforce_cache_v10');
+        if (_raw) {
+          var _parsed = JSON.parse(_raw);
+          if (_parsed && _parsed._allItems && _parsed._allItems.length > 50) _hasCache = true;
+        }
+      } catch(e) {}
+
+      // ★ 涨幅前二数据（item_price_all 返回后填充）
+      var _topMoverData = null;
+      var _topMoverApiDone = false;
+      running._topMoverData = null;
+      running._topMoverApiDone = false;
+
+      // ★ 核心：并行拉取价格 + 元数据，客户端合并
+      // metadata 优先从 /api/metadata（KV动态更新）获取，失败降级到静态文件
+      // ★ 必须校验响应：代理异常时常以 HTTP 200 返回 { code:-1, msg } 错误体
+      //   （典型场景：本地 server.js 没有 /api/metadata 路由时，请求被当成上游接口转发），
+      //   若只 r.json() 不校验，metadata[id] 恒为 undefined，全站物品名会退化为「物品#ID」。
+      var metadataPromise = fetch('/api/metadata')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('结构非法');
+          if (typeof data.code !== 'undefined' && data.code !== 0) throw new Error('code=' + data.code);
+          if (Object.keys(data).length === 0) throw new Error('内容为空');
+          return data;
+        })
+        .catch(function(e) {
+          console.warn('[prefetch] /api/metadata 不可用(' + (e && e.message) + ')，降级到静态文件');
+          return fetch('/data/metadata.json')
+            .then(function(r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })
+            .then(function(data) {
+              if (!data || typeof data !== 'object' || Array.isArray(data) || Object.keys(data).length === 0) {
+                throw new Error('内容为空或结构非法');
+              }
+              return data;
+            })
+            .catch(function(e2) {
+              console.error('[prefetch] 静态 metadata 也失败(' + (e2 && e2.message) + ')，物品将显示为"物品#ID"');
+              running._metadataFailed = true;
+              return {};
+            });
+        });
+
+      // ★ 带超时 + 1次重试的 fetch
+      function _fetchWithTimeout(url, timeoutMs) {
+        return new Promise(function(resolve, reject) {
+          var controller = new AbortController();
+          var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+          fetch(url, { signal: controller.signal })
+            .then(function(r) { clearTimeout(timer); resolve(r); })
+            .catch(function(e) { clearTimeout(timer); reject(e); });
+        });
+      }
+
+      // ★ 超时必须大于「服务端中继上限」，否则页面会先放弃：
+      //   上游 orzice.com 经 Cloudflare Functions 转发，单次实测 9~15s；
+      //   本地中继的硬上限是 22s（RELAY_TIMEOUT_MS），线上 Functions 是 25s。
+      //   曾经这里写 15000，正好卡在中继返回之前，页面必然弹「数据加载超时」——
+      //   服务端其实正在正常返回数据。
+        //  留出余量，让服务端先给出可识别的 504，页面据此重试而不是直接报错。
+      var PREFETCH_TIMEOUT_MS = 30000;
+      var PREFETCH_FINAL_TIMEOUT_MS = 35000;
+
+      function _fetchPriceAllWithRetry() {
+        var url = proxyUrl + '?endpoint=item_price_all';
+        return _fetchWithTimeout(url, PREFETCH_TIMEOUT_MS).catch(function(err) {
+          console.warn('[prefetch] item_price_all 首次失败(' + err.message + ')，1秒后重试...');
+          return new Promise(function(resolve) {
+            setTimeout(function() { resolve(_fetchWithTimeout(url, PREFETCH_TIMEOUT_MS)); }, 1000);
+          });
+        }).catch(function(err) {
+          console.warn('[prefetch] item_price_all 重试也失败(' + err.message + ')');
+          return new Promise(function(resolve) {
+            setTimeout(function() { resolve(_fetchWithTimeout(url, PREFETCH_FINAL_TIMEOUT_MS)); }, 1500);
+          });
+        });
+      }
+
+      // ★ 错误状态（loading 层可检查）
+      running._error = null;
+      running._metadataFailed = false;  // metadata 加载失败标志
+      running.getError = function() { return running._error; };
+      running.isMetadataDegraded = function() { return running._metadataFailed; };
+
+      // ★ 暴露重试入口
+      running.retry = function() { location.reload(); };
+
+      // ★ 元数据补全补丁（v3 修复）: 上次补全学到的 name/分类 持久化到 localStorage,
+      //   避免元数据不完整时每次页面加载都重复拉 10 个分类第 1 页（10 次上游请求）。
+      // v2 加固：这份缓存的内容会流入渲染层（patch.name / patch.pic），虽然渲染时已有
+      // escapeHtml / sanitizeUrl，但仍需控制其规模与存活时间——它此前无条数上限、无过期、
+      // 无结构版本，会无限累积已下架物品，且被污染后会长期驻留。
+      var _metaPatchKey = 'deltaforce_meta_patch_v2';
+      var _META_PATCH_MAX = 2000;                    // 条数上限
+      var _META_PATCH_TTL = 90 * 24 * 3600 * 1000;   // 存活 90 天
+      var _metaPatch = {};
+      try {
+        localStorage.removeItem('deltaforce_meta_patch_v1');   // 清理无结构的旧版本
+        var _patchRaw = localStorage.getItem(_metaPatchKey);
+        if (_patchRaw) {
+          var _parsed = JSON.parse(_patchRaw);
+          if (_parsed && _parsed.__ts && (Date.now() - _parsed.__ts) < _META_PATCH_TTL) {
+            _metaPatch = _parsed.data || {};
+          } else {
+            localStorage.removeItem(_metaPatchKey);   // 过期或结构不符 → 丢弃，本轮重新学习
+          }
+        }
+      } catch (e) { _metaPatch = {}; }
+
+      Promise.all([
+        _fetchPriceAllWithRetry().then(function(r) { return r.json(); }),
+        metadataPromise
+      ]).then(async function(results) {
+        var priceRes = results[0];
+        var metadata = results[1];
+
+        if (!priceRes || priceRes.code !== 0 || !Array.isArray(priceRes.data)) {
+          console.error('[prefetch] item_price_all 返回异常');
+          _allReject(new Error('price data unavailable'));
+          return;
+        }
+
+        // ★ 合并：item_price_all 提供价格，metadata 提供名称/图标/分类
+        var merged = priceRes.data.map(function(item) {
+          var meta = metadata[item.id] || metadata[item.tid] || {};
+          var result = Object.assign({}, item, meta);
+          if (!result._category) {
+            // 尝试用 tid 在 metadata 中查找
+            var metaByTid = metadata[item.tid];
+            if (metaByTid) {
+              result = Object.assign({}, item, metaByTid);
+            } else {
+              result._category = 'unknown';
+              result.name = result.name || ('物品#' + item.id);
+            }
+          }
+          return result;
+        });
+
+        // ★ 应用上次补全的补丁（减少未知物品, 避免重复触发 10 分类补全请求）
+        merged.forEach(function(item) {
+          var patch = _metaPatch[String(item.id)] || _metaPatch[String(item.tid)];
+          if (patch) {
+            item._category = patch._category || item._category;
+            item.name = patch.name || item.name;
+            item.pic = patch.pic || item.pic;
+            if (patch.grade !== undefined && patch.grade !== null) item.grade = patch.grade;
+            if (patch.secondClassCN) item.secondClassCN = patch.secondClassCN;
+            if (patch.objectID) item.objectID = patch.objectID;
+          }
+        });
+
+        // ★ 补充 metadata 中有但 item_price_all 中没有的物品（已下架/过期物品）
+        var priceIds = {};
+        merged.forEach(function(item) { priceIds[item.id] = true; if (item.tid) priceIds[item.tid] = true; });
+        Object.keys(metadata).forEach(function(id) {
+          if (!priceIds[Number(id)] && !priceIds[id]) {
+            var meta = metadata[id];
+            merged.push(Object.assign(
+              { id: Number(id), price: 0, bl: 0, day_3_bl: 0, day_7_bl: 0, tid: meta.tid },
+              meta
+            ));
+          }
+        });
+
+        // ★ 元数据自动补全：检测合并后仍有未知分类/无名物品，从 item_list API 补全
+        var _unknownItems = merged.filter(function(item) {
+          return !item._category || item._category === 'unknown' || !item.name || item.name.indexOf('物品#') === 0;
+        });
+
+        if (_unknownItems.length > 0) {
+          console.warn('[prefetch] 发现 ' + _unknownItems.length + ' 个未知物品，启动补全...');
+
+          // Phase 1: 用已获取的 metadata 按 tid 二次匹配
+          if (Object.keys(metadata).length > 0) {
+            _unknownItems.forEach(function(item) {
+              if (item.tid && metadata[item.tid]) {
+                Object.assign(item, metadata[item.tid]);
+              }
+            });
+            _unknownItems = merged.filter(function(item) {
+              return !item._category || item._category === 'unknown' || !item.name || item.name.indexOf('物品#') === 0;
+            });
+          }
+
+          // Phase 2: 从 item_list 第1页并行拉取 10 个分类补全
+          if (_unknownItems.length > 0) {
+            var _unknownIds = {};
+            _unknownItems.forEach(function(item) { _unknownIds[item.id] = true; if (item.tid) _unknownIds[item.tid] = true; });
+
+            var _itemListPromises = CATS.map(function(cat) {
+              return fetch(proxyUrl + '?endpoint=item_list&types=' + cat + '&p=1')
+                .then(function(r) { return r.json(); })
+                .catch(function() { return null; });
+            });
+
+            try {
+              var _itemListResults = await Promise.all(_itemListPromises);
+              var _patched = 0;
+
+              for (var ci = 0; ci < CATS.length; ci++) {
+                var cat = CATS[ci];
+                var result = _itemListResults[ci];
+                if (!result || result.code !== 0 || !Array.isArray(result.data)) continue;
+                for (var ii = 0; ii < result.data.length; ii++) {
+                  var apiItem = result.data[ii];
+                  var apiId = apiItem.id;
+                  if (!apiId) continue;
+                  if (_unknownIds[apiId] || (apiItem.tid && _unknownIds[apiItem.tid])) {
+                    for (var mi = 0; mi < _unknownItems.length; mi++) {
+                      var uItem = _unknownItems[mi];
+                      if (uItem.id === apiId || (apiItem.tid && uItem.tid === apiItem.tid) || uItem.id === apiItem.tid) {
+                        uItem._category = cat;
+                        uItem.name = apiItem.name || uItem.name;
+                        uItem.pic = apiItem.pic || uItem.pic || '';
+                        if (apiItem.grade !== undefined && apiItem.grade !== null) uItem.grade = apiItem.grade;
+                        if (apiItem.objectID !== undefined && apiItem.objectID !== null) uItem.objectID = apiItem.objectID;
+                        if (apiItem.tid !== undefined && apiItem.tid !== null) uItem.tid = apiItem.tid;
+                        if (apiItem.secondClassCN) uItem.secondClassCN = apiItem.secondClassCN;
+                        if (apiItem.ShopSellType) uItem.ShopSellType = apiItem.ShopSellType;
+                        // 记录补丁, 下次加载直接使用, 不再重复请求
+                        _metaPatch[String(apiId)] = {
+                          _category: cat,
+                          name: apiItem.name || uItem.name,
+                          pic: apiItem.pic || uItem.pic || '',
+                          grade: apiItem.grade,
+                          secondClassCN: apiItem.secondClassCN,
+                          objectID: apiItem.objectID
+                        };
+                        _patched++;
+                      }
+                    }
+                  }
+                }
+              }
+
+              if (_patched > 0) {
+                try {
+                  var _pk = Object.keys(_metaPatch);
+                  if (_pk.length > _META_PATCH_MAX) {
+                    // 超出上限时淘汰最早写入的一批（Object.keys 对字符串键按插入序返回）
+                    _pk.slice(0, _pk.length - _META_PATCH_MAX).forEach(function (k) { delete _metaPatch[k]; });
+                  }
+                  localStorage.setItem(_metaPatchKey, JSON.stringify({ __ts: Date.now(), data: _metaPatch }));
+                } catch (e) {
+                  // 配额不足：直接清空。缓存丢失只是多一次补全请求，不能让它影响主流程
+                  console.warn('[prefetch] metaPatch 写入失败，已清空');
+                  try { localStorage.removeItem(_metaPatchKey); } catch (e2) {}
+                }
+                console.log('[prefetch] 补全完成: ' + _patched + ' 个物品获得元数据');
+              } else {
+                console.warn('[prefetch] item_list page1 未找到剩余未知物品的元数据');
+              }
+            } catch(e) {
+              console.warn('[prefetch] item_list 补全失败:', e.message);
+            }
+          }
+        }
+
+        _allMerged = merged;
+
+        // ★ 数据迟到时，加载层可能已判定超时并弹出「连接超时 / 重新加载」。
+        //   一旦真正拿到数据就必须撤掉该横幅，否则错误提示会一直压在
+        //   已经正常渲染出价格的页面上（慢上游下极易复现）。
+        var _lateErrWrap = document.getElementById('loadingRetryWrap');
+        if (_lateErrWrap) _lateErrWrap.style.display = 'none';
+
+        // ★ 按分类分配
+        var catMap = {};
+        CATS.forEach(function(c) { catMap[c] = []; });
+        merged.forEach(function(item) {
+          var cat = item._category;
+          if (cat && catMap[cat]) {
+            catMap[cat].push(item);
+          }
+        });
+
+        // 填充各分类对象
+        CATS.forEach(function(cat) {
+          var items = catMap[cat];
+          items.sort(function(a, b) { return _significanceScore(b) - _significanceScore(a); });
+          var o = running[cat];
+          o._resolvedData = items;
+          o._totalCount = items.length;
+          o._complete = true;
+          o._hasPage1 = true;
+          o._loadingMore = false;
+          var page1Result = { code: 0, count: items.length, data: items, _complete: true };
+          o._qr(page1Result);
+          if (typeof o._onComplete === 'function') o._onComplete(items);
+        });
+
+        // ★ 涨幅前二数据就绪
+        _topMoverData = priceRes.data;
+        _topMoverApiDone = true;
+        running._topMoverData = _topMoverData;
+        running._topMoverApiDone = true;
+
+        // ★ 数据净化：预取路径不走 js/api.js 的 sanitizeItemArray（此刻 bundle.js 尚未加载完）。
+        //   渲染层会把 id/length/width/weight 等字段直接拼进 innerHTML（见 js/render/detail.js），
+        //   这里统一收敛为有限数字，避免上游异常数据破坏 DOM 结构。
+        var NUM_FIELDS = ['id', 'tid', 'price', 'bl', 'day_3_bl', 'day_7_bl', 'day_30_bl',
+                          'grade', 'length', 'width', 'weight', 'Weight', 'price_start',
+                          'priceStart', 'day_3_price', 'day_7_price', 'day_30_price', 'is_get_time'];
+        for (var si = 0; si < merged.length; si++) {
+          var sit = merged[si];
+          for (var sf = 0; sf < NUM_FIELDS.length; sf++) {
+            var skey = NUM_FIELDS[sf];
+            if (sit[skey] === undefined || sit[skey] === null || sit[skey] === '') continue;
+            var snum = Number(sit[skey]);
+            if (!isFinite(snum)) snum = 0;
+            sit[skey] = snum;
+          }
+        }
+
+        _dataReady = true;
+        _notifyArrive(merged);
+        _allResolve(merged.slice().sort(function(a, b) { return _significanceScore(b) - _significanceScore(a); }));
+
+        // 写入缓存
+        if (typeof setCache === 'function') {
+          try { setCache({ _allItems: merged }); } catch(e) {}
+        }
+        if (typeof buildSearchIndex === 'function') {
+          try { buildSearchIndex(merged); } catch(e) {}
+        }
+        if (typeof updateCategoryIcons === 'function') {
+          try { updateCategoryIcons(merged); } catch(e) {}
+        }
+      }).catch(function(err) {
+        console.error('[prefetch] 加载失败:', err);
+        running._error = err.message || '数据加载失败，请检查网络连接';
+        _allReject(err);
+        // ★ 3 秒后仍未恢复 → 显示重试按钮（loading 层的 8s 超时可能已隐藏 loading）
+        var errWrap = document.getElementById('loadingRetryWrap');
+        var errText = document.getElementById('loadingErrorText');
+        var statusEl = document.getElementById('loadingStatus');
+        if (errWrap) errWrap.style.display = 'flex';
+        if (errText) errText.textContent = running._error;
+        if (statusEl) statusEl.textContent = '连接超时';
+      });
+
+      // ★ 暴露 API（保持与 v2 兼容）
+      running._allPage1Ready = _allReady;
+      running._totalArrived = 0;
+      running.getTotalArrived = function() { return _totalArrived; };
+      running.onItemsArrive = function(cb) { _onArriveCallbacks.push(cb); };
+      running.getAllPage1Items = function() { return _allMerged.slice(); };
+      running.isAllPage1Ready = function() { return _dataReady; };
+      running.startPagination = function() {}; // no-op: 数据一次到齐
+      running.getQueueLength = function() { return 0; };
+      running.isPaginationDone = function() { return _dataReady; };
+      running.hasCache = _hasCache;
+      running.getProgress = function() {
+        return _dataReady ? 0.98 : 0.05;
+      };
+      running.getExpectedTotal = function() { return _dataReady ? _totalArrived : 1350; };
+      // ★ 新增：分类全量检查
+      running.isCategoryComplete = function(cat) { return _dataReady; };
+      running.getCategoryLoadedCount = function(cat) {
+        var o = running[cat];
+        return o && o._resolvedData ? o._resolvedData.length : 0;
+      };
+      running.prioritizeCategory = function(cat) {}; // no-op: 数据一次到齐
+
+      return running;
+    })();
+  </script>
+  <!-- ★ 关键 CSS 内联，消除渲染阻塞请求。
+       注意：这里只放首屏必需的「两套最小令牌 + 骨架样式」，
+       不能写死单一底色——否则深色主题下会先闪一帧白屏再变黑（比不内联更刺眼）。
+       完整令牌仍在 layout.css，加载后同名变量被覆盖，取值一致。 -->
+  <style>
+    :root,html[data-theme="light"]{--bg:#f5f7fa;--surface:#ffffff;--text:#111827;--text-3:#6b7280;--brand:#a86f08;--brand-2:#8a5a05;--up:#c81e2f;--down:#067a4b;--line:rgba(17,24,39,.09)}
+    html[data-theme="dark"]{--bg:#0a0e15;--surface:#171d2a;--text:#eef1f7;--text-3:#8b95a8;--brand:#f0b542;--brand-2:#e59a2a;--up:#ff5a6e;--down:#26d08a;--line:rgba(255,255,255,.07)}
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{overscroll-behavior-y:contain}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;overflow-x:hidden;overscroll-behavior-y:contain;touch-action:manipulation;font-variant-numeric:tabular-nums}
+    .container{max-width:500px;margin:0 auto;min-height:100vh;padding-bottom:64px;touch-action:pan-y}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+    @keyframes progressShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .fade-in{animation:fadeIn .3s ease}
+    .loading-container{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 0}
+    .loading-spinner{width:40px;height:40px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}
+    .loading-text{color:var(--text-3);font-size:13px;margin-top:16px}
+    .loading-retry-wrap{display:flex;flex-direction:column;align-items:center;margin-top:8px}
+    .loading-error-text{color:var(--up);font-size:13px;text-align:center}
+    .loading-retry-btn{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border:none;border-radius:20px;padding:8px 28px;font-size:13px;font-weight:600;cursor:pointer;margin-top:10px}
+    .loading-retry-btn:active{opacity:.8}
+    .error-container{text-align:center;padding:80px 20px}
+    .error-text{color:var(--up);font-size:14px;margin-bottom:20px}
+    .retry-btn{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border:none;border-radius:20px;padding:10px 36px;font-size:14px;font-weight:600;cursor:pointer}
+    .retry-btn:active{opacity:.8}
+    .empty-container{text-align:center;padding:80px 20px}
+    .empty-icon{font-size:48px;margin-bottom:12px;opacity:.3}
+    .empty-text{color:var(--text-3);font-size:14px}
+    ::-webkit-scrollbar{width:0;height:0}
+    button.dropdown-item{background:0;border:none;width:100%;text-align:left;font-family:inherit;outline:none;-webkit-tap-highlight-color:transparent}
+    button.dropdown-item:active{background:var(--brand-bg,rgba(201,138,18,.12))}
+    button.filter-cat-chip{-webkit-tap-highlight-color:transparent}
+    button.toolbar-btn{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  </style>
+  <link rel="preload" href="css/layout.css?v=v20261025p-8e307264-fbfeb628" as="style">
+  <link rel="preload" href="css/components.css?v=v20261025p-8e307264-0025463d" as="style">
+  <link rel="stylesheet" href="css/layout.css?v=v20261025p-8e307264-fbfeb628">
+  <link rel="stylesheet" href="css/components.css?v=v20261025p-8e307264-0025463d">
+</head>
+<body>
+  <div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo-wrap">
+    <div class="loading-logo-glow" id="loadingGlow"></div>
+    <img class="loading-logo-img" id="loadingLogo" src="delta-force-logo.webp?v=2" alt="落幕查" onerror="this.src='delta-force-logo.png?v=2'">
+  </div>
+  <div class="loading-progress-wrap">
+    <div class="loading-progress-track">
+      <div class="loading-progress-bar" id="loadingProgressBar"></div>
+    </div>
+    <div class="loading-status" id="loadingStatus">正在连接数据源...</div>
+    <div class="loading-retry-wrap" id="loadingRetryWrap" style="display:none">
+      <div class="loading-error-text" id="loadingErrorText"></div>
+      <button class="loading-retry-btn" onclick="location.reload()">重新加载</button>
+    </div>
+  </div>
+</div>
+<div class="container" id="app">
+    <!-- ===== 首页（合并价格异动）===== -->
+    <div class="page active" id="page-home">
+      <div class="header">
+        <img class="header-logo" src="delta-force-logo.webp?v=2" alt="落幕查" onerror="this.src='delta-force-logo.png?v=2'">
+        <div class="header-title">落幕查</div>
+        <div class="header-subtitle">变卖物实时价格查询</div>
+        <div class="header-info">
+          <span class="refresh-all" onclick="refreshAllData()">刷新全部</span>
+          <span id="autoRefreshTime" style="font-size:10px;color:#8a93a3;margin-left:8px"></span>
+          <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="切换背景色（浅色 / 深色）">
+            <svg class="ti ti-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+            <svg class="ti ti-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            <span id="themeLabel">浅色</span>
+          </button>
+          <button class="scheme-toggle" id="schemeToggle" onclick="toggleScheme()" title="切换涨跌配色（红涨绿跌 / 绿涨红跌）"><span class="sw"><i></i><i></i></span><span id="schemeLabel">红涨</span></button>
+        </div>
+      </div>
+
+      <!-- ★ 筛选工具栏：时间 / 价格 / 分类 / 排序 四个下拉 -->
+      <div class="filter-toolbar" id="filterToolbar">
+        <button class="toolbar-btn" id="btnTime" onclick="toggleTimeDropdown()">
+          <span id="timeLabel">近1天</span><span class="toolbar-arrow">▾</span>
+        </button>
+        <button class="toolbar-btn" id="btnPrice" onclick="togglePriceDropdown()">
+          <span id="priceLabel">全部价格</span><span class="toolbar-arrow">▾</span>
+        </button>
+        <button class="toolbar-btn" id="btnFilter" onclick="toggleFilterDropdown()">
+          <span id="filterLabel">筛选</span><span class="toolbar-arrow">▾</span>
+        </button>
+        <button class="toolbar-btn" id="btnSort" onclick="toggleSortDropdown()">
+          <span id="sortLabel">综合↓</span><span class="toolbar-arrow">▾</span>
+        </button>
+      </div>
+
+      <!-- ★ 已选条件回显（chips）：可单删，可一键清空 -->
+      <div class="home-chips" id="homeFilterChips" style="display:none"></div>
+
+      <!-- ★ 时间下拉 -->
+      <div class="dropdown-panel" id="timeDropdown" style="display:none" onclick="event.stopPropagation()">
+        <button class="dropdown-item active" type="button" data-period="bl" onclick="event.stopPropagation();setHomePeriod('bl')">近1天</button>
+        <button class="dropdown-item" type="button" data-period="day_3_bl" onclick="event.stopPropagation();setHomePeriod('day_3_bl')">近3天</button>
+        <button class="dropdown-item" type="button" data-period="day_7_bl" onclick="event.stopPropagation();setHomePeriod('day_7_bl')">近7天</button>
+        <div class="dd-foot">
+          <button type="button" class="dd-btn" onclick="event.stopPropagation();resetCurrentDropdown()">重置</button>
+          <button type="button" class="dd-btn primary" onclick="event.stopPropagation();applyHomeDropdown()">查看 <span class="dd-apply-count">0</span> 件</button>
+        </div>
+      </div>
+
+      <!-- ★ 价格下拉：快捷档 + 自定义区间 -->
+      <div class="dropdown-panel" id="priceDropdown" style="display:none" onclick="event.stopPropagation()">
+        <button class="dropdown-item active" type="button" data-range="all" onclick="event.stopPropagation();setHomePriceRange('all')">全部价格</button>
+        <button class="dropdown-item" type="button" data-range="lt1w" onclick="event.stopPropagation();setHomePriceRange('lt1w')">&lt; 1万</button>
+        <button class="dropdown-item" type="button" data-range="1-10w" onclick="event.stopPropagation();setHomePriceRange('1-10w')">1万 ~ 10万</button>
+        <button class="dropdown-item" type="button" data-range="10-100w" onclick="event.stopPropagation();setHomePriceRange('10-100w')">10万 ~ 100万</button>
+        <button class="dropdown-item" type="button" data-range="gt100w" onclick="event.stopPropagation();setHomePriceRange('gt100w')">&gt; 100万</button>
+        <div class="dd-custom">
+          <div class="dd-custom-title">自定义区间（游戏币 ¥）</div>
+          <div class="dd-range">
+            <input id="homePriceMinInput" type="number" inputmode="numeric" min="0" placeholder="最低" oninput="event.stopPropagation();setHomePriceCustom()">
+            <span class="dd-range-sep">—</span>
+            <input id="homePriceMaxInput" type="number" inputmode="numeric" min="0" placeholder="最高" oninput="event.stopPropagation();setHomePriceCustom()">
+          </div>
+          <div class="dd-custom-hint">填了自定义区间就以它为准，不再叠加快捷档</div>
+        </div>
+        <div class="dd-foot">
+          <button type="button" class="dd-btn" onclick="event.stopPropagation();resetCurrentDropdown()">重置</button>
+          <button type="button" class="dd-btn primary" onclick="event.stopPropagation();applyHomeDropdown()">查看 <span class="dd-apply-count">0</span> 件</button>
+        </div>
+      </div>
+
+      <!-- ★ 筛选下拉（十大分类，支持多选，带件数） -->
+      <div class="dropdown-panel" id="filterDropdown" style="display:none" onclick="event.stopPropagation()">
+        <div class="dd-custom-title" id="filterCatHint">默认全部类型，可多选</div>
+        <div class="filter-cat-list" id="filterCatList">
+          <button class="filter-cat-chip" type="button" data-cat="all" onclick="event.stopPropagation();toggleHomeCategory('all')">全部类型<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="gun" onclick="event.stopPropagation();toggleHomeCategory('gun')">枪械<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="ammo" onclick="event.stopPropagation();toggleHomeCategory('ammo')">子弹<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="acc" onclick="event.stopPropagation();toggleHomeCategory('acc')">配件<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="helmet" onclick="event.stopPropagation();toggleHomeCategory('helmet')">头盔<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="armor" onclick="event.stopPropagation();toggleHomeCategory('armor')">护甲<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="chest" onclick="event.stopPropagation();toggleHomeCategory('chest')">胸挂<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="bag" onclick="event.stopPropagation();toggleHomeCategory('bag')">背包<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="key" onclick="event.stopPropagation();toggleHomeCategory('key')">钥匙卡<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="collection" onclick="event.stopPropagation();toggleHomeCategory('collection')">收集品<span class="cat-cnt"></span></button>
+          <button class="filter-cat-chip" type="button" data-cat="consume" onclick="event.stopPropagation();toggleHomeCategory('consume')">消耗品<span class="cat-cnt"></span></button>
+        </div>
+        <div class="dd-foot">
+          <button type="button" class="dd-btn" onclick="event.stopPropagation();resetCurrentDropdown()">重置</button>
+          <button type="button" class="dd-btn primary" onclick="event.stopPropagation();applyHomeDropdown()">查看 <span class="dd-apply-count">0</span> 件</button>
+        </div>
+      </div>
+
+      <!-- ★ 排序下拉 -->
+      <div class="dropdown-panel" id="sortDropdown" style="display:none" onclick="event.stopPropagation()">
+        <button class="dropdown-item active" type="button" data-sort="default" data-dir="" onclick="event.stopPropagation();setHomeSort('default','desc')">默认 (综合热度)</button>
+        <button class="dropdown-item" type="button" data-sort="change" data-dir="desc" onclick="event.stopPropagation();setHomeSort('change','desc')">涨跌幅 (高到低)</button>
+        <button class="dropdown-item" type="button" data-sort="change" data-dir="asc" onclick="event.stopPropagation();setHomeSort('change','asc')">涨跌幅 (低到高)</button>
+        <button class="dropdown-item" type="button" data-sort="price" data-dir="desc" onclick="event.stopPropagation();setHomeSort('price','desc')">价格 (高到低)</button>
+        <button class="dropdown-item" type="button" data-sort="price" data-dir="asc" onclick="event.stopPropagation();setHomeSort('price','asc')">价格 (低到高)</button>
+        <div class="dd-foot">
+          <button type="button" class="dd-btn" onclick="event.stopPropagation();resetCurrentDropdown()">重置</button>
+          <button type="button" class="dd-btn primary" onclick="event.stopPropagation();applyHomeDropdown()">查看 <span class="dd-apply-count">0</span> 件</button>
+        </div>
+      </div>
+
+      <!-- ★ 首页内联搜索：边输边给联想，点选直接进详情 -->
+      <div class="search-bar" id="homeSearchBar">
+        <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a93a3" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="homeSearchInput" type="search" placeholder="搜索物品名称..." autocomplete="off"
+               oninput="event.stopPropagation();onHomeSearchInput(this.value)"
+               onfocus="event.stopPropagation()"
+               onkeydown="if(event.key==='Enter'){event.stopPropagation();showSearchWith(this.value)}">
+        <span class="search-clear" id="homeSearchClear" onclick="event.stopPropagation();clearHomeSearch()">✕</span>
+        <span class="search-go" onclick="event.stopPropagation();showSearchWith(document.getElementById('homeSearchInput').value)">搜索</span>
+        <div class="home-sugg" id="homeSugg"></div>
+      </div>
+      <div class="topmover" id="topMover" style="display:none"></div>
+      <div class="price-alert" id="priceAlert"></div>
+      <div class="price-changed-section" id="priceChangedSection">
+        <div class="price-changed-title">收藏价格提醒</div>
+        <div id="priceChangedItems"></div>
+      </div>
+
+      <!-- ★ 市场宽度卡：上涨/平盘/下跌家数 + 涨跌分布条（2026-10-24 起替代「均价」伪指标） -->
+      <div class="home-statbar" id="homeStatBar">
+        <div class="hs-cells">
+          <div class="hs-cell"><span class="hs-k">上涨</span><span class="hs-v up" id="hsUp">--</span></div>
+          <div class="hs-cell"><span class="hs-k">平盘</span><span class="hs-v" id="hsFlat">--</span></div>
+          <div class="hs-cell"><span class="hs-k">下跌</span><span class="hs-v down" id="hsDn">--</span></div>
+          <div class="hs-cell"><span class="hs-k">行情</span><span class="hs-mood flat" id="hsMood">持平</span></div>
+        </div>
+        <div class="hs-breadth">
+          <div class="hs-b-up" id="hsBUp"></div>
+          <div class="hs-b-flat" id="hsBFlat"></div>
+          <div class="hs-b-down" id="hsBDn"></div>
+        </div>
+        <div class="hs-foot"><span>结果 <b id="hsCount">--</b> 件</span><span id="hsUpd">--</span></div>
+      </div>
+
+      <!-- ★ 首页物品列表 -->
+      <div class="home-movers-section" id="homeMoversSection">
+        <div id="homeMoversList"></div>
+      </div>
+    </div>
+
+    <!-- ===== 市场总览仪表盘（桌面 ≥1024px 双栏的右栏默认视图；移动端不展示） ===== -->
+    <div class="page" id="page-dash">
+      <div class="nav-bar">
+        <div class="nav-back" style="visibility:hidden">‹</div>
+        <div class="nav-title">市场总览</div>
+        <div class="nav-actions">
+          <span class="nav-action" onclick="refreshAllData()" title="刷新全部行情">刷新</span>
+        </div>
+      </div>
+      <div class="dash">
+        <div class="dash-nums">
+          <div class="dash-num"><span class="v up" id="dashUp">--</span><span class="k">上涨</span></div>
+          <div class="dash-num"><span class="v" id="dashFlat">--</span><span class="k">平盘</span></div>
+          <div class="dash-num"><span class="v down" id="dashDown">--</span><span class="k">下跌</span></div>
+        </div>
+        <div class="dash-mood" id="dashMood">--</div>
+        <div class="dash-breadth">
+          <div class="db-up" id="dashBUp"></div><div class="db-flat" id="dashBFlat"></div><div class="db-down" id="dashBDn"></div>
+        </div>
+        <div class="dash-sec">板块表现 <small id="dashSecNote">点击进入板块</small></div>
+        <div class="dash-sector-grid" id="dashSectorGrid"></div>
+        <div class="dash-sec">涨跌幅榜 <small id="dashRankNote">TOP 5</small></div>
+        <div class="dash-rank-cols">
+          <div class="dash-rank-card"><div class="drh"><span>涨幅榜</span><span class="up">TOP 5</span></div><div id="dashRankUp"></div></div>
+          <div class="dash-rank-card"><div class="drh"><span>跌幅榜</span><span class="down">TOP 5</span></div><div id="dashRankDown"></div></div>
+        </div>
+        <div class="dash-foot" id="dashFoot">--</div>
+      </div>
+    </div>
+
+    <!-- ===== 列表页 ===== -->
+    <div class="page" id="page-list">
+      <div class="nav-bar">
+        <div class="nav-back" onclick="goBack()">‹ 返回</div>
+        <div class="nav-title" id="listTitle">物品列表</div>
+        <div class="nav-actions">
+          <span class="nav-action" onclick="refreshCurrentList()" title="刷新当前分类">刷新</span>
+          <span class="nav-action" onclick="showSearch()" title="搜索">搜索</span>
+        </div>
+      </div>
+      <div class="list-stats" id="listStats"></div>
+      <div class="sort-bar" id="sortBar">
+        <button class="sort-btn active" data-sort="price" onclick="setSort('price')">价格</button>
+        <button class="sort-btn" data-sort="change" onclick="setSort('change')">涨跌幅</button>
+      </div>
+      <div id="listContent"></div>
+      <div id="pagination"></div>
+    </div>
+
+    <!-- ===== 详情页 ===== -->
+    <div class="page" id="page-detail">
+      <div class="nav-bar">
+        <div class="nav-back" onclick="goBack()">‹ 返回</div>
+        <div class="nav-title">物品详情</div>
+        <div class="nav-actions">
+          <span class="nav-action" id="detailFavBtn" onclick="toggleCurrentFavorite()" title="收藏"></span>
+          <span class="nav-action" onclick="refreshCurrentItem()" title="刷新此物品">刷新</span>
+        </div>
+      </div>
+      <div id="detailContent">
+        <div class="loading-container"><div class="loading-spinner"></div><div class="loading-text">正在向API请求最新数据...</div></div>
+      </div>
+    </div>
+
+    <!-- ===== 搜索页 ===== -->
+    <div class="page slide-in" id="page-search">
+      <div class="search-header">
+        <div class="search-input-wrap">
+          <input type="text" id="searchInput" placeholder="输入物品名称搜索..." autocomplete="off">
+          <span class="search-clear" id="searchClear" onclick="clearSearch()">✕</span>
+        </div>
+        <div class="search-cancel" onclick="hideSearch()">取消</div>
+      </div>
+      <div class="search-hint" id="searchHint">
+        <div class="hint-title">搜索提示</div>
+        <div class="hint-text">支持搜索物品名称关键词<br>例如：头盔、弹匣、钥匙、瞄具...</div>
+      </div>
+      <!-- 搜索历史 -->
+      <div class="history-section" id="searchHistory" style="display:none">
+        <div class="history-title">
+          <span>搜索历史</span>
+          <span class="history-clear" onclick="clearSearchHistory()">清空</span>
+        </div>
+        <div class="history-tags" id="historyTags"></div>
+      </div>
+      <!-- 最近浏览 -->
+      <div class="history-section" id="recentViewSection" style="display:none">
+        <div class="history-title">
+          <span>最近浏览</span>
+          <span class="history-clear" onclick="clearRecentViews()">清空</span>
+        </div>
+        <div class="recent-items" id="recentViewItems"></div>
+      </div>
+      <!-- 收藏物品 -->
+      <div class="history-section" id="favoritesSection" style="display:none">
+        <div class="history-title">
+          <span>我的收藏</span>
+          <span class="history-clear" onclick="clearFavorites()">清空</span>
+        </div>
+        <div class="recent-items" id="favoritesItems"></div>
+      </div>
+      <div id="searchResults"></div>
+    </div>
+
+
+    <!-- ===== 我的收藏页 ===== -->
+    <div class="page" id="page-favtab">
+      <div class="nav-bar">
+        <div class="nav-back" onclick="switchTab('home')">‹ 首页</div>
+        <div class="nav-title">我的收藏</div>
+        <div class="nav-actions">
+          <span class="nav-action" onclick="refreshFavTab()" title="刷新">刷新</span>
+        </div>
+      </div>
+      <div id="favtabContent"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <!-- ===== 底部导航 ===== -->
+  <div class="bottom-nav" id="bottomNav">
+    <div class="tab active" data-tab="home" onclick="switchTab('home')">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 4 6-8"/><path d="M14 7h4v4"/></svg>
+      <span class="tab-label">首页</span>
+    </div>
+    <div class="tab" data-tab="favtab" onclick="switchTab('favtab')">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.7l5.4-.8z"/></svg>
+      <span class="tab-label">我的收藏</span>
+    </div>
+  </div>
+
+  <!-- 涨跌配色按钮文案与已存方案同步（默认红涨） -->
+  <script>
+    (function () { var lb = document.getElementById('schemeLabel'); if (lb) lb.textContent = document.documentElement.dataset.scheme === 'intl' ? '绿涨' : '红涨'; })();
+  </script>
+
+  <!-- Service Worker 注册（必须在 bundle 之前加载） -->
+  <script src="js/sw-register.js?v=v20261025q-8e307264" defer></script>
+  <!-- ★ 单文件 bundle：减少 HTTP 请求 6→1，defer 不阻塞解析 -->
+  <script src="js/bundle.js?v=v20261025q-8e307264" defer></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "delta-force-price-query",
+  "version": "3.1.0",
+  "description": "《三角洲行动》变卖物价格查询：分类、搜索、收藏、涨跌榜与 30 天走势。",
+  "main": "server.js",
+  "author": "hxj-2888",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

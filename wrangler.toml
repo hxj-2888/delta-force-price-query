@@ -1,0 +1,13 @@
+name = "delta-force-v5"
+pages_build_output_dir = "."
+compatibility_date = "2026-07-27"
+
+# 在 Cloudflare 控制台创建 D1 与 KV 后填入自己的 ID。
+[[d1_databases]]
+binding = "DB"
+database_name = "delta-force-prices"
+database_id = "<D1_DATABASE_ID>"
+
+[[kv_namespaces]]
+binding = "METADATA_KV"
+id = "<KV_NAMESPACE_ID>"
