@@ -1,0 +1,352 @@
+// ===== workers/cron/index.js — Cloudflare Cron Worker 定时任务 =====
+// 功能清单: 每日价格采集(item_price_all→D1 price_history表) | 元数据增量刷新(item_list翻页→KV)
+// 去重控制(同一天不重复记录) | 单次执行防重(checkKey KV锁) | 分批写入(500条/批)
+// 调度: cron "0 22 * * *" (UTC 22:00 = 北京时间 06:00)
+// 依赖: Cloudflare D1(price_history) KV(METADATA_KV) 环境变量(API_TOKEN)
+// 改动影响: 修改cron表达式→影响采集频率; 修改D1写入→影响价格历史数据; 修改元数据刷新→影响KV缓存
+// 保留策略: 只保留近 30 天明细（前端只展示 30 天曲线），超出部分每天自动删除，不做归档。
+// 阈值集中在 RETENTION_DAYS，改这一处即可；删除按北京时间计算，与查询侧 date('now','+8 hours','-30 days') 对齐。
+
+const API_HOST = 'orzice.com';
+const API_PATH = '/workApi/v1/sjz_api';
+const CATS = ['gun', 'ammo', 'acc', 'helmet', 'armor', 'chest', 'bag', 'key', 'collection', 'consume'];
+const META_FIELDS = ['name', 'pic', 'grade', 'ShopSellType', 'desc', 'secondClassCN', 'length', 'width', 'weight', 'Weight', 'objectID', 'tid'];
+
+// 价格历史保留天数。前端 /api/history 只查近 30 天，更早的数据读不到，因此直接删除、不归档。
+const RETENTION_DAYS = 30;
+
+// ===== 带超时的 fetch =====
+// Cron Worker 有 CPU / 墙钟预算，任何上游调用都必须设上限。
+// 超时或网络错误统一返回 null，由调用方降级，避免整个 scheduled 任务被拖死。
+async function fetchWithTimeout(url, init, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, Object.assign({}, init, { signal: controller.signal }));
+  } catch (e) {
+    console.error(`[Cron] 请求失败/超时(${timeoutMs}ms): ${e.message}`);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export default {
+  async scheduled(event, env, ctx) {
+    // 单 cron "0 22 * * *" 同时处理：每日价格采集 + 每日增量元数据检查
+    await runScheduled(env, ctx);
+  },
+};
+
+// ===== 采集心跳（2026-09-27）：每次执行把状态写入 KV，供 /api/cron-status 查询 =====
+// 背景：2026-08-30~09-23 上游 token 失效导致 Cron 静默失败 25 天无人察觉
+//（backfill 仅回溯 3 天，超过即成永久缺口）。心跳让断档当天就能被发现。
+// KV 写频：每天 1~2 次，远低于 1 key/秒 限制。
+const HEARTBEAT_KEY = 'cron_heartbeat';
+
+async function writeHeartbeat(env, patch) {
+  if (!env.METADATA_KV) return;
+  try {
+    let prev = {};
+    try {
+      const raw = await env.METADATA_KV.get(HEARTBEAT_KEY, 'json');
+      if (raw && typeof raw === 'object') prev = raw;
+    } catch (_) { /* 读失败视作空，不阻断主流程 */ }
+    await env.METADATA_KV.put(HEARTBEAT_KEY, JSON.stringify(Object.assign({}, prev, patch)));
+  } catch (e) {
+    console.error('[Cron-heartbeat] 写入失败:', e.message);
+  }
+}
+
+function beijingDateStr(d) {
+  return new Date(d.getTime() + 8 * 3600 * 1000).toISOString().split('T')[0];
+}
+
+async function runScheduled(env, ctx) {
+  const nowIso = new Date().toISOString();
+  const token = (env.API_TOKEN || '').trim();
+  if (!token) {
+    console.error('[Cron] API_TOKEN 未配置');
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: 'API_TOKEN 未配置' });
+    return;
+  }
+
+  // ★ 拉取 item_price_all（价格+元数据共享这一次请求）
+  // 必须加超时：Cron Worker 有 CPU / 墙钟上限，上游挂起会把本次执行整个拖死，
+  // 导致「价格采集 + 元数据刷新」双双失败且无人察觉。阈值与 Pages Functions 对齐（25s）。
+  console.log('[Cron] 拉取 item_price_all...');
+  const priceUrl = `https://${API_HOST}${API_PATH}/item_price_all?token=${encodeURIComponent(token)}`;
+  const priceResp = await fetchWithTimeout(priceUrl, {
+    headers: { 'User-Agent': 'DeltaForceCron/1.0', 'Accept': 'application/json' },
+  }, 25000);
+  if (!priceResp) {
+    console.error('[Cron] item_price_all 请求超时，放弃本次执行');
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: 'item_price_all 请求超时' });
+    return;
+  }
+  if (!priceResp.ok) {
+    console.error(`[Cron] item_price_all 返回 ${priceResp.status}`);
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: `item_price_all HTTP ${priceResp.status}` });
+    return;
+  }
+
+  let priceData;
+  try {
+    priceData = await priceResp.json();
+  } catch (e) {
+    console.error(`[Cron] item_price_all JSON 解析失败: ${e.message}`);
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: 'item_price_all JSON 解析失败' });
+    return;
+  }
+  if (priceData.code !== 0 || !Array.isArray(priceData.data)) {
+    console.error(`[Cron] item_price_all 异常: code=${priceData.code}`);
+    await writeHeartbeat(env, { lastRunAt: nowIso, lastFailAt: nowIso, lastFailReason: `item_price_all code=${priceData.code}` });
+    return;
+  }
+  console.log(`[Cron] 获取到 ${priceData.data.length} 个物品`);
+
+  // ★ 补录：检查昨天是否有记录，没有就用当前数据补上（防止单次失败造成永久缺口）
+  if (env.DB) {
+    await backfillMissingDays(env, priceData);
+  }
+
+  // 任务 1: 采集每日价格到 D1（成功与否决定心跳的 lastSuccessDate）
+  const collect = await collectDailyPrices(env, priceData);
+  if (collect && collect.ok) {
+    await writeHeartbeat(env, {
+      lastSuccessDate: beijingDateStr(new Date()),
+      lastSuccessAt: new Date().toISOString(),
+      itemCount: collect.items,
+    });
+  } else {
+    await writeHeartbeat(env, { lastFailAt: new Date().toISOString(), lastFailReason: 'D1 批量写入失败' });
+  }
+
+  // 任务 2: 增量刷新元数据到 KV（仅检查是否有新物品）
+  await refreshMetadata(env, priceData, token);
+
+  // 任务 3: 每天清理 30 天前的历史数据（前端只展示近 30 天，超出即删）
+  await dailyCleanup(env);
+}
+
+// ===== 每日数据清理（删除 RETENTION_DAYS 天前的历史记录，不归档）=====
+// 说明：
+//   1) 每天执行而非每月，是为了让表体积恒定在 ~31 天，不会出现「月初删一次、月末涨到 60 天」的锯齿；
+//   2) 每日约删除 1360 行，占 D1 免费写入配额(10 万/日)的 1.4%，可忽略；
+//   3) 阈值与查询侧 /api/history 的 -30 days 完全一致，删掉的数据本来就读不到。
+async function dailyCleanup(env) {
+  if (!env.DB) return;
+  try {
+    const result = await env.DB.prepare(
+      `DELETE FROM price_history WHERE recorded_date < date('now', '+8 hours', '-${RETENTION_DAYS} days')`
+    ).run();
+    const n = result && result.meta ? result.meta.changes : 0;
+    if (n > 0) console.log(`[Cron-cleanup] 已清理 ${RETENTION_DAYS} 天前的历史数据, ${n} 行`);
+  } catch (e) {
+    console.error('[Cron-cleanup] 清理失败:', e.message);
+  }
+}
+
+// ===== 补录缺失天（最多回溯 3 天，防止 API 超时/D1 故障造成永久缺口） =====
+async function backfillMissingDays(env, priceData) {
+  const beijingNow = new Date(new Date().getTime() + 8 * 3600 * 1000);
+  const todayStr = beijingNow.toISOString().split('T')[0];
+  const items = priceData.data.filter(item => item.id && item.price > 0);
+
+  for (let daysAgo = 1; daysAgo <= 3; daysAgo++) {
+    const target = new Date(beijingNow);
+    target.setDate(target.getDate() - daysAgo);
+    const dateStr = target.toISOString().split('T')[0];
+    // 跳过今天（由 collectDailyPrices 处理）
+    if (dateStr === todayStr) continue;
+
+    try {
+      const row = await env.DB.prepare(
+        `SELECT COUNT(*) as cnt FROM price_history WHERE recorded_date = ?`
+      ).bind(dateStr).first();
+
+      if (row && row.cnt > 100) {
+        // 该天已有足够数据，跳过但继续检查更早的天
+        console.log(`[Backfill] ${dateStr} 已有 ${row.cnt} 条记录，跳过`);
+        continue;
+      }
+
+      console.log(`[Backfill] ${dateStr} 仅 ${row ? row.cnt : 0} 条，补录中...`);
+      // ★ INSERT OR IGNORE: 只补缺失行, 不覆盖当天已有的真实历史数据
+      //   补录的数据用当前价格近似, 仅作缺口占位（避免 30 天曲线断点）
+      const stmts = items.map(item =>
+        env.DB.prepare(`INSERT OR IGNORE INTO price_history (item_id, price, name, recorded_date) VALUES (?, ?, ?, ?)`)
+          .bind(item.id, item.price, item.name || '', dateStr)
+      );
+
+      const BATCH = 100;
+      let written = 0;
+      for (let i = 0; i < stmts.length; i += BATCH) {
+        try {
+          await env.DB.batch(stmts.slice(i, i + BATCH));
+          written += Math.min(BATCH, stmts.length - i);
+        } catch (e) {
+          console.error(`[Backfill] 批次写入失败 (${dateStr}, offset=${i}):`, e.message);
+        }
+      }
+      console.log(`[Backfill] ${dateStr} 补录完成: ${written} 条`);
+    } catch (e) {
+      console.error(`[Backfill] ${dateStr} 查询/写入失败:`, e.message);
+      break; // 连续失败则停止，下个 cron 周期再试
+    }
+  }
+}
+
+// ===== 每日价格采集（每日无条件写入，保证 30 天曲线无缺口） =====
+// 返回 { ok, items, written, errors } 供心跳判断采集是否成功
+async function collectDailyPrices(env, priceData) {
+  if (!env.DB) {
+    console.error('[Cron-price] D1 数据库未绑定');
+    return { ok: false, items: 0, written: 0, errors: 0 };
+  }
+
+  try {
+    const items = priceData.data.filter(item => item.id && item.price > 0);
+    console.log(`[Cron-price] ${items.length} 个有效物品`);
+    if (items.length === 0) return { ok: false, items: 0, written: 0, errors: 0 };
+
+    const now = new Date();
+    const beijing = new Date(now.getTime() + 8 * 3600 * 1000);
+    const today = beijing.toISOString().split('T')[0];
+
+    // ★ 每日无条件全量写入，价格不变也存一行，保证每天都有数据点
+    // D1 免费版 5GB，按 1307 物品 × 365 天 = ~48 万行/年 ≈ 50MB/年，完全够用
+    // ★ 用 UPSERT 取代 INSERT OR REPLACE：REPLACE 的语义是「删旧行 + 插新行」，
+    //   会让 id 自增列不断 churn 并推高 sqlite_sequence；UPSERT 是原地更新同一行。
+    const statements = items.map(item =>
+      env.DB.prepare(
+        'INSERT INTO price_history (item_id, price, name, recorded_date) VALUES (?, ?, ?, ?) ' +
+        'ON CONFLICT(item_id, recorded_date) DO UPDATE SET price = excluded.price, name = excluded.name'
+      ).bind(item.id, item.price, item.name || '', today)
+    );
+
+    const BATCH_SIZE = 100;
+    let written = 0;
+    let errors = 0;
+    for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+      try {
+        await env.DB.batch(statements.slice(i, i + BATCH_SIZE));
+        written += Math.min(BATCH_SIZE, statements.length - i);
+      } catch (batchErr) {
+        console.error(`[Cron-price] 批量写入失败 (offset=${i}):`, batchErr.message);
+        errors++;
+      }
+    }
+    console.log(`[Cron-price] 完成: ${items.length} 个物品, ${written} 条已写入` + (errors ? `, ${errors} 批失败` : ''));
+    return { ok: errors === 0, items: items.length, written, errors };
+  } catch (err) {
+    console.error('[Cron-price] 执行失败:', err.message);
+    return { ok: false, items: 0, written: 0, errors: 0 };
+  }
+}
+
+// ===== 每日增量元数据刷新（全量翻页，直到找到全部新物品）=====
+async function refreshMetadata(env, priceData, token) {
+  if (!env.METADATA_KV) { console.error('[Cron-meta] METADATA_KV 未绑定'); return; }
+
+  try {
+    // Step 1: 提取全量物品 ID（复用已拉取的 priceData）
+    const priceItemIds = new Set();
+    priceData.data.forEach(item => { if (item.id) priceItemIds.add(Number(item.id)); if (item.tid) priceItemIds.add(Number(item.tid)); });
+
+    // Step 2: 读取现有 KV 元数据
+    let existingMeta = {};
+    try {
+      const kvRaw = await env.METADATA_KV.get('metadata', 'json');
+      if (kvRaw && typeof kvRaw === 'object') existingMeta = kvRaw;
+    } catch(e) {
+      console.warn('[Cron-meta] KV 读取失败，视作空元数据:', e.message);
+    }
+    const existingIds = new Set(Object.keys(existingMeta).map(Number));
+    console.log(`[Cron-meta] KV 现有 ${existingIds.size} 个物品元数据`);
+
+    // Step 3: 找出新 ID
+    const newIdSet = new Set();
+    priceItemIds.forEach(id => { if (!existingIds.has(id) && id > 0) newIdSet.add(id); });
+    console.log(`[Cron-meta] 发现 ${newIdSet.size} 个新物品 ID`);
+
+    if (newIdSet.size === 0) { console.log('[Cron-meta] 无需更新，退出'); return; }
+
+    // Step 4: 逐分类翻页扫描，直到所有新物品都被找到（或翻完全部分类）
+    // ★ 时间预算：全量翻页可达上百次请求，而 Cron Worker 有 CPU / 墙钟上限。
+    //   超出预算就中断，已收集到的部分照常写回 KV；剩下没找到的 ID 下次 cron 会重新计算
+    //   （newIdSet 每次都从 priceData 与现有 KV 对比得出），不会留下永久缺口。
+    const META_DEADLINE_MS = 40 * 1000;
+    const REQ_TIMEOUT_MS = 15000;
+    const metaStartedAt = Date.now();
+    let newCount = 0;
+    let budgetExceeded = false;
+
+    for (const cat of CATS) {
+      if (newIdSet.size === 0) break;
+      let page = 1;
+      let totalPages = 1;
+      while (page <= totalPages && newIdSet.size > 0) {
+        if (Date.now() - metaStartedAt > META_DEADLINE_MS) { budgetExceeded = true; break; }
+
+        const url = `https://${API_HOST}${API_PATH}/item_list?types=${cat}&p=${page}&token=${encodeURIComponent(token)}`;
+        const resp = await fetchWithTimeout(url, {
+          headers: { 'User-Agent': 'DeltaForceMetaRefresh/1.0', 'Accept': 'application/json' },
+        }, REQ_TIMEOUT_MS);
+
+        let data = null;
+        if (resp && resp.ok) {
+          try { data = await resp.json(); } catch (e) { data = null; }
+        }
+        if (!resp || !resp.ok) {
+          console.warn(`[Cron-meta] ${cat} p${page} 请求失败，跳过该分类`);
+          break;
+        }
+        if (!data || data.code !== 0 || !Array.isArray(data.data)) {
+          console.warn(`[Cron-meta] ${cat} p${page} 返回异常，跳过该分类`);
+          break;
+        }
+
+        if (page === 1) {
+          const perPage = data.data.length || 10;
+          totalPages = Math.ceil((data.count || data.data.length) / perPage) || 1;
+        }
+
+        for (const item of data.data) {
+          if (!item.id) continue;
+          const id = Number(item.id);
+          const tid = item.tid ? Number(item.tid) : 0;
+          if (!newIdSet.has(id) && !(tid && newIdSet.has(tid))) continue;
+
+          const meta = { _category: cat };
+          META_FIELDS.forEach(f => {
+            if (item[f] !== undefined && item[f] !== null && item[f] !== '') {
+              meta[f] = item[f];
+            }
+          });
+          existingMeta[String(id)] = meta;
+          newIdSet.delete(id);
+          if (tid) newIdSet.delete(tid);
+          newCount++;
+        }
+        page++;
+      }
+      if (budgetExceeded) break;
+    }
+
+    if (budgetExceeded) {
+      console.warn(`[Cron-meta] 已用满 ${META_DEADLINE_MS / 1000}s 时间预算，提前中断；剩余 ${newIdSet.size} 个将在下次 cron 继续`);
+    }
+
+    // Step 5: 写回 KV（即使被预算中断，已收集到的部分也要落盘，避免白跑一趟）
+    if (newCount > 0) {
+      await env.METADATA_KV.put('metadata', JSON.stringify(existingMeta));
+      console.log(`[Cron-meta] 完成: ${newCount} 个新物品元数据已写入 KV, 总计 ${Object.keys(existingMeta).length} 件` +
+        (newIdSet.size > 0 ? `，仍有 ${newIdSet.size} 个未找到（可能在深分页或已下架，下次重试）` : ''));
+    } else {
+      console.log('[Cron-meta] 未找到新物品的元数据（可能在深分页或已下架，下次重试）');
+    }
+  } catch (err) {
+    console.error('[Cron-meta] 执行失败:', err.message);
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "delta-force-price-query",
+  "version": "1.0.0",
+  "description": "落幕查 - 变卖物实时价格查询工具",
+  "private": true,
+  "main": "server.js",
+  "bin": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node -e \"if(require('fs').existsSync('scripts/build.js'))require('child_process').execSync('node scripts/build.js',{stdio:'inherit'})\"",
+    "check": "node scripts/build.js --check",
+    "test": "node --test",
+    "lint": "node scripts/lint.js",
+    "generate-metadata": "node scripts/generate-metadata.js",
+    "smoke:home": "node tools/home-ui-smoke.cjs",
+    "smoke:scrollbar": "node tools/scrollbar-smoke.cjs",
+    "smoke:theme": "node tools/theme-smoke.cjs",
+    "predeploy": "node scripts/build.js"
+  },
+  "keywords": ["落幕查", "价格查询", "变卖物"],
+  "author": "",
+  "license": "UNLICENSED"
+}

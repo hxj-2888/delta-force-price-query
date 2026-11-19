@@ -1,0 +1,39 @@
+# 依赖
+node_modules/
+package-lock.json
+
+# 敏感文件 — 绝不上传
+.env*
+project.private.config.json
+
+# 分发产物（改走 GitHub Release，不入库；部署下载见 download.html 的 Release 链接）
+delta-force.apk
+delta-force-portable.zip
+
+# Cloudflare Workers 本地缓存
+.wrangler/
+
+# Vercel 本地配置
+.vercel/
+
+# 构建产物/生成目录（源文件全部纳入版本控制）
+installer/
+dist/
+weapp.zip
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+*.log
+# Android signing key / build output (not committed)
+android/release.keystore
+android/release.keystore.old-*
+android/*.idsig
+android/DeltaForce.apk
+
+# 设计评审产物（demo）的生成数据文件，可由 design/gen-demo-data.cjs 重新生成
+design/demo-data.js
+design/real-prices.json
+
+# 本地 D1 导出备份（运维产物，体积大且含价格历史；不入库）
+delta-force-backups/
